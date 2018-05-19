@@ -50,7 +50,7 @@ echo '' >> SPECS/mediacenter.spec
 echo 'AutoReq:  0' >> SPECS/mediacenter.spec
 echo 'Requires: libnotify librtmp lame vorbis-tools alsa-lib' >> SPECS/mediacenter.spec
 echo 'Requires: libX11 libX11-common libxcb libXau libXdmcp libuuid' >> SPECS/mediacenter.spec
-echo 'Requires: gtk2 gtk2-engines mesa-libGL gnutls gtk2 lame libgomp' >> SPECS/mediacenter.spec
+echo 'Requires: gtk3 mesa-libGL gnutls lame libgomp webkit2gtk3' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
 echo 'License: Copyright 1998-2013, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468' >> SPECS/mediacenter.spec
 echo 'URL:     http://www.jriver.com/' >> SPECS/mediacenter.spec
