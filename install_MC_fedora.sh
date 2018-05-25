@@ -50,7 +50,7 @@ echo '' >> SPECS/mediacenter.spec
 echo 'AutoReq:  0' >> SPECS/mediacenter.spec
 echo 'Requires: libnotify librtmp lame vorbis-tools alsa-lib' >> SPECS/mediacenter.spec
 echo 'Requires: libX11 libX11-common libxcb libXau libXdmcp libuuid' >> SPECS/mediacenter.spec
-echo 'Requires: gtk3 mesa-libGL gnutls lame libgomp webkit2gtk3' >> SPECS/mediacenter.spec
+echo 'Requires: gtk3 mesa-libGL gnutls lame libgomp webkit2gtk3 ca-certificates' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
 echo 'License: Copyright 1998-2013, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468' >> SPECS/mediacenter.spec
 echo 'URL:     http://www.jriver.com/' >> SPECS/mediacenter.spec
@@ -113,5 +113,10 @@ if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.fc${release}.
 	sudo dnf install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.fc${release}.x86_64.rpm -y && echo "${bold}JRiver Media Center ${version} installed successfully!${normal}"
 else
     echo "${bold}Conversion Failed!${normal}"
+fi
+
+echo "${bold}Symlinking ca-certificates for license registration...${normal}"
+if [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
+  sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ca-certificates.crt
 fi
 
