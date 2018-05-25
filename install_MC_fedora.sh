@@ -9,32 +9,31 @@ mversion=${version%%.*}
 bold=$(tput bold)
 normal=$(tput sgr0)
 
-echo "${bold}Checking for RPMFusion repos${normal}"
 
-rpm --quiet --query rpmfusion-free-release || sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
-rpm --quiet --query rpmfusion-nonfree-release || sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+if ! rpm --quiet --query rpmfusion-free-release; then
+    echo "${bold}Installing rpmfusion-free-release repo...${normal}"
+    sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+fi
 
-echo "${bold}Checking for rpm-build${normal}"
+if ! rpm --quiet --query rpmfusion-nonfree-release; then
+    echo "${bold}Installing rpmfusion-nonfree-release repo...${normal}"
+    sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+fi
 
-if ! rpm -qa --nosignature | grep -qw "rpm-build-[0-9]"; then
-    echo "${bold}Attempting to install rpm-build package...${normal}"
+if ! rpm --quiet --query rpm-build; then
+    echo "${bold}Installing rpm-build...${normal}"
     sudo dnf install rpm-build -y
 fi
 
-echo "${bold}Checking for dpkg${normal}"
-
-if ! rpm -qa --nosignature | grep -qw dpkg; then
-    echo "${bold}Attempting to install dpkg...${normal}"
+if ! rpm --quiet --query dpkg; then
+    echo "${bold}Installing dpkg...${normal}"
     sudo dnf install dpkg -y
 fi
 
-echo "${bold}Making build directories${normal}"
-mkdir -p SOURCES SPECS
+[ -d SOURCES ] || mkdir -p SOURCES
+[ -d SPECS ] || mkdir -p SPECS
 
-echo "${bold}Creating input files${normal}"
-
-# Create SPEC file
-
+# Create spec file
 echo 'Name:    MediaCenter' > SPECS/mediacenter.spec
 echo 'Version: %{_tversion}' >> SPECS/mediacenter.spec
 echo 'Release: %{?_variation:%{_variation}}%{?dist}' >> SPECS/mediacenter.spec
@@ -58,6 +57,7 @@ echo '' >> SPECS/mediacenter.spec
 echo '%description' >> SPECS/mediacenter.spec
 echo 'Media Center is more than a world class player.' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
+echo '%global __os_install_post %{nil}' >> SPECS/mediacenter.spec
 echo '%prep' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
 echo '%build' >> SPECS/mediacenter.spec
@@ -74,7 +74,6 @@ echo '"%{_libdir}/jriver"' >> SPECS/mediacenter.spec
 echo '%{_datadir}' >> SPECS/mediacenter.spec
 
 # Create .desktop file
-
 echo '[Desktop Entry]' > SOURCES/mediacenter${mversion}.desktop
 echo 'Name=Media Center' >> SOURCES/mediacenter${mversion}.desktop
 echo 'GenericName=Music Player' >> SOURCES/mediacenter${mversion}.desktop
@@ -93,19 +92,13 @@ echo "StartupWMClass=Media Center ${mversion}" >> SOURCES/mediacenter${mversion}
 echo '' >> SOURCES/mediacenter${mversion}.desktop
 echo "Name[en_US]=mediacenter${mversion}" >> SOURCES/mediacenter${mversion}.desktop
 
-echo "${bold}Checking for source DEB..."
-
-if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ] ; then
-    echo "${bold}Downloading source DEB...${normal}"
+if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
+  echo "${bold}Downloading source DEB...${normal}"
 	wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
 fi
 
-echo "${bold}Found source DEB!${normal}"
-
-cd ${builddir}/SPECS
-
 echo "${bold}Converting DEB to RPM...${normal}"
-
+cd ${builddir}/SPECS
 rpmbuild --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec > /dev/null 2>&1
 
 if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.fc${release}.x86_64.rpm ] ; then
@@ -113,10 +106,13 @@ if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.fc${release}.
 	sudo dnf install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.fc${release}.x86_64.rpm -y && echo "${bold}JRiver Media Center ${version} installed successfully!${normal}"
 else
     echo "${bold}Conversion Failed!${normal}"
+    exit 1
 fi
 
-echo "${bold}Symlinking ca-certificates for license registration...${normal}"
 if [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
+  echo "${bold}Symlinking ca-certificates for license registration...${normal}"
   sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ca-certificates.crt
 fi
+
+exit 0
 
