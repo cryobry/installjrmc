@@ -1,23 +1,37 @@
 #!/usr/bin/env bash
 
+# Get MC version from user input
 builddir=`readlink -f .`
 version=${1:?You must enter a MediaCenter version.}
 release=`sed -nre "s/.*:([0-9]+)$/\1/gp" /etc/system-release-cpe`
 variation=${version##*.}
 mversion=${version%%.*}
 
+# Prettify output
 bold=$(tput bold)
 normal=$(tput sgr0)
 
+# Get host OS name and version
+if [ -e /etc/os-release ]; then 
+  source /etc/os-release
+else
+  echo "Can't determine host OS, exiting..."
+  exit 1
+fi
+
+# Use RHEL RPMFusion repos for CentOS
+if [ $ID = "centos" ]; then
+  ID="el"
+fi
 
 if ! rpm --quiet --query rpmfusion-free-release; then
     echo "${bold}Installing rpmfusion-free-release repo...${normal}"
-    sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+    sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm
 fi
 
 if ! rpm --quiet --query rpmfusion-nonfree-release; then
     echo "${bold}Installing rpmfusion-nonfree-release repo...${normal}"
-    sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+    sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/${ID}/rpmfusion-nonfree-release-${VERSION_ID}.noarch.rpm
 fi
 
 if ! rpm --quiet --query rpm-build; then
@@ -111,7 +125,7 @@ fi
 
 if [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
   echo "${bold}Symlinking ca-certificates for license registration...${normal}"
-  sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ca-certificates.crt
+  sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
 fi
 
 exit 0
