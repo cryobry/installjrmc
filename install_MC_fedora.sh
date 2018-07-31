@@ -36,10 +36,10 @@ if ! rpm --quiet --query rpmfusion-free-release; then
     sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm
 fi
 
-if ! rpm --quiet --query rpmfusion-nonfree-release; then
-    echo "${bold}Installing rpmfusion-nonfree-release repo...${normal}"
-    sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/${ID}/rpmfusion-nonfree-release-${VERSION_ID}.noarch.rpm
-fi
+#if ! rpm --quiet --query rpmfusion-nonfree-release; then
+#    echo "${bold}Installing rpmfusion-nonfree-release repo...${normal}"
+#    sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/${ID}/#rpmfusion-nonfree-release-${VERSION_ID}.noarch.rpm
+#fi
 
 if ! rpm --quiet --query rpm-build; then
     echo "${bold}Installing rpm-build...${normal}"
