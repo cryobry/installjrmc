@@ -28,6 +28,9 @@ elif [ $ID = "fedora" ]; then
   ID="fedora"
   SID="fc"
   PM="dnf"
+else
+  echo "OS does not appear to be CentOS or Fedora, exiting..."
+  exit 1
 fi
 
 # If necessary, install RPMFusion repos, dpkg, and rpm-build
@@ -94,6 +97,7 @@ echo '%files' >> SPECS/mediacenter.spec
 echo "%{_bindir}/mediacenter${mversion}" >> SPECS/mediacenter.spec
 echo '"%{_libdir}/jriver"' >> SPECS/mediacenter.spec
 echo '%{_datadir}' >> SPECS/mediacenter.spec
+echo '/etc/security/limits.d/mediacenter.conf' >> SPECS/mediacenter.spec
 
 # Acquire deb
 if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
