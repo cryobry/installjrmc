@@ -13,24 +13,24 @@ normal=$(tput sgr0)
 
 # Get host OS name and version
 if [ -e /etc/os-release ]; then 
-  source /etc/os-release
+    source /etc/os-release
 else
-  echo "Can't determine host OS, exiting..."
-  exit 1
+    echo "Can't determine host OS, exiting..."
+    exit 1
 fi
 
 # Set repo IDs and package manager based on distro
 if [ $ID = "centos" ]; then
-  ID="el"
-  SID="el"
-  PM="yum"
+    ID="el"
+    SID="el"
+    PM="yum"
 elif [ $ID = "fedora" ]; then
-  ID="fedora"
-  SID="fc"
-  PM="dnf"
+    ID="fedora"
+    SID="fc"
+    PM="dnf"
 else
-  echo "OS does not appear to be CentOS or Fedora, exiting..."
-  exit 1
+    echo "OS does not appear to be CentOS or Fedora, exiting..."
+    exit 1
 fi
 
 # If necessary, install RPMFusion repos, dpkg, and rpm-build
@@ -41,7 +41,7 @@ fi
 
 #if ! rpm --quiet --query rpmfusion-nonfree-release; then
 #    echo "${bold}Installing rpmfusion-nonfree-release repo...${normal}"
-#    sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/${ID}/#rpmfusion-nonfree-release-${VERSION_ID}.noarch.rpm
+#    sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/nonfree/${ID}/rpmfusion-nonfree-release-${VERSION_ID}.noarch.rpm
 #fi
 
 if ! rpm --quiet --query rpm-build; then
@@ -97,23 +97,33 @@ echo '%files' >> SPECS/mediacenter.spec
 echo "%{_bindir}/mediacenter${mversion}" >> SPECS/mediacenter.spec
 echo '"%{_libdir}/jriver"' >> SPECS/mediacenter.spec
 echo '%{_datadir}' >> SPECS/mediacenter.spec
-echo '/etc/security/limits.d/mediacenter.conf' >> SPECS/mediacenter.spec
+echo "/etc/security/limits.d/mediacenter${mversion}.conf" >> SPECS/mediacenter.spec
 
 # Acquire deb
 if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
-  echo "${bold}Downloading source DEB...${normal}"
-	wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
+    echo "${bold}Downloading source DEB...${normal}"
+    wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
+    if [ $? -ne 0 ]; then
+        echo "${bold}Specified Media Center version not found!${normal}"
+        read -p "${bold}If beta version, enter beta password to retry, otherwise Ctrl-C to exit: ${normal}" betapwd
+        wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+        if [ $? -ne 0 ]; then
+            echo "Beta password wrong or specified Media Center version not found, exiting..."
+            exit 1
+        fi
+    fi
+
 fi
 
 # Run rpm-build
 echo "${bold}Converting DEB to RPM...${normal}"
 cd ${builddir}/SPECS
-rpmbuild --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec > /dev/null 2>&1
+rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
 
 # Install RPM
 if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${release}.x86_64.rpm ] ; then
-	echo "${bold}Attempting to install RPM...${normal}"
-	sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${release}.x86_64.rpm -y && echo "${bold}JRiver Media Center ${version} installed successfully!${normal}"
+    echo "${bold}Attempting to install RPM...${normal}"
+    sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${release}.x86_64.rpm -y && echo "${bold}JRiver Media Center ${version} installed successfully!${normal}"
 else
     echo "${bold}Conversion Failed!${normal}"
     exit 1
@@ -121,10 +131,10 @@ fi
 
 # Symlink certificates
 if [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
-  if [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
-    echo "${bold}Symlinking ca-certificates for license registration...${normal}"
-    sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
-  fi
+    if [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
+        echo "${bold}Symlinking ca-certificates for license registration...${normal}"
+        sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
+    fi
 fi
 
 exit 0
