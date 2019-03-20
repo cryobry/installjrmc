@@ -95,9 +95,9 @@ echo '%postun -p /sbin/ldconfig' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
 echo '%files' >> SPECS/mediacenter.spec
 echo "%{_bindir}/mediacenter${mversion}" >> SPECS/mediacenter.spec
-echo '"%{_libdir}/jriver"' >> SPECS/mediacenter.spec
+echo '%{_libdir}/jriver' >> SPECS/mediacenter.spec
 echo '%{_datadir}' >> SPECS/mediacenter.spec
-echo "/etc/security/limits.d/mediacenter${mversion}.conf" >> SPECS/mediacenter.spec
+echo '/etc/security/limits.d/*' >> SPECS/mediacenter.spec
 
 # Acquire deb
 if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
@@ -112,10 +112,9 @@ if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
             exit 1
         fi
     fi
-
 fi
 
-# Run rpm-build
+# Run rpmbuild
 echo "${bold}Converting DEB to RPM...${normal}"
 cd ${builddir}/SPECS
 rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
