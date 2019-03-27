@@ -104,12 +104,15 @@ if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
     echo "${bold}Downloading source DEB...${normal}"
     wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
     if [ $? -ne 0 ]; then
-        echo "${bold}Specified Media Center version not found!${normal}"
-        read -p "${bold}If beta version, enter beta password to retry, otherwise Ctrl-C to exit: ${normal}" betapwd
-        wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+        echo "${bold}Specified Media Center version not found! Retrying the test repo...${normal}"
+        wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
         if [ $? -ne 0 ]; then
-            echo "Beta password wrong or specified Media Center version not found, exiting..."
-            exit 1
+            read -p "${bold}Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: ${normal}" betapwd
+            wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+            if [ $? -ne 0 ]; then
+                echo "Beta password wrong or specified Media Center version not found, exiting..."
+                exit 1
+            fi
         fi
     fi
 fi
