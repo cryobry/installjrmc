@@ -9,9 +9,11 @@
 1. Download the script
 
 2a. Install or update MC (the script will ask for your sudo password to install packages): 
-`./install_MC_fedora.sh 25.0.16` (where 25.0.16 is the current Debian AMD64 version)
+`./install_MC_fedora.sh 25.0.41` (where 25.0.41 is the current Debian AMD64 version)
 
-2b. If beta version, the script will prompt for the beta team password 
+2b. If no version number is specified the script will try to scrape Interact for the latest MC version
+
+2c. If beta version, the script will prompt for the beta team password 
 
 3. (Optional) Install your .mjr license: 
   `mediacenter25 /RestoreFromFile YOURMEDIACENTER23MJRFILE.mjr`

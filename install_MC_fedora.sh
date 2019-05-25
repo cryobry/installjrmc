@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
 
-# Get MC version from user input
-builddir=`readlink -f .`
-version=${1:?You must enter a MediaCenter version.}
-release=`sed -nre "s/.*:([0-9]+)$/\1/gp" /etc/system-release-cpe`
-variation=${version##*.}
-mversion=${version%%.*}
-
 # Prettify output
 bold=$(tput bold)
 normal=$(tput sgr0)
 
+# URL for latest MC for Linux board (for automatic version scraping)
+boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
+
 # Get host OS name and version
-if [ -e /etc/os-release ]; then 
+if [ -e /etc/os-release ]; then
     source /etc/os-release
 else
     echo "Can't determine host OS, exiting..."
@@ -32,6 +28,37 @@ else
     echo "OS does not appear to be CentOS or Fedora, exiting..."
     exit 1
 fi
+
+# set build directory in current path
+builddir=`readlink -f .`
+
+# Get version number from user input or scrape Interact
+if [ -z ${1} ]; then
+    echo "${bold}No version number specified, attempting automatic mode...${normal}"
+    version=$(curl -s "${boardurl}" | grep -o "2[0-9]\.[0-9]\.[0-9]\+" | head -n 1)
+    while [ -z ${version} ]; do
+        read -p "${bold}Version number not found, re-enter it now, otherwise Ctrl-C to exit: ${normal}" version
+    done
+else
+    version=${1}
+fi
+
+variation=${version##*.}
+mversion=${version%%.*}
+
+# in automatic mode, skip building/reinstalling the same version
+if [ -z ${1} ]; then
+    installed_ver="$(rpm --query MediaCenter)"
+    to_be_installed_ver="MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64"
+    if [ "${installed_ver}" == "${to_be_installed_ver}" ]; then
+        echo "JRiver Media Center is already up-to-date!"
+        exit 0
+    fi
+fi
+
+
+echo "${bold}Attempting to install version ${version}...${normal}"
+
 
 # If necessary, install RPMFusion repos, dpkg, and rpm-build
 if ! rpm --quiet --query rpmfusion-free-release; then
@@ -76,7 +103,7 @@ echo 'Requires: libX11 libX11-common libxcb libXau libXdmcp libuuid' >> SPECS/me
 echo 'Requires: gtk3 mesa-libGL gnutls lame libgomp webkit2gtk3 ca-certificates' >> SPECS/mediacenter.spec
 echo 'Requires: gstreamer1 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-ugly gstreamer1-libav' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
-echo 'License: Copyright 1998-2013, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468' >> SPECS/mediacenter.spec
+echo 'License: Copyright 1998-2019, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468' >> SPECS/mediacenter.spec
 echo 'URL:     http://www.jriver.com/' >> SPECS/mediacenter.spec
 echo '' >> SPECS/mediacenter.spec
 echo '%description' >> SPECS/mediacenter.spec
@@ -99,33 +126,35 @@ echo '%{_libdir}/jriver' >> SPECS/mediacenter.spec
 echo '%{_datadir}' >> SPECS/mediacenter.spec
 echo '/etc/security/limits.d/*' >> SPECS/mediacenter.spec
 
-# Acquire deb
-if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
-    echo "${bold}Downloading source DEB...${normal}"
-    wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
-    if [ $? -ne 0 ]; then
-        echo "${bold}Specified Media Center version not found! Retrying the test repo...${normal}"
-        wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
+# Check for existing rpm, if it doesn't exist, acquire deb and rpmbuild it
+if [ ! -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
+    # Acquire deb
+    if [ ! -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
+        echo "${bold}Downloading source DEB...${normal}"
+        wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
         if [ $? -ne 0 ]; then
-            read -p "${bold}Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: ${normal}" betapwd
-            wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+            echo "${bold}Specified Media Center version not found! Retrying the test repo...${normal}"
+            wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
             if [ $? -ne 0 ]; then
-                echo "Beta password wrong or specified Media Center version not found, exiting..."
-                exit 1
+                read -p "${bold}Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: ${normal}" betapwd
+                wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+                if [ $? -ne 0 ]; then
+                    echo "Beta password wrong or specified Media Center version not found, exiting..."
+                    exit 1
+                fi
             fi
         fi
     fi
+    # Run rpmbuild
+    echo "${bold}Converting DEB to RPM...${normal}"
+    cd ${builddir}/SPECS
+    rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
 fi
 
-# Run rpmbuild
-echo "${bold}Converting DEB to RPM...${normal}"
-cd ${builddir}/SPECS
-rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
-
 # Install RPM
-if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${release}.x86_64.rpm ] ; then
+if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
     echo "${bold}Attempting to install RPM...${normal}"
-    sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${release}.x86_64.rpm -y && echo "${bold}JRiver Media Center ${version} installed successfully!${normal}"
+    sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm -y && echo "${bold}JRiver Media Center ${version} installed successfully!${normal}"
 else
     echo "${bold}Conversion Failed!${normal}"
     exit 1
@@ -140,4 +169,3 @@ if [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
 fi
 
 exit 0
-
