@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+shopt -s extglob
+
+# Usage: ./install_MC_fedora.sh [-v|--version] [version] [-a|--auto] [-b|--build-only] [-i|--install-repo]
+# e.g. ./install_MC_fedora.sh -v 25.0.41
+# If no version number is specified (i.e. ./install_MC_fedora.sh or ./install_MC_fedora.sh --build-only), automatic mode will be attempted
 
 # URL for latest MC for Linux board (for automatic version scraping)
 boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
@@ -7,16 +12,79 @@ boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
 ####### FUNCTIONS ########
 ##########################
 
+parse_inp () {
+    # clear user vars
+    build_only_mode=false
+    auto_mode=false
+    install_mode=false
+
+    # parse user input
+    while (( "$#" )); do
+        case "$1" in
+            -i |--install-repo )
+                echo "Installing repo file!"
+                install_mode=true
+                ;;
+            -a |--auto )
+                echo "Using auto mode!"
+                auto_mode=true
+                ;;
+            -b |--build-only )
+                echo "Using build-only mode!"
+                build_only_mode=true
+                ;;
+            -v |--version )
+                echo "Using manual mode!"
+                shift
+                version="$1"
+                ;;
+            +([0-9]).[0-9].+([0-9]) )
+                echo "Using manual mode!"
+                version="$1"
+        esac
+        shift
+    done
+
+    # if no version number specified, enter auto_mode
+    [ -z $version ] && [ $auto_mode == false ] %% [ $install_mode == false ] && echo "Using auto mode!" && auto_mode=true
+}
+
+
+find_os () {
+
+    if [ $build_only_mode == false ]; then
+        if [ -e /etc/os-release ]; then
+            source /etc/os-release
+            if [ $ID = "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
+                ID="el"
+                SID="el"
+                PM="yum"
+            elif [ $ID = "fedora" ]; then
+                ID="fedora"
+                SID="fc"
+                PM="dnf"
+            elif [ $install_mode == false ]; then
+                echo "You are not running Fedora or CentOS >=8, falling back to build-only mode..."
+                build_only_mode=true
+            fi
+        elif [ $install_mode == false ]; then
+            echo "You are not running Fedora or CentOS >=8, falling back to build-only mode..."
+            build_only_mode=true
+        fi
+    fi
+}
+
+
 get_source_deb () {
 
+    # Skip if in install mode
+    [ $install_mode == true ] && return
+
     # Get version number from user input or scrape Interact
-    if [ ! -z ${1} ]; then
-        version=${1}
-    else
-        echo "No version number specified, attempting automatic mode..."
+    if [ $auto_mode == true ]; then
         version=$(curl -s "${boardurl}" | grep -o "2[0-9]\.[0-9]\.[0-9]\+" | head -n 1)
         while [ -z ${version} ]; do
-            read -p "Version number not found, re-enter it now, otherwise Ctrl-C to exit: " version
+            read -p "Version number cannot be scraped, re-enter it now manually, otherwise Ctrl-C to exit: " version
         done
     fi
 
@@ -25,10 +93,10 @@ get_source_deb () {
     mversion=${version%%.*}
 
     # in automatic mode and build only mode, skip building/reinstalling the same version
-    if [ -z ${1} ]; then
-        if [ ! -z ${build_only_mode} ]; then
-            if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
-                echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm already exists!"
+    if [ $auto_mode == true ]; then
+        if [ $build_only_mode == true ]; then
+            if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
+                echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm already exists!"
                 exit 0
             fi
         else
@@ -61,29 +129,25 @@ get_source_deb () {
 
 install_dependencies () {
 
-    if [ -z ${build_only_mode} ]; then
-        if ! rpm --quiet --query rpmfusion-free-release; then
-            echo "Installing rpmfusion-free-release repo..."
-            sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm
-        fi
-        if ! rpm --quiet --query rpm-build; then
-            echo "Installing rpm-build..."
-            sudo ${PM} install rpm-build -y
-        fi
-        if ! rpm --quiet --query dpkg; then
-            echo "Installing dpkg..."
-            sudo ${PM} install dpkg -y
-        fi
+    # Skip if in install mode
+    [ $install_mode == true ] && return
+
+    if [ $build_only_mode == false ]; then
+        if ! rpm --quiet --query rpmfusion-free-release; then echo "Installing rpmfusion-free-release repo..."; \
+            sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm; fi
+        if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build..."; sudo ${PM} install rpm-build -y; fi
+        if ! rpm --quiet --query dpkg; then echo "Installing dpkg..."; sudo ${PM} install dpkg -y; fi
     else
-        pkgs='rpm dpkg'
-        if ! dpkg -s ${pkgs} >/dev/null 2>&1; then
-          sudo ${PM} install -y ${pkgs}
-        fi
+        command -v rpmbuild >/dev/null 2>&1 || { echo "Please install rpmbuild, cannot continue, aborting..." >&2; exit 1; }
+        command -v dpkg >/dev/null 2>&1 || { echo "Please install dpkg, cannot continue, aborting..." >&2; exit 1; }
     fi
 }
 
 
 build_rpm () {
+
+    # Skip if in install mode
+    [ $install_mode == true ] && return
 
     # If necessary, make build directories
     [ -d SOURCES ] || mkdir -p SOURCES
@@ -97,7 +161,7 @@ build_rpm () {
     echo 'Group:   Applications/Media' >> SPECS/mediacenter.spec
     echo "Source0: http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-%{_version}-amd64.deb" >> SPECS/mediacenter.spec
     echo '' >> SPECS/mediacenter.spec
-    if [ -z ${build_only_mode} ]; then
+    if [ $build_only_mode == false ]; then
         echo 'BuildRequires: rpm >= 4.11.0' >> SPECS/mediacenter.spec
         echo 'BuildRequires: dpkg' >> SPECS/mediacenter.spec
     fi
@@ -134,29 +198,42 @@ build_rpm () {
 
     # Run rpmbuild
     cd ${builddir}/SPECS
-    rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
+    rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" \
+             --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
 }
 
 
-# Install RPM
 install_rpm () {
-    if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
-        echo "Attempting to install RPM..."
+
+    # Install mode
+    if [ $install_mode == true ]; then
+
+        echo "Attempting to install repo file"
+        sudo bash -c 'cat << EOF > /etc/yum.repos.d/jriver.repo
+[jriver]
+name=JRiver Media Center repo by BryanC
+baseurl=https://repos.bryanroessler.com/jriver
+gpgcheck=0
+EOF'
+        echo "Attempting to install JRiver Media Center version ${version} from repo..."
+        sudo ${PM} update && sudo ${PM} install MediaCenter -y
+
+    elif [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
+        echo "Attempting to install version ${version}..."
         sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm -y && echo "JRiver Media Center ${version} installed successfully!"
     else
-        echo "Installation Failed!"
         echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm is missing!"
+        echo "Installation Failed!"
         exit 1
     fi
 
     # Symlink certificates
-    if [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
-        if [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
-            echo "Symlinking ca-certificates for license registration..."
-            sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
-        fi
+    if [ ! -e /etc/ssl/certs/ca-certificates.crt ] && [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
+        echo "Symlinking ca-certificates for license registration..."
+        sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
     fi
 }
+
 
 
 ##########################
@@ -164,42 +241,13 @@ install_rpm () {
 ##########################
 
 # set build directory to current path
-builddir=`readlink -f .`
+builddir="$(pwd)"
+parse_inp "${@}"
+find_os
+get_source_deb
+install_dependencies
+echo "Building version ${version}, please wait..."
+build_rpm
+[ $build_only_mode == false ] && install_rpm
 
-# Get host OS name and version and set repo IDs and package manager based on distro
-if [ -e /etc/os-release ]; then
-    source /etc/os-release
-    if [ $ID = "centos" ]; then
-        ID="el"
-        SID="el"
-        PM="yum"
-        get_source_deb
-        install_dependencies
-        echo "Attempting to build version ${version}..." && build_rpm
-        echo "Build complete! Attempting to install version ${version}..." && install_rpm
-    elif [ $ID = "fedora" ]; then
-        ID="fedora"
-        SID="fc"
-        PM="dnf"
-        get_source_deb
-        install_dependencies
-        echo "Attempting to build version ${version}..." && build_rpm
-        echo "Build complete! Attempting to install version ${version}..." && install_rpm
-    else
-        echo "You are not running Fedora or CentOS, entering build-only mode..."
-        ID="fedora"
-        SID=""
-        PM="apt-get"
-        VERSION_ID=""
-        build_only_mode=1
-        get_source_deb
-        install_dependencies
-        echo "Attempting to build version ${version}..." && build_rpm
-        echo "Build complete!"
-    fi
-else
-    echo "Can't determine host OS, exiting..."
-    exit 1
-fi
-
-exit $?
+exit 0
