@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 shopt -s extglob
 
-# Usage: ./install_MC_fedora.sh [-v|--version] [version] [-a|--auto] [-b|--build-only] [-i|--install-repo]
-# e.g. ./install_MC_fedora.sh -v 25.0.41
-# If no version number is specified (i.e. ./install_MC_fedora.sh or ./install_MC_fedora.sh --build-only), automatic mode will be attempted
+# Usage: ./install_MC_fedora.sh [-v|--version] [version] [-b|--build-mode] [-i|--install-repo] [-p|--password]
+# e.g. ./install_MC_fedora.sh -v 25.0.48
+# If no version number is specified (i.e. ./install_MC_fedora.sh or ./install_MC_fedora.sh -b), the script
+# will attempt to install the latest version from Interact
 
 # URL for latest MC for Linux board (for automatic version scraping)
 boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
@@ -12,10 +13,10 @@ boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
 ####### FUNCTIONS ########
 ##########################
 
-parse_inp () {
+parse_input_and_version () {
+
     # clear user vars
-    build_only_mode=false
-    auto_mode=false
+    build_mode=false
     install_mode=false
 
     # parse user input
@@ -25,51 +26,56 @@ parse_inp () {
                 echo "Installing repo file!"
                 install_mode=true
                 ;;
-            -a |--auto )
-                echo "Using auto mode!"
-                auto_mode=true
-                ;;
-            -b |--build-only )
-                echo "Using build-only mode!"
-                build_only_mode=true
+            -b |--build-mode )
+                echo "Using build mode!"
+                build_mode=true
                 ;;
             -v |--version )
-                echo "Using manual mode!"
                 shift
                 version="$1"
                 ;;
+            -p |--password )
+                shift
+                betapwd="$1"
+                ;;
             +([0-9]).[0-9].+([0-9]) )
-                echo "Using manual mode!"
                 version="$1"
+                ;;
         esac
         shift
     done
 
-    # if no version number specified, enter auto_mode
-    [ -z $version ] && [ $auto_mode == false ] %% [ $install_mode == false ] && echo "Using auto mode!" && auto_mode=true
+    # If version number not supplied by user, scrape Interact
+    [ -z "$version" ] && version=$(curl -s "$boardurl" | grep -o "2[0-9]\.[0-9]\.[0-9]\+" | head -n 1)
+    [ -z "$version" ] && read -t 60 -p "Version number cannot be scraped, re-enter it now manually, otherwise Ctrl-C to exit: " version
+    [ -z "$version" ] && echo "No version number available, exiting..." && exit 0
+
+    # parse version number
+    variation=${version##*.}
+    mversion=${version%%.*}
 }
 
 
 find_os () {
 
-    if [ $build_only_mode == false ]; then
+    if [ "$build_mode" == false ]; then
         if [ -e /etc/os-release ]; then
             source /etc/os-release
-            if [ $ID = "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
+            if [ "$ID" = "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
                 ID="el"
                 SID="el"
                 PM="yum"
-            elif [ $ID = "fedora" ]; then
+            elif [ "$ID" = "fedora" ]; then
                 ID="fedora"
                 SID="fc"
                 PM="dnf"
-            elif [ $install_mode == false ]; then
-                echo "You are not running Fedora or CentOS >=8, falling back to build-only mode..."
-                build_only_mode=true
+            elif [ "$install_mode" == false ]; then
+                echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
+                build_mode=true
             fi
-        elif [ $install_mode == false ]; then
-            echo "You are not running Fedora or CentOS >=8, falling back to build-only mode..."
-            build_only_mode=true
+        elif [ "$install_mode" == false ]; then
+            echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
+            build_mode=true
         fi
     fi
 }
@@ -77,62 +83,41 @@ find_os () {
 
 get_source_deb () {
 
-    # Skip if in install mode
-    [ $install_mode == true ] && return
-
-    # Get version number from user input or scrape Interact
-    if [ $auto_mode == true ]; then
-        version=$(curl -s "${boardurl}" | grep -o "2[0-9]\.[0-9]\.[0-9]\+" | head -n 1)
-        while [ -z ${version} ]; do
-            read -p "Version number cannot be scraped, re-enter it now manually, otherwise Ctrl-C to exit: " version
-        done
-    fi
-
-    # parse version number
-    variation=${version##*.}
-    mversion=${version%%.*}
-
-    # in automatic mode and build only mode, skip building/reinstalling the same version
-    if [ $auto_mode == true ]; then
-        if [ $build_only_mode == true ]; then
-            if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
-                echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm already exists!"
-                exit 0
-            fi
-        else
-            installed_ver="$(rpm --quiet --query MediaCenter)"
-            to_be_installed_ver="MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64"
-            if [ "${installed_ver}" == "${to_be_installed_ver}" ]; then
-                echo "MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64 is already installed!"
-                exit 0
-            fi
-        fi
-    fi
-
-    # Acquire DEB if missing
+    # If deb file exists, skip download
     if [ -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
         echo "Using local DEB file: $builddir/SOURCES/MediaCenter-${version}-amd64.deb"
+        return
+    fi
+
+    # Acquire DEB
+    echo "Attempting to download MC $version DEB file..."
+    wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
+               http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
+    if [ $? -ne 0 ]; then
+        echo "Specified Media Center version not found! Retrying the test repo..."
+        wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
+                   http://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
+    fi
+    if [ $? -ne 0 ]; then
+        [ -z $betapwd ] && read -t 60 -p "Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: " betapwd
+        [ -z $betapwd ] && echo "Cannot find DEB file, re-check version number or beta password. Exiting..." && exit 1
+        wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
+                   http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+        [ $? -ne 0 ] && echo "Cannot find DEB file, re-check version number or beta password. Exiting..." && exit 1
+    fi
+
+    if [ -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
+        echo "Downloaded MC $version DEB file to $builddir/SOURCES/MediaCenter-${version}-amd64.deb"
     else
-        echo "Downloading source DEB..."
-        wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
-        if [ $? -ne 0 ]; then
-            echo "Specified Media Center version not found! Retrying the test repo..."
-            wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
-            while [ $? -ne 0 ]; do
-                read -p "Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: " betapwd
-                wget -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
-            done
-        fi
+        echo "Downloaded DEB file missing or corrupted, exiting..."
+        exit 1
     fi
 }
 
 
 install_dependencies () {
 
-    # Skip if in install mode
-    [ $install_mode == true ] && return
-
-    if [ $build_only_mode == false ]; then
+    if [ $build_mode == false ]; then
         if ! rpm --quiet --query rpmfusion-free-release; then echo "Installing rpmfusion-free-release repo..."; \
             sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm; fi
         if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build..."; sudo ${PM} install rpm-build -y; fi
@@ -146,8 +131,14 @@ install_dependencies () {
 
 build_rpm () {
 
-    # Skip if in install mode
-    [ $install_mode == true ] && return
+    # skip rebuilding the rpm if it exists
+    if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
+        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm already exists! Skipping build step..."
+        return
+    elif [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then 
+        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm already exists! Skipping build step..."
+        return
+    fi
 
     # If necessary, make build directories
     [ -d SOURCES ] || mkdir -p SOURCES
@@ -161,7 +152,7 @@ build_rpm () {
     echo 'Group:   Applications/Media' >> SPECS/mediacenter.spec
     echo "Source0: http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-%{_version}-amd64.deb" >> SPECS/mediacenter.spec
     echo '' >> SPECS/mediacenter.spec
-    if [ $build_only_mode == false ]; then
+    if [ $build_mode == false ]; then
         echo 'BuildRequires: rpm >= 4.11.0' >> SPECS/mediacenter.spec
         echo 'BuildRequires: dpkg' >> SPECS/mediacenter.spec
     fi
@@ -198,6 +189,7 @@ build_rpm () {
 
     # Run rpmbuild
     cd ${builddir}/SPECS
+    echo "Building version ${version}, please wait..."
     rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" \
              --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
 }
@@ -205,34 +197,69 @@ build_rpm () {
 
 install_rpm () {
 
-    # Install mode
-    if [ $install_mode == true ]; then
+    # Skip reinstalling the same version
+    installed_ver="$(rpm --quiet --query MediaCenter)"
+    to_be_installed_ver="MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64"
+    if [ "${installed_ver}" == "${to_be_installed_ver}" ]; then
+        echo "MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64 is already installed! Exiting..."
+        return
+    fi
 
-        echo "Attempting to install repo file"
-        sudo bash -c 'cat << EOF > /etc/yum.repos.d/jriver.repo
+    if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
+        echo "Attempting to install version ${version}..."
+        sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm -y
+        if [ $? -eq 0 ]; then
+            echo "JRiver Media Center ${version} was installed successfully!" 
+        else
+            echo "JRiver Media Center ${version} installation failed!"
+            exit 1
+        fi
+    else
+        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm is missing!"
+        echo "JRiver Media Center ${version} installation failed!"
+        exit 1
+    fi
+}
+
+
+install_repo () {
+
+    echo "Installing repo file to /etc/yum.repos.d/jriver.repo"
+    sudo bash -c 'cat << EOF > /etc/yum.repos.d/jriver.repo
 [jriver]
 name=JRiver Media Center repo by BryanC
 baseurl=https://repos.bryanroessler.com/jriver
 gpgcheck=0
 EOF'
-        echo "Attempting to install JRiver Media Center version ${version} from repo..."
-        sudo ${PM} update && sudo ${PM} install MediaCenter -y
 
-    elif [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
-        echo "Attempting to install version ${version}..."
-        sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm -y && echo "JRiver Media Center ${version} installed successfully!"
+    echo "Installing latest JRiver Media Center from repo..."
+    sudo ${PM} update && sudo ${PM} install MediaCenter -y
+    if [ $? -eq 0 ]; then
+        echo "JRiver Media Center installed successfully!"
+        echo "You can check for future MC updates by running \"sudo dnf|yum update\""
+        echo "To remove the repo file run \"sudo rm /etc/yum.repos.d/jriver.repo\""
     else
-        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm is missing!"
-        echo "Installation Failed!"
+        echo "JRiver Media Center installation failed!"
         exit 1
     fi
+}
 
-    # Symlink certificates
+
+symlink_certs_and_restore () {
+
     if [ ! -e /etc/ssl/certs/ca-certificates.crt ] && [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
         echo "Symlinking ca-certificates for license registration..."
         sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
+        read -p "To install your .mjr license, enter the full filepath to your .mjr file, or enter Ctrl-C to skip: " restorefile
+        while [ ! -z "$restorefile" ] || [ ! -f "$restorefile" ]; do
+            echo "File not found!"
+            read -p "To install your .mjr license, enter the full filepath to your .mjr file, or enter Ctrl-C to skip: " restorefile
+        done
+        mediacenter${mversion} /RestoreFromFile "$restorefile"
     fi
 }
+
+
 
 
 
@@ -242,12 +269,20 @@ EOF'
 
 # set build directory to current path
 builddir="$(pwd)"
-parse_inp "${@}"
+
+parse_input_and_version "${@}"
+
+[ "$install_mode" == true ] && find_os \
+                            && install_repo \
+                            && symlink_certs_and_restore \
+                            && exit 0
+
 find_os
 get_source_deb
 install_dependencies
-echo "Building version ${version}, please wait..."
 build_rpm
-[ $build_only_mode == false ] && install_rpm
+[ "$build_mode" == true ] && exit 0
+install_rpm
+symlink_certs_and_restore
 
 exit 0
