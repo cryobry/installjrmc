@@ -62,12 +62,8 @@ find_os () {
         if [ -e /etc/os-release ]; then
             source /etc/os-release
             if [ "$ID" = "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
-                ID="el"
-                SID="el"
                 PM="yum"
             elif [ "$ID" = "fedora" ]; then
-                ID="fedora"
-                SID="fc"
                 PM="dnf"
             elif [ "$install_mode" == false ]; then
                 echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
@@ -131,12 +127,9 @@ install_dependencies () {
 
 build_rpm () {
 
-    # skip rebuilding the rpm if it exists
+    # skip rebuilding the rpm if it already exists
     if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
         echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm already exists! Skipping build step..."
-        return
-    elif [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then 
-        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm already exists! Skipping build step..."
         return
     fi
 
@@ -147,7 +140,7 @@ build_rpm () {
     # Create spec file
     echo 'Name:    MediaCenter' > SPECS/mediacenter.spec
     echo 'Version: %{_tversion}' >> SPECS/mediacenter.spec
-    echo 'Release: %{?_variation:%{_variation}}%{?dist}' >> SPECS/mediacenter.spec
+    echo 'Release: %{?_variation:%{_variation}}' >> SPECS/mediacenter.spec
     echo 'Summary: JRiver Media Center' >> SPECS/mediacenter.spec
     echo 'Group:   Applications/Media' >> SPECS/mediacenter.spec
     echo "Source0: http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-%{_version}-amd64.deb" >> SPECS/mediacenter.spec
@@ -188,7 +181,7 @@ build_rpm () {
     echo '/etc/security/limits.d/*' >> SPECS/mediacenter.spec
 
     # Run rpmbuild
-    cd ${builddir}/SPECS
+    cd "$builddir"/SPECS
     echo "Building version ${version}, please wait..."
     rpmbuild --quiet --define="%_topdir $builddir" --define="%_variation $variation" --define="%_tversion ${mversion}" \
              --define="%_version ${version}" --define="%_libdir /usr/lib" -bb mediacenter.spec
@@ -197,17 +190,18 @@ build_rpm () {
 
 install_rpm () {
 
-    # Skip reinstalling the same version
-    installed_ver="$(rpm --quiet --query MediaCenter)"
-    to_be_installed_ver="MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64"
-    if [ "${installed_ver}" == "${to_be_installed_ver}" ]; then
-        echo "MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64 is already installed! Exiting..."
+    # skip installing same version
+    installed_ver="$(rpm --query MediaCenter)"
+    to_be_installed_ver="MediaCenter-${mversion}-${variation}.x86_64"
+    if [ "$installed_ver" == "$to_be_installed_ver" ]; then
+        echo "JRiver Media Center $version is already installed! Skipping installation..."
         return
     fi
 
-    if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm ]; then
+    # install rpm
+    if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
         echo "Attempting to install version ${version}..."
-        sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm -y
+        sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm -y
         if [ $? -eq 0 ]; then
             echo "JRiver Media Center ${version} was installed successfully!" 
         else
@@ -215,7 +209,7 @@ install_rpm () {
             exit 1
         fi
     else
-        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.${SID}${VERSION_ID}.x86_64.rpm is missing!"
+        echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm is missing!"
         echo "JRiver Media Center ${version} installation failed!"
         exit 1
     fi
@@ -271,12 +265,10 @@ symlink_certs_and_restore () {
 builddir="$(pwd)"
 
 parse_input_and_version "${@}"
-
 [ "$install_mode" == true ] && find_os \
                             && install_repo \
                             && symlink_certs_and_restore \
                             && exit 0
-
 find_os
 get_source_deb
 install_dependencies
