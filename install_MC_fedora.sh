@@ -5,6 +5,7 @@ shopt -s extglob
 # e.g. ./install_MC_fedora.sh -v 25.0.48
 # If no version number is specified (i.e. ./install_MC_fedora.sh or ./install_MC_fedora.sh -b), the script
 # will attempt to install the latest version from Interact
+# Beta team members can add the beta password to autoamtically check for beta versions
 
 # URL for latest MC for Linux board (for automatic version scraping)
 boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
@@ -203,7 +204,7 @@ install_rpm () {
         echo "Attempting to install version ${version}..."
         sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm -y
         if [ $? -eq 0 ]; then
-            echo "JRiver Media Center ${version} was installed successfully!" 
+            echo "JRiver Media Center ${version} was installed successfully!"
         else
             echo "JRiver Media Center ${version} installation failed!"
             exit 1
@@ -266,6 +267,7 @@ builddir="$(pwd)"
 
 parse_input_and_version "${@}"
 [ "$install_mode" == true ] && find_os \
+                            && install_dependencies \
                             && install_repo \
                             && symlink_certs_and_restore \
                             && exit 0
