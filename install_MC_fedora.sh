@@ -80,6 +80,9 @@ find_os () {
 
 get_source_deb () {
 
+    # If necessary, create SOURCES dir
+    [ -d SOURCES ] || mkdir -p SOURCES
+
     # If deb file exists, skip download
     if [ -f $builddir/SOURCES/MediaCenter-${version}-amd64.deb ]; then
         echo "Using local DEB file: $builddir/SOURCES/MediaCenter-${version}-amd64.deb"
@@ -89,17 +92,17 @@ get_source_deb () {
     # Acquire DEB
     echo "Attempting to download MC $version DEB file..."
     wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
-               http://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
+               https://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
     if [ $? -ne 0 ]; then
         echo "Specified Media Center version not found! Retrying the test repo..."
         wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
-                   http://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
+                   https://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
     fi
     if [ $? -ne 0 ]; then
         [ -z $betapwd ] && read -t 60 -p "Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: " betapwd
         [ -z $betapwd ] && echo "Cannot find DEB file, re-check version number or beta password. Exiting..." && exit 1
         wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
-                   http://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
+                   https://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
         [ $? -ne 0 ] && echo "Cannot find DEB file, re-check version number or beta password. Exiting..." && exit 1
     fi
 
@@ -128,15 +131,14 @@ install_dependencies () {
 
 build_rpm () {
 
+    # If necessary, make build directories
+    [ -d SPECS ] || mkdir -p SPECS
+
     # skip rebuilding the rpm if it already exists
     if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
         echo "$builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm already exists! Skipping build step..."
         return
     fi
-
-    # If necessary, make build directories
-    [ -d SOURCES ] || mkdir -p SOURCES
-    [ -d SPECS ] || mkdir -p SPECS
 
     # Create spec file
     echo 'Name:    MediaCenter' > SPECS/mediacenter.spec
