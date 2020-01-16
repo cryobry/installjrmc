@@ -60,21 +60,19 @@ parse_input_and_version () {
 
 find_os () {
 
-    if [ "$build_mode" == false ]; then
-        if [ -e /etc/os-release ]; then
-            source /etc/os-release
-            if [ "$ID" == "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
-                ID="centos"
-            elif [ "$ID" == "fedora" ]; then
-                ID="fedora"
-            elif [ "$install_mode" == false ]; then
-                echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
-                build_mode=true
-            fi
+    if [ -e /etc/os-release ]; then
+        source /etc/os-release
+        if [ "$ID" == "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
+            ID="centos"
+        elif [ "$ID" == "fedora" ]; then
+            ID="fedora"
         elif [ "$install_mode" == false ]; then
             echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
             build_mode=true
         fi
+    elif [ "$install_mode" == false ]; then
+        echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
+        build_mode=true
     fi
 }
 
@@ -118,7 +116,7 @@ get_source_deb () {
 
 install_dependencies () {
 
-    if [ $build_mode == false ]; then
+    if ! [ -x "$(command -v rpmbuild)" ] || ! [ -x "$(command -v dpkg)" ]; then
         if [ "$ID" == "fedora" ]; then
             if ! rpm --quiet --query rpmfusion-free-release; then echo "Installing rpmfusion-free-release repo..."; \
             sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm; fi
@@ -133,10 +131,12 @@ install_dependencies () {
             if ! rpm --quiet --query dpkg; then echo "Installing dpkg from EPEL..."; sudo dnf install dpkg -y; fi
             if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build from EPEL testing..."; sudo dnf install --enablerepo=epel-testing rpm-build -y; fi
             if ! rpm --quiet --query dpkg; then echo "Installing dpkg from EPEL testing..."; sudo dnf install --enablerepo=epel-testing dpkg -y; fi
+        else
+            command -v rpmbuild >/dev/null 2>&1 || { echo "Please install rpmbuild, cannot continue, aborting..." >&2; exit 1; }
+            command -v dpkg >/dev/null 2>&1 || { echo "Please install dpkg, cannot continue, aborting..." >&2; exit 1; }
         fi
     else
-        command -v rpmbuild >/dev/null 2>&1 || { echo "Please install rpmbuild, cannot continue, aborting..." >&2; exit 1; }
-        command -v dpkg >/dev/null 2>&1 || { echo "Please install dpkg, cannot continue, aborting..." >&2; exit 1; }
+        echo "rpmbuild and dpkg already installed"
     fi
 }
 
