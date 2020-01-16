@@ -8,7 +8,7 @@ shopt -s extglob
 # Beta team members can add the beta password to autoamtically check for beta versions
 
 # URL for latest MC for Linux board (for automatic version scraping)
-boardurl="https://yabb.jriver.com/interact/index.php/board,62.0.html"
+boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
 
 ##########################
 ####### FUNCTIONS ########
@@ -48,8 +48,9 @@ parse_input_and_version () {
 
     # If version number not supplied by user, scrape Interact
     [ -z "$version" ] && version=$(curl -s "$boardurl" | grep -o "2[0-9]\.[0-9]\.[0-9]\+" | head -n 1)
+    # If no version number is found wait for input for 60 seconds before timing out (so the script will run w/o user input)
     [ -z "$version" ] && read -t 60 -p "Version number cannot be scraped, re-enter it now manually, otherwise Ctrl-C to exit: " version
-    [ -z "$version" ] && echo "No version number available, exiting..." && exit 0
+    [ -z "$version" ] && echo "No version number available, recheck boardurl, exiting..." && exit 0
 
     # parse version number
     variation=${version##*.}
@@ -62,10 +63,10 @@ find_os () {
     if [ "$build_mode" == false ]; then
         if [ -e /etc/os-release ]; then
             source /etc/os-release
-            if [ "$ID" = "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
-                PM="yum"
-            elif [ "$ID" = "fedora" ]; then
-                PM="dnf"
+            if [ "$ID" == "centos" ] && [ "$VERSION_ID" -ge "8" ]; then
+                ID="centos"
+            elif [ "$ID" == "fedora" ]; then
+                ID="fedora"
             elif [ "$install_mode" == false ]; then
                 echo "You are not running Fedora or CentOS >=8, falling back to build mode..."
                 build_mode=true
@@ -118,10 +119,21 @@ get_source_deb () {
 install_dependencies () {
 
     if [ $build_mode == false ]; then
-        if ! rpm --quiet --query rpmfusion-free-release; then echo "Installing rpmfusion-free-release repo..."; \
-            sudo ${PM} -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm; fi
-        if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build..."; sudo ${PM} install rpm-build -y; fi
-        if ! rpm --quiet --query dpkg; then echo "Installing dpkg..."; sudo ${PM} install dpkg -y; fi
+        if [ "$ID" == "fedora" ]; then
+            if ! rpm --quiet --query rpmfusion-free-release; then echo "Installing rpmfusion-free-release repo..."; \
+            sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/${ID}/rpmfusion-free-release-${VERSION_ID}.noarch.rpm; fi
+            if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build from RPMFusion Free..."; sudo dnf install rpm-build -y; fi
+            if ! rpm --quiet --query dpkg; then echo "Installing dpkg from RPMFusion Free..."; sudo dnf install dpkg -y; fi
+        elif [ "$ID" == "centos" ]; then
+            if ! rpm --quiet --query epel-release; then echo "Installing epel-release repo..."; \
+            sudo dnf -y --nogpgcheck install epel-release; fi
+            if ! rpm --quiet --query rpmfusion-free-release; then echo "Installing rpmfusion-free-release repo..."; \
+            sudo dnf -y --nogpgcheck install https://download1.rpmfusion.org/free/el/rpmfusion-free-release-${VERSION_ID}.noarch.rpm; fi
+            if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build from EPEL..."; sudo dnf install rpm-build -y; fi
+            if ! rpm --quiet --query dpkg; then echo "Installing dpkg from EPEL..."; sudo dnf install dpkg -y; fi
+            if ! rpm --quiet --query rpm-build; then echo "Installing rpm-build from EPEL testing..."; sudo dnf install --enablerepo=epel-testing rpm-build -y; fi
+            if ! rpm --quiet --query dpkg; then echo "Installing dpkg from EPEL testing..."; sudo dnf install --enablerepo=epel-testing dpkg -y; fi
+        fi
     else
         command -v rpmbuild >/dev/null 2>&1 || { echo "Please install rpmbuild, cannot continue, aborting..." >&2; exit 1; }
         command -v dpkg >/dev/null 2>&1 || { echo "Please install dpkg, cannot continue, aborting..." >&2; exit 1; }
@@ -155,10 +167,14 @@ build_rpm () {
     echo 'BuildArch: x86_64' >> SPECS/mediacenter.spec
     echo '' >> SPECS/mediacenter.spec
     echo 'AutoReq:  0' >> SPECS/mediacenter.spec
-    echo 'Requires: libnotify librtmp lame vorbis-tools alsa-lib' >> SPECS/mediacenter.spec
+    if [ $ID != "centos" ]; then
+        echo 'Requires: lame' >> SPECS/mediacenter.spec
+    fi
+    echo 'Requires: libnotify librtmp vorbis-tools alsa-lib' >> SPECS/mediacenter.spec
     echo 'Requires: libX11 libX11-common libxcb libXau libXdmcp libuuid' >> SPECS/mediacenter.spec
-    echo 'Requires: gtk3 mesa-libGL gnutls lame libgomp webkit2gtk3 ca-certificates' >> SPECS/mediacenter.spec
+    echo 'Requires: gtk3 mesa-libGL gnutls libgomp webkit2gtk3 ca-certificates' >> SPECS/mediacenter.spec
     echo 'Requires: gstreamer1 gstreamer1-plugins-base gstreamer1-plugins-good gstreamer1-plugins-ugly gstreamer1-libav' >> SPECS/mediacenter.spec
+    echo 'Requires: nss libgomp xdg-utils' >> SPECS/mediacenter.spec
     echo '' >> SPECS/mediacenter.spec
     echo 'License: Copyright 1998-2019, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468' >> SPECS/mediacenter.spec
     echo 'URL:     http://www.jriver.com/' >> SPECS/mediacenter.spec
@@ -204,7 +220,7 @@ install_rpm () {
     # install rpm
     if [ -f $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm ]; then
         echo "Attempting to install version ${version}..."
-        sudo ${PM} install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm -y
+        sudo dnf install $builddir/RPMS/x86_64/MediaCenter-${mversion}-${variation}.x86_64.rpm -y
         if [ $? -eq 0 ]; then
             echo "JRiver Media Center ${version} was installed successfully!"
         else
@@ -230,7 +246,7 @@ gpgcheck=0
 EOF'
 
     echo "Installing latest JRiver Media Center from repo..."
-    sudo ${PM} update && sudo ${PM} install MediaCenter -y
+    sudo dnf update && sudo dnf install MediaCenter -y
     if [ $? -eq 0 ]; then
         echo "JRiver Media Center installed successfully!"
         echo "You can check for future MC updates by running \"sudo dnf|yum update\""
@@ -244,9 +260,9 @@ EOF'
 
 symlink_certs_and_restore () {
 
-    if [ ! -e /etc/ssl/certs/ca-certificates.crt ] && [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
-        echo "Symlinking ca-certificates for license registration..."
-        sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
+    if [ -e "/usr/lib/jriver/Media Center ${mversion}/ca-certificates.crt" ] && [ -e "/usr/lib/jriver/Media Center ${mversion}/local-ca-certificates.crt" ]; then
+        echo 'Symlinking "/usr/lib/jriver/Media Center ${mversion}/ca-certificates.crt" to "/usr/lib/jriver/Media Center ${mversion}/local-ca-certificates.crt"'
+        sudo ln -sf "/usr/lib/jriver/Media Center ${mversion}/local-ca-certificates.crt" "/usr/lib/jriver/Media Center ${mversion}/ca-certificates.crt"
         read -p "To install your .mjr license, enter the full filepath to your .mjr file, or enter Ctrl-C to skip: " restorefile
         while [ ! -z "$restorefile" ] || [ ! -f "$restorefile" ]; do
             echo "File not found!"
@@ -255,8 +271,6 @@ symlink_certs_and_restore () {
         mediacenter${mversion} /RestoreFromFile "$restorefile"
     fi
 }
-
-
 
 
 
