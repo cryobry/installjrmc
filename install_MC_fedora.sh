@@ -92,17 +92,17 @@ get_source_deb () {
 
     # Acquire DEB
     echo "Attempting to download MC $version DEB file..."
-    wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
+    curl -so $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
                https://files.jriver.com/mediacenter/channels/v${mversion}/latest/MediaCenter-${version}-amd64.deb
     if [ $? -ne 0 ]; then
         echo "Specified Media Center version not found! Retrying the test repo..."
-        wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
+        curl -so $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
                    https://files.jriver.com/mediacenter/test/MediaCenter-${version}-amd64.deb
     fi
     if [ $? -ne 0 ]; then
         [ -z $betapwd ] && read -t 60 -p "Not found in test repo, if beta version, enter beta password to retry, otherwise Ctrl-C to exit: " betapwd
         [ -z $betapwd ] && echo "Cannot find DEB file, re-check version number or beta password. Exiting..." && exit 1
-        wget -q -O $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
+        curl -so $builddir/SOURCES/MediaCenter-${version}-amd64.deb \
                    https://files.jriver.com/mediacenter/channels/v${mversion}/beta/${betapwd}/MediaCenter-${version}-amd64.deb
         [ $? -ne 0 ] && echo "Cannot find DEB file, re-check version number or beta password. Exiting..." && exit 1
     fi
