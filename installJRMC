@@ -645,9 +645,9 @@ EOF"
 
             # Enable service
             if [[ "$_user" == "root" ]]; then
-                firewall-cmd --permanent --zone=default --add-service=jriver
+                firewall-cmd --permanent --add-service=jriver
             else
-                sudo firewall-cmd --permanent --zone=default --add-service=jriver
+                sudo firewall-cmd --permanent --add-service=jriver
             fi
 
         # Ubuntu
