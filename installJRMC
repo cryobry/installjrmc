@@ -717,6 +717,9 @@ EOF"
             _service_fname="/usr/lib/systemd/system/$1.service"
             _timer_fname="/usr/lib/systemd/system/$1.timer"
         else
+            if [[ ! -d "$HOME/.config/systemd/user" ]]; then
+                mkdir -p "$HOME/.config/systemd/user"
+            fi
             _service_fname="$HOME/.config/systemd/user/$1.service"
             _timer_fname="$HOME/.config/systemd/user/$1.timer"
             _systemd_user="User=$_user"
