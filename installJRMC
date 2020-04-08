@@ -626,12 +626,12 @@ EOF"
                     _firewallcmd=("sudo" "firewall-cmd")
                 fi
                 # shellcheck disable=SC2140,SC1079,SC1078
-                "${_firewallcmd[@]}" --permanent --new-service=jriver
-                "${_firewallcmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server"
-                "${_firewallcmd[@]}" --permanent --service=jriver --set-short="jriver"
-                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp
-                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=1900/udp
-                "${_firewallcmd[@]}" --reload
+                "${_firewallcmd[@]}" --permanent --new-service=jriver >/dev/null
+                "${_firewallcmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server" >/dev/null
+                "${_firewallcmd[@]}" --permanent --service=jriver --set-short="jriver" >/dev/null
+                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp >/dev/null
+                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=1900/udp >/dev/null
+                "${_firewallcmd[@]}" --reload >/dev/null
             fi
 
         # Ubuntu
