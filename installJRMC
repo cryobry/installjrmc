@@ -45,10 +45,8 @@ USAGE:
     installJRMC [[OPTION] [VALUE]]...
 
 OPTIONS
-        --repo
-            Install JRiver MC repository using the OS package manager (recommended)
-        --build
-            Build the rpm, do nothing else
+        --rpmbuild
+            Build RPM from source DEB
         --buildpath PATH
             Run rpmbuild in this directory (Default: the current working directory)
         --mcversion VERSION
@@ -61,6 +59,8 @@ OPTIONS
             Specify URL to source DEB package (Default: automatic)
         --betapass PASSWORD
             Enter beta team password for access to beta builds
+        --service SERVICE
+            See SERVICES section below for a list of possible service to install
         -v|--version
             Print this script version and exit
         -d|--debug
@@ -80,14 +80,13 @@ OPTIONS
             --createrepo-user USER
                 The web server user (Default: www-user)
 
-        See SERVICES for service-createrepo to automate createrepo
-
     SERVICES
-        --service-mediaserver
-            Install JRiver MC mediaserver service
-        --service-x11vnc-mediaserver
-            Install JRiver MC mediaserver service and x11vnc (for headless installations without
-            an existing X server)
+        mediaserver
+            Create and enable a JRiver MC Media Server systemd service for the current user
+
+        x11vnc-mediaserver
+            Create and enable a JRiver MC mediaserver service and x11vnc (for headless
+            installations without an existing X server) service for the current user
 
             --vncpass PASSWORD
                 Set vnc password for x11vnc access. If no password is set, the script will either use
@@ -96,29 +95,28 @@ OPTIONS
                 Start X11VNC on this display (Default: The current display or :0 if current display is
                 unaccessible)
 
-        --service-createrepo
-            Install service to build latest MC and run createrepo hourly
+        createrepo
+            Install service to build latest MC RPM and run createrepo hourly for the current user
+
+            --createrepo-webroot PATH
+                The webroot directory to install the repo (Default: /var/www/html)
+            --createrepo-user USER
+                The web server user (Default: www-user)
 EOF
 
         # Exit using passed exit code
         [[ -z $1 ]] && exit 0 || exit "$1"
-
     }
 
 
     _parseInput () {
 
-        if _input=$(getopt -o +vdhu -l repo,build,outputdir:,mcversion:,restorefile:,boardurl:,deburl:,betapass:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,service-mediaserver,service-x11vnc-mediaserver,vncpass:,display:,service-createrepo -- "$@"); then
+        if _input=$(getopt -o +vdhu -l rpmbuild,outputdir:,mcversion:,restorefile:,boardurl:,deburl:,betapass:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
             eval set -- "$_input"
             while true; do
                 case "$1" in
-                    --repo)
-                        echo "Installing JRMC from repository"
-                        _installrepo="true"
-                        ;;
-                    --build)
-                        echo "Using build only mode"
-                        _buildonly="true"
+                    --rpmbuild)
+                        _rpmbuild="true"
                         ;;
                     --outputdir)
                         shift && _outputdir="$1"
@@ -138,6 +136,9 @@ EOF
                     --betapass)
                         shift && _betapass="$1"
                         ;;
+                    --service)
+                        shift && _service="$1"
+                        ;;
                     --version|-v)
                         echo "Version: $_scriptversion"
                         exit 0
@@ -150,7 +151,6 @@ EOF
                         _printHelpAndExit 0
                         ;;
                     --uninstall|-u)
-                        echo "Uninstalling..."
                         _uninstall="true"
                         ;;
                     --createrepo)
@@ -162,20 +162,11 @@ EOF
                     --createrepo-user)
                         shift && _createrepo_user="$1"
                         ;;
-                    --service-mediaserver)
-                        _service_ms="true"
-                        ;;
-                    --service-x11vnc-mediaserver)
-                        _service_xms="true"
-                        ;;
                     --vncpass)
                         shift && _vncpass="$1"
                         ;;
                     --display)
                         shift && _display="$1"
-                        ;;
-                    --service-createrepo)
-                        _service_createrepo="true"
                         ;;
                     --)
                         shift
@@ -186,7 +177,7 @@ EOF
             done
         else
             echo "Incorrect options provided"
-            _print-help-and-exit 1
+            _printHelpAndExit 1
         fi
     }
 
@@ -220,30 +211,14 @@ EOF
     }
 
 
-    _sanityChecks () {
-
-        if [[ -n $_service_ms && -n $_service_xms ]]; then
-            echo "--service-mediaserver is redundant when --service-x11vnc-mediaserver is set, unsetting..."
-            unset _service_ms
-        fi
-
-        if ! [[ "$ID" == "fedora" || "$ID" == "centos" ]] && \
-        [[ -z $_installrepo && -z $_buildonly && -z $_createrepo ]]; then
-            echo "You must specify --repo, --build, or --createrepo on non-RHEL distributions!"
-            _printHelpAndExit 1
-        fi
-
-    }
-
-
     _buildCommands () {
 
         # build some basic command arrays based on OS and user input
-        if [[ "$ID" == "fedora" || "$ID" == "centos" ]]; then
+        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             _install_cmd=("dnf" "install" "-y")
             _update_cmd=("dnf" "update" "-y")
             _pkg_query_cmd=("rpm" "-q")
-        elif [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
+        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             _install_cmd=("apt-get" "install" "-y")
             _update_cmd=("apt-get" "update" "-y")
             _pkg_query_cmd=("dpkg" "-l")
@@ -253,7 +228,7 @@ EOF
 
         _install_cmd_nogpg=("${_install_cmd[@]}" "--nogpgcheck")
 
-        # append sudo to non-containers and non-root users
+        # append sudo for non-root users
         if [[ "$_user" != "root" ]]; then
             _install_cmd=("sudo" "${_install_cmd[@]}")
             _install_cmd_nogpg=("sudo" "${_install_cmd_nogpg[@]}")
@@ -333,6 +308,20 @@ EOF
         #_variation="${_mcversion##*.}"
     }
 
+    _sanityChecks () {
+
+        # Cannot create a repo without an rpm
+        if [[ -n $_createrepo ]]; then
+            _rpmbuild="true"
+        fi
+
+        # Check for bad service name
+        if [[ -n $_service && ! "$_service" =~ ^(mediaserver|x11vnc-mediaserver|createrepo)$ ]]; then
+            echo "Incorrect service type provided!"
+            _printHelpAndExit 1
+        fi
+    }
+
 
     _installExternalRepos () {
 
@@ -358,7 +347,7 @@ EOF
 
         _installPackage wget gnupg
 
-        if [[ "$ID" == "fedora" || "$ID" == "centos" ]]; then
+        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             "${_bash_cmd[@]}" 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
 [jriver]
 name=JRiver Media Center repo by BryanC
@@ -449,7 +438,7 @@ EOF'
 
         # rpmbuild uses rpm to check for build dependencies
         # this will fail on non-rpm distros
-        if [[ "$ID" == "fedora" || "$ID" == "centos" ]]; then
+        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
         else
             _build_requires=''
@@ -626,32 +615,27 @@ EOF"
     }
 
 
-    _openFirewallPorts () {
+    _openFirewall () {
 
         # RHEL
-        if [[ "$ID" == "fedora" || "$ID" == "centos" ]] && [[ -x $(command -v firewall-cmd) ]]; then
+        if [[ "$ID" =~ ^(fedora|centos)$ ]] && [[ -x $(command -v firewall-cmd) ]]; then
             if ! firewall-cmd --get-services | grep -q jriver; then
+                if [[ "$_user" == "root" ]]; then
+                    _firewallcmd=("firewall-cmd")
+                else
+                    _firewallcmd=("sudo" "firewall-cmd")
+                fi
                 # shellcheck disable=SC2140,SC1079,SC1078
-                "${_bash_cmd[@]}" "cat <<-EOF > /etc/firewalld/services/jriver.xml
-<?xml version="1.0" encoding="utf-8"?>
-<service>
-  <short>jriver</short>
-  <description>JRiver Media Center Media Server</description>
-  <port protocol="udp" port="1900" />
-  <port protocol="tcp" port="52100-52200"/>
-</service>
-EOF"
-            fi
-
-            # Enable service
-            if [[ "$_user" == "root" ]]; then
-                firewall-cmd --permanent --add-service=jriver
-            else
-                sudo firewall-cmd --permanent --add-service=jriver
+                "${_firewallcmd[@]}" --permanent --new-service=jriver
+                "${_firewallcmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server"
+                "${_firewallcmd[@]}" --permanent --service=jriver --set-short="jriver"
+                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp
+                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=1900/udp
+                "${_firewallcmd[@]}" --reload
             fi
 
         # Ubuntu
-        elif [[ "$ID" == "ubuntu" && -x $(command -v ufw) ]]; then
+    elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
             if [[ ! -f "/etc/ufw/applications.d/jriver.service" ]]; then
                 "${_bash_cmd[@]}" "cat <<-EOF > /etc/ufw/applications.d/jriver.service
 [jriver]
@@ -700,29 +684,28 @@ EOF"
             systemctl daemon-reload
             systemctl enable --now "$1"
         else
-            systemctl --user daemon-reload
-            systemctl --user enable --now "$1"
+            sudo systemctl daemon-reload
+            sudo systemctl enable --now "$1"
         fi
     }
 
 
     _generateServiceVars () {
 
-        unset _service_fname _service_name _timer_fname _timer_name _systemd_user
-
-        _service_name="$1.service"
-        _timer_name="$1.timer"
+        unset _service_fname _service_name _timer_fname _timer_name _user_specifier
 
         if [[ "$_user" == "root" ]]; then
             _service_fname="/usr/lib/systemd/system/$1.service"
             _timer_fname="/usr/lib/systemd/system/$1.timer"
+            _service_name="$1.service"
+            _timer_name="$1.timer"
+            _user_specifier=""
         else
-            if [[ ! -d "$HOME/.config/systemd/user" ]]; then
-                mkdir -p "$HOME/.config/systemd/user"
-            fi
-            _service_fname="$HOME/.config/systemd/user/$1.service"
-            _timer_fname="$HOME/.config/systemd/user/$1.timer"
-            _systemd_user="User=$_user"
+            _service_fname="/usr/lib/systemd/system/$1@.service"
+            _timer_fname="/usr/lib/systemd/system/$1@.timer"
+            _service_name="$1@$_user.service"
+            _timer_name="$1@$_user.timer"
+            _user_specifier="User=%I"
         fi
     }
 
@@ -737,8 +720,8 @@ Description=JRiver Media Center $_mversion Media Server
 After=graphical.target
 
 [Service]
+$_user_specifier
 Type=simple
-$_systemd_user
 Environment=DISPLAY=$_display
 ExecStart=/usr/bin/mediacenter$_mversion /MediaServer
 Restart=always
@@ -761,9 +744,9 @@ EOF"
         _generateServiceVars "jriver-x11vnc"
 
         if [[ "$_novncauth" == "true" ]]; then
-            _exec_start_cmd="/usr/bin/x11vnc -display $_display -geometry 1920x1080 -auth guess -forever -bg -nopw"
+            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -nopw"
         else
-            _exec_start_cmd="/usr/bin/x11vnc -display $_display -geometry 1920x1080 -rfbauth $HOME/.vnc/jrmc_passwd -auth guess -forever -bg"
+            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -rfbauth $HOME/.vnc/jrmc_passwd -auth guess -forever -bg"
         fi
 
         "${_bash_cmd[@]}" "cat <<-EOF > $_service_fname
@@ -772,15 +755,15 @@ Description=x11vnc
 After=display-manager.service
 
 [Service]
+$_user_specifier
 Type=forking
-$_systemd_user
 Environment=DISPLAY=$_display
 ExecStart=$_exec_start_cmd
 Restart=always
 RestartSec=10
 
 [Install]
-WantedBy=graphical.target
+WantedBy=default.target
 EOF"
         _systemctlReloadAndEnable "$_service_name"
     }
@@ -795,11 +778,11 @@ EOF"
 Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
 
 [Service]
-$_systemd_user
+$_user_specifier
 ExecStart=$_basedir/installJRMC --buildpath=$_outputdir --createrepo --createrepo-webroot $_createrepo_webroot --createrepo-user $_createrepo_user
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 EOF"
         "${_bash_cmd[@]}" "cat <<-EOF > $_timer_fname
 [Unit]
@@ -847,14 +830,15 @@ EOF"
             [[ -f "/etc/ufw/applications.d/jriver.service" ]] && sudo rm /etc/ufw/applications.d/jriver.service
         fi
         echo "Uninstalling Media Center"
-        if [[ "$ID" == "fedora" || "$ID" == "centos" ]]; then
+        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             sudo dnf remove MediaCenter -y
-        elif [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
+        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             sudo apt-get remove "mediacenter$_mversion" -y
         fi
         echo "JRiver Media Center has been completely uninstalled"
         [[ "$_user" != "root" ]] && echo "Your library files will remain at $HOME/.jriver"
     }
+
 
 
     __main () {
@@ -868,14 +852,14 @@ EOF"
         # Detect OS
         _getOS
 
-        # Sanity checks
-        _sanityChecks
-
         # Build some commands based on the selected OS
         _buildCommands
 
-        # Set version to install
+        # Set version to install/uninstall
         _setVersion
+
+        # Sanity checks
+        _sanityChecks
 
         # Uninstall and exit
         if [[ -n $_uninstall ]]; then
@@ -886,52 +870,38 @@ EOF"
         # Install external repos
         _installExternalRepos
 
-        # install repo file and install MC using package manager
-        if [[ -n $_installrepo ]]; then
+        # install MC using package manager (default)
+        if [[ -z $_rpmbuild ]]; then
             _installRepo
             _symlinkCerts
             _restoreLicense
-            return $?
+            _openFirewall
+        else
+            _acquireDeb
+            _buildRPM
+            if [[ -n $_createrepo ]]; then
+                _runCreateRepo
+            # Go ahead and install MC from RPM if on a supported platform
+            elif [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                _installRPM
+                _symlinkCerts
+                _restoreLicense
+                _openFirewall
+            fi
         fi
 
-        # Install MC systemd services
-        if [[ -n $_service_xms ]]; then
+        # Install systemd services
+        if [[ "$_service" == "createrepo" ]]; then
+            _serviceCreaterepo
+        elif [[ "$_service" == "x11vnc-mediaserver" ]]; then
             _serviceMediaserver
             _serviceX11VNC
-        fi
-
-        if [[ -n $_service_ms ]]; then
+        elif [[ "$_service" == "mediaserver"  ]]; then
             _serviceMediaserver
         fi
-
-        # Install createrepo systemd service
-        if [[ -n $_service_createrepo ]]; then
-            _serviceCreaterepo
-        fi
-
-        # Acquire source deb package
-        _acquireDeb
-
-        # build
-        _buildRPM
-        if [[ -n $_buildonly ]]; then
-            return 0
-        fi
-
-        # create repo at webroot
-        if [[ -n $_createrepo ]]; then
-            _runCreateRepo
-            return $?
-        fi
-
-        # install MC
-        _installRPM
-        _symlinkCerts
-        _restoreLicense
-        _openFirewallPorts
     }
 
-    # Execute function when called
+    # Execute main function when called
     __main "$@"
 }
 
