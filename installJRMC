@@ -47,8 +47,8 @@ USAGE:
 OPTIONS
         --rpmbuild
             Build RPM from source DEB
-        --buildpath PATH
-            Run rpmbuild in this directory (Default: the current working directory)
+        --outputdir PATH
+            Generate rpmbuild output in this directory (Default: the current working directory)
         --mcversion VERSION
             Build or install a specific version (Default: scrape the latest version from Interact)
         --restorefile RESTOREFILE
@@ -779,7 +779,7 @@ Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and r
 
 [Service]
 $_user_specifier
-ExecStart=$_basedir/installJRMC --buildpath=$_outputdir --createrepo --createrepo-webroot $_createrepo_webroot --createrepo-user $_createrepo_user
+ExecStart=$_basedir/installJRMC --outputdir $_outputdir --createrepo --createrepo-webroot $_createrepo_webroot --createrepo-user $_createrepo_user
 
 [Install]
 WantedBy=default.target
