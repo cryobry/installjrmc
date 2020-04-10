@@ -26,7 +26,7 @@ installJRMC () {
         _createrepo_webroot="/var/www/jriver"
 
     [[ -z $_createrepo_user ]] && \
-        _createrepo_user="www-user"
+        _createrepo_user="$(whoami)"
 
     [[ -z $_user ]] && \
         _user="$(whoami)"
@@ -78,7 +78,7 @@ OPTIONS
             --createrepo-webroot PATH
                 The webroot directory to install the repo (Default: /var/www/html)
             --createrepo-user USER
-                The web server user (Default: www-user)
+                The web server user (Default: current user)
 
     SERVICES
         mediaserver
@@ -97,11 +97,6 @@ OPTIONS
 
         createrepo
             Install service to build latest MC RPM and run createrepo hourly for the current user
-
-            --createrepo-webroot PATH
-                The webroot directory to install the repo (Default: /var/www/html)
-            --createrepo-user USER
-                The web server user (Default: www-user)
 EOF
 
         # Exit using passed exit code
@@ -536,7 +531,11 @@ EOF"
         _createrepo_cmd=("createrepo" "-q")
 
         # If the webroot does not exist, create it
-        [[ ! -d "$_createrepo_webroot" ]] && "${_prefix[@]}" mkdir -p "$_createrepo_webroot"
+        if [[ ! -d "$_createrepo_webroot" ]]; then
+            if ! "${_prefix[@]}" mkdir -p "$_createrepo_webroot"; then
+                echo "Make sure that the createrepo-webroot is writeable by createrepo-user!"
+            fi
+        fi
 
         # Copy built rpms to webroot
         if "${_prefix[@]}" cp -n "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" "$_createrepo_webroot"; then
