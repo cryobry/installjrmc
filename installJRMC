@@ -261,8 +261,8 @@ EOF
         done
 
         if [[ ${#_pkg_array[@]} -ge 1 ]]; then
-            [[ -n $_debug ]] && echo "${_install_cmd[@]}" "${_pkg_array[@]}"
-            "${_install_cmd[@]}" "${_pkg_array[@]}"
+            echo "Installing ${_pkg_array[*]}"
+            "${_install_cmd[@]}" "${_pkg_array[@]}" > /dev/null 2>&1
         fi
     }
 
@@ -328,16 +328,16 @@ EOF
         if [[ "$ID" == "fedora" ]]; then
             if ! rpm --quiet --query rpmfusion-free-release; then
                 echo "Installing rpmfusion-free-release repo..."
-                "${_install_cmd_nogpg[@]}" "https://download1.rpmfusion.org/free/$ID/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                "${_install_cmd_nogpg[@]}" "https://download1.rpmfusion.org/free/$ID/rpmfusion-free-release-$VERSION_ID.noarch.rpm"  > /dev/null 2>&1
             fi
         elif [[ "$ID" == "centos" ]]; then
             if ! rpm --quiet --query epel-release; then
                 echo "Installing epel-release repo..."
-                "${_install_cmd_nogpg[@]}" epel-release
+                "${_install_cmd_nogpg[@]}" epel-release > /dev/null 2>&1
             fi
             if ! rpm --quiet --query rpmfusion-free-release; then
                 echo "Installing rpmfusion-free-release repo..."
-                "${_install_cmd_nogpg[@]}" "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                "${_install_cmd_nogpg[@]}" "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm" > /dev/null 2>&1
             fi
         fi
     }
@@ -355,7 +355,7 @@ baseurl=https://repos.bryanroessler.com/jriver
 gpgcheck=0
 EOF'
             [[ -n $_debug ]] && cat /etc/yum.repos.d/jriver.repo
-
+            echo "Installing latest JRiver Media Center from repo..."
             if "${_update_cmd[@]}" && "${_install_cmd[@]}" MediaCenter; then
                 echo "JRiver Media Center installed successfully!"
                 echo "You can check for future MC updates by running \"sudo dnf update\""
@@ -364,7 +364,7 @@ EOF'
                 _printHelpAndExit 1
             fi
 
-        elif [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
+        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             if [[ $_user != "root" ]]; then
                 wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add -
                 sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list"
