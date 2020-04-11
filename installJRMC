@@ -286,14 +286,14 @@ EOF
             _installPackage wget
 
             # Get latest version from Interact
-            echo "Scraping MC version number from Interact..."
+            echo -n "Scraping latest MC version number from Interact..."
             if ! _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
                 echo "MC version could not be scraped. Please specify a version manually using --mcversion or check your --boardurl"
             fi
         fi
 
         if [[ "$_mcversion" =~ ^[0-9]+.[0-9].[0-9]+ ]]; then
-            echo "Using MC version: $_mcversion"
+            echo "$_mcversion"
         else
             echo "MC version: $_mcversion could not be parsed!"
             _printHelpAndExit 1
@@ -362,16 +362,16 @@ EOF'
 
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             if [[ $_user != "root" ]]; then
-                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add -
-                sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list"
+                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - > /dev/null 2>&1
+                sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list" > /dev/null 2>&1
             else
-                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add -
-                wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list"
+                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - > /dev/null 2>&1
+                wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list" > /dev/null 2>&1
             fi
 
             [[ -n $_debug ]] && cat "/etc/apt/sources.list.d/jriver.list"
-            echo "Installing latest JRiver Media Center from repo..."
-            if "${_update_cmd[@]}" && "${_install_cmd[@]}" "mediacenter$_mversion"; then
+            echo "Installing JRiver Media Center from repo..."
+            if "${_update_cmd[@]}" > /dev/null 2>&1 && "${_install_cmd[@]}" "mediacenter$_mversion" > /dev/null 2>&1; then
                 echo "JRiver Media Center installed successfully!"
                 echo "You can check for future MC updates by running \"apt-get update && apt-get dist-upgrade\""
             else
@@ -639,7 +639,7 @@ EOF"
             fi
 
         # Ubuntu
-    elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
+        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
             if [[ ! -f "/etc/ufw/applications.d/jriver.service" ]]; then
                 "${_bash_cmd[@]}" "cat <<-EOF > /etc/ufw/applications.d/jriver.service
 [jriver]
@@ -651,9 +651,9 @@ EOF"
 
             # Enable service
             if [[ "$_user" == "root" ]]; then
-                ufw allow jriver
+                ufw allow jriver > /dev/null 2>&1
             else
-                sudo ufw allow jriver
+                sudo ufw allow jriver > /dev/null 2>&1
             fi
         fi
     }
@@ -680,7 +680,7 @@ EOF"
 
     _systemctlReloadAndEnable () {
 
-        echo "Enabling $1"
+        [[ -n $_debug ]] && echo "Enabling $1"
 
         if [[ "$_user" == "root" ]]; then
             systemctl daemon-reload
