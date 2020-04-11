@@ -645,16 +645,14 @@ EOF"
 [jriver]
 title=JRiver Media Center
 description=Allows JRiver Media Server access
-ports=52100-52200/tcp|1900/udp
+ports=52100:52200/tcp|1900/udp
 EOF"
             fi
 
             # Enable service
             if [[ "$_user" == "root" ]]; then
-                ufw app update --add-new jriver
                 ufw allow jriver
             else
-                sudo ufw app update --add-new jriver
                 sudo ufw allow jriver
             fi
         fi
