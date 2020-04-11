@@ -23,7 +23,7 @@ installJRMC () {
         _outputdir="$_basedir/output"
 
     [[ -z $_createrepo_webroot ]] && \
-        _createrepo_webroot="/var/www/jriver"
+        _createrepo_webroot="/srv/jriver"
 
     [[ -z $_createrepo_user ]] && \
         _createrepo_user="$(whoami)"
@@ -46,7 +46,8 @@ USAGE:
 
 OPTIONS
         --rpmbuild
-            Build RPM from source DEB
+            Build RPM from source DEB (Default: install MC from repository)
+            This will build the RPM on all OSes, and additionally install it on Fedora/CentOS
         --outputdir PATH
             Generate rpmbuild output in this directory (Default: the current working directory)
         --mcversion VERSION
@@ -76,7 +77,7 @@ OPTIONS
             Build rpm, copy to webroot, and run createrepo
 
             --createrepo-webroot PATH
-                The webroot directory to install the repo (Default: /var/www/html)
+                The webroot directory to install the repo (Default: /srv/jriver/)
             --createrepo-user USER
                 The web server user (Default: current user)
 
@@ -473,7 +474,7 @@ Requires: gstreamer1-plugins-base >= 1.4.4
 Requires: nss >= 3.26
 Requires: nspr >= 4.12
 Requires: ca-certificates
-Requires: python >= 2.7
+Requires: python3
 Recommends: vorbis-tools >= 1.4.0
 
 Provides: mediacenter$_mversion
@@ -533,6 +534,7 @@ EOF"
         # If the webroot does not exist, create it
         if [[ ! -d "$_createrepo_webroot" ]]; then
             if ! "${_prefix[@]}" mkdir -p "$_createrepo_webroot"; then
+                echo "Could not create the createrepo-webroot path!"
                 echo "Make sure that the createrepo-webroot is writeable by createrepo-user!"
             fi
         fi
@@ -540,6 +542,9 @@ EOF"
         # Copy built rpms to webroot
         if "${_prefix[@]}" cp -n "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" "$_createrepo_webroot"; then
             echo "Copied $_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm to $_createrepo_webroot/MediaCenter-$_mcversion.x86_64.rpm"
+        else
+            echo "Could not copy the RPM to the createrepo-webroot path!"
+            echo "Make sure that the createrepo-webroot path is writeable by createrepo-user!"
         fi
 
         # If repodata exists, append --update to createrepo command
@@ -625,12 +630,12 @@ EOF"
                     _firewallcmd=("sudo" "firewall-cmd")
                 fi
                 # shellcheck disable=SC2140,SC1079,SC1078
-                "${_firewallcmd[@]}" --permanent --new-service=jriver >/dev/null
-                "${_firewallcmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server" >/dev/null
-                "${_firewallcmd[@]}" --permanent --service=jriver --set-short="jriver" >/dev/null
-                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp >/dev/null
-                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=1900/udp >/dev/null
-                "${_firewallcmd[@]}" --reload >/dev/null
+                "${_firewallcmd[@]}" --permanent --new-service=jriver > /dev/null 2>&1
+                "${_firewallcmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
+                "${_firewallcmd[@]}" --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
+                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
+                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
+                "${_firewallcmd[@]}" --reload > /dev/null 2>&1
             fi
 
         # Ubuntu
