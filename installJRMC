@@ -54,10 +54,6 @@ OPTIONS
             Build or install a specific version (Default: scrape the latest version from Interact)
         --restorefile RESTOREFILE
             Restore file location for registration (Default: skip registration)
-        --boardurl URL
-            Interact board url to scrape for latest version number (Default: see DEFAULTS)
-        --deburl URL
-            Specify URL to source DEB package (Default: automatic)
         --betapass PASSWORD
             Enter beta team password for access to beta builds
         --service SERVICE
@@ -107,7 +103,7 @@ EOF
 
     _parseInput () {
 
-        if _input=$(getopt -o +vdhu -l rpmbuild,outputdir:,mcversion:,restorefile:,boardurl:,deburl:,betapass:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
+        if _input=$(getopt -o +vdhu -l rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
             eval set -- "$_input"
             while true; do
                 case "$1" in
@@ -122,12 +118,6 @@ EOF
                         ;;
                     --restorefile)
                         shift && _restorefile="$1"
-                        ;;
-                    --boardurl)
-                        shift && _boardurl="$1"
-                        ;;
-                    --deburl)
-                        shift && _deburl="$1"
                         ;;
                     --betapass)
                         shift && _betapass="$1"
@@ -396,15 +386,8 @@ EOF'
         # If necessary, create SOURCES dir
         [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
 
-        # if $_deburl is set, try it first and overwrite local files
-        if [[ -n "$_deburl" ]]; then
-            if wget -q -O "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" "$_deburl"; then
-                true
-            else
-                echo "Your --deburl is broken, trying automatic download instead"
-            fi
         # If deb file already exists, skip download
-        elif [[ -f "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" ]]; then
+        if [[ -f "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" ]]; then
             echo "Using local DEB file: $_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb"
         # Else check beta repo
         elif [[ -n $_betapass ]]; then
