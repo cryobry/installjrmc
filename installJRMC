@@ -204,13 +204,16 @@ EOF
             _install_cmd=("dnf" "install" "-y")
             _update_cmd=("dnf" "makecache" "-y")
             _pkg_query_cmd=("rpm" "-q")
+            _firewall_cmd=("firewall-cmd")
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             _install_cmd=("apt-get" "install" "-y")
             _update_cmd=("apt-get" "update" "-y")
             _pkg_query_cmd=("dpkg" "-l")
+            _firewall_cmd=("ufw")
         fi
 
         _bash_cmd=("bash" "-c")
+        _rm_cmd=("rm" "-rf")
 
         _install_cmd_nogpg=("${_install_cmd[@]}" "--nogpgcheck")
 
@@ -220,6 +223,8 @@ EOF
             _install_cmd_nogpg=("sudo" "${_install_cmd_nogpg[@]}")
             _update_cmd=("sudo" "${_update_cmd[@]}")
             _bash_cmd=("sudo" "${_bash_cmd[@]}")
+            _bash_cmd=("sudo" "${_rm_cmd[@]}")
+            _firewall_cmd=("sudo" "${_firewall_cmd[@]}")
             #_pkg_query_cmd=("sudo" "${_pkg_query_cmd[@]}")
         fi
 
@@ -252,12 +257,12 @@ EOF
         done
 
         if [[ ${#_pkg_array[@]} -ge 1 ]]; then
-            [[ -n $_debug ]] && echo "Installing: " "${_pkg_array[@]}"
+            echo "Installing: " "${_pkg_array[@]}"
             "${_install_cmd[@]}" "${_pkg_array[@]}" > /dev/null 2>&1
         fi
 
         if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
-            [[ -n $_debug ]] && echo "Installing: " "${_url_pkg_array[@]}"
+            echo "Installing: " "${_url_pkg_array[@]}"
             "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}" > /dev/null 2>&1
         fi
 
@@ -615,18 +620,13 @@ EOF"
         # RHEL
         if [[ "$ID" =~ ^(fedora|centos)$ ]] && [[ -x $(command -v firewall-cmd) ]]; then
             if ! firewall-cmd --get-services | grep -q jriver; then
-                if [[ "$_user" == "root" ]]; then
-                    _firewallcmd=("firewall-cmd")
-                else
-                    _firewallcmd=("sudo" "firewall-cmd")
-                fi
                 # shellcheck disable=SC2140,SC1079,SC1078
-                "${_firewallcmd[@]}" --permanent --new-service=jriver > /dev/null 2>&1
-                "${_firewallcmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
-                "${_firewallcmd[@]}" --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
-                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
-                "${_firewallcmd[@]}" --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
-                "${_firewallcmd[@]}" --reload > /dev/null 2>&1
+                "${_firewall_cmd[@]}" --permanent --new-service=jriver > /dev/null 2>&1
+                "${_firewall_cmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
+                "${_firewall_cmd[@]}" --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
+                "${_firewall_cmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
+                "${_firewall_cmd[@]}" --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
+                "${_firewall_cmd[@]}" --reload > /dev/null 2>&1
             fi
 
         # Ubuntu
@@ -640,12 +640,7 @@ ports=52100:52200/tcp|1900/udp
 EOF"
             fi
 
-            # Enable service
-            if [[ "$_user" == "root" ]]; then
-                ufw allow jriver > /dev/null 2>&1
-            else
-                sudo ufw allow jriver > /dev/null 2>&1
-            fi
+            "${_firewall_cmd[@]}" allow jriver > /dev/null 2>&1
         fi
     }
 
@@ -801,26 +796,24 @@ EOF"
         sudo systemctl disable --now jriver-createrepo.timer jriver-x11vnc.service jriver-mediaserver.service
         echo "Removing repo and service files"
         for _service in "jriver-mediaserver" "jriver-x11vnc" "jriver-createrepo"; do
-            [[ -f "/usr/lib/systemd/system/$_service.service" ]] \
-                && sudo rm -f "/usr/lib/systemd/system/$_service.service"
-            [[ -f "$HOME/.config/systemd/user/$_service.service" ]] \
-                && sudo rm -f "$HOME/.config/systemd/user/$_service.service"
+            _generateServiceVars _service
+            [[ -f "$_service_fname" ]] && "${_rm_cmd[@]}" "$_service_fname"
+            [[ -f "$_timer_fname" ]] && "${_rm_cmd[@]}" "$_timer_fname"
         done
-        [[ -e /etc/yum.repos.d/jriver.repo ]] \
-            && sudo rm -f "/etc/yum.repos.d/jriver.repo"
-        [[ -e /etc/apt/sources.list.d/jriver.list ]] \
-            && sudo rm -f "/etc/apt/sources.list.d/jriver.list"
-        sudo rm /etc/apt/sources.list.d/mediacenter26.list
+        [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
+            && "${_rm_cmd[@]}" "/etc/yum.repos.d/jriver.repo"
+        [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
+            && "${_rm_cmd[@]}" "/etc/apt/sources.list.d/jriver.list"
         if [[ -x $(command -v firewall-cmd) ]]; then
             echo "Removing firewall rules"
             sudo firewall-cmd --permanent --remove-service=jriver
             sudo firewall-cmd --permanent --delete-service=jriver
             sudo firewall-cmd --reload
-        fi
-        if [[ -x $(command -v ufw) ]]; then
+        elif [[ -x $(command -v ufw) ]]; then
             echo "Removing firewall rules"
             sudo ufw delete allow jriver
-            [[ -f "/etc/ufw/applications.d/jriver.service" ]] && sudo rm /etc/ufw/applications.d/jriver.service
+            [[ -f "/etc/ufw/applications.d/jriver.service" ]] \
+                && "${_rm_cmd[@]}" /etc/ufw/applications.d/jriver.service
         fi
         echo "Uninstalling Media Center"
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -829,7 +822,7 @@ EOF"
             sudo apt-get remove "mediacenter$_mversion" -y
         fi
         echo "JRiver Media Center has been completely uninstalled"
-        [[ "$_user" != "root" ]] && echo "Your library files will remain at $HOME/.jriver"
+        echo "Your library files will remain at $HOME/.jriver"
     }
 
 
