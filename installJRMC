@@ -40,6 +40,8 @@ installJRMC () {
 
     _printHelpAndExit () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         cat <<-'EOF'
 USAGE:
     installJRMC [[OPTION] [VALUE]]...
@@ -102,6 +104,8 @@ EOF
 
 
     _parseInput () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         if _input=$(getopt -o +vdhu -l rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
             eval set -- "$_input"
@@ -168,7 +172,15 @@ EOF
     }
 
 
+    _runDebug () {
+
+        [[ -n $_debug ]] && echo "Running: " "$@"
+    }
+
+
     _checkUser () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         if [[ "$_user" == "root" ]]; then
 
@@ -187,6 +199,8 @@ EOF
 
     _getOS () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         if [[ -e /etc/os-release ]]; then
             source /etc/os-release
         else
@@ -194,10 +208,14 @@ EOF
             echo "Your OS is unsupported"
             _printHelpAndExit 1
         fi
+
+        [[ -n $_debug ]] && echo "Platform: $ID $VERSION_ID"
     }
 
 
     _buildCommands () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         # build some basic command arrays based on OS and user input
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -238,6 +256,8 @@ EOF
 
     _installPackage () {
 
+        _runDebug "${FUNCNAME[0]}" "$@"
+
         # We will add packages to this array if their command is not available
         local -a _pkg_array
         local -a _url_pkg_array
@@ -270,6 +290,8 @@ EOF
 
     _packageQuirks () {
 
+        _runDebug "${FUNCNAME[0]}" "$@"
+
         unset _url_pkg
 
         if [[ "$1" == "rpm-build" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
@@ -296,6 +318,8 @@ EOF
 
     _setVersion () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         if [[ -z "$_mcversion" ]]; then
 
             _installPackage wget
@@ -321,8 +345,10 @@ EOF
 
     _sanityChecks () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         # Cannot create a repo without an rpm
-        if [[ -n $_createrepo || -n $_mcversion ]]; then
+        if [[ -n $_createrepo || "$_service" == "createrepo" ]]; then
             _rpmbuild="true"
         fi
 
@@ -336,15 +362,22 @@ EOF
 
     _installExternalRepos () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         _installPackage rpmfusion-free-release epel-release
     }
 
 
     _installRepo () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         _installPackage wget gnupg
 
+        echo "$ID"
+
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+            echo "here!"
             "${_bash_cmd[@]}" 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
 [jriver]
 name=JRiver Media Center repo by BryanC
@@ -386,6 +419,8 @@ EOF'
 
     _acquireDeb () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         # If necessary, create SOURCES dir
         [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
 
@@ -419,6 +454,8 @@ EOF'
 
 
     _buildRPM () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         # install build dependencies
         _installPackage wget dpkg rpm-build
@@ -524,6 +561,8 @@ EOF"
 
     _runCreateRepo () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         _installPackage createrepo_c
 
         unset _prefix
@@ -564,6 +603,8 @@ EOF"
 
     _installRPM () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         # skip installing same version
         _installed_ver="$(rpm --query MediaCenter)"
         _to_be_installed_ver="MediaCenter-$_mcversion.x86_64"
@@ -591,6 +632,8 @@ EOF"
 
     _symlinkCerts () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
         -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
             echo "Symlinking /etc/ssl/certs/ca-certificates.crt to /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
@@ -604,6 +647,8 @@ EOF"
 
 
     _restoreLicense () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         # Allow user to drop an mjr file next to installJRMC
         if [[ -z $_restorefile ]]; then
@@ -622,6 +667,8 @@ EOF"
 
 
     _openFirewall () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         # RHEL
         if [[ "$ID" =~ ^(fedora|centos)$ ]] && [[ -x $(command -v firewall-cmd) ]]; then
@@ -653,6 +700,8 @@ EOF"
 
     _setVNCPass () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
         if [[ -n $_vncpass ]]; then
@@ -668,6 +717,8 @@ EOF"
 
     _systemctlReloadAndEnable () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         echo "Enabling $1"
 
         if [[ "$_user" == "root" ]]; then
@@ -681,6 +732,8 @@ EOF"
 
 
     _generateServiceVars () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         unset _service_fname _service_name _timer_fname _timer_name _user_specifier
 
@@ -701,6 +754,8 @@ EOF"
 
 
     _serviceMediaserver () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         _generateServiceVars "jriver-mediaserver"
 
@@ -727,6 +782,8 @@ EOF"
 
 
     _serviceX11VNC () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         _installPackage x11vnc
         _setVNCPass
@@ -761,6 +818,8 @@ EOF"
 
     _serviceCreaterepo () {
 
+        _runDebug "${FUNCNAME[0]}"
+
         _generateServiceVars "jriver-createrepo"
 
         "${_bash_cmd[@]}" "cat <<-EOF > $_service_fname
@@ -790,6 +849,8 @@ EOF"
 
 
     _uninstall () {
+
+        _runDebug "${FUNCNAME[0]}"
 
         read -r -p "Do you really want to uninstall all JRiver Media Center files? [y/N] " _response
         _response=${_response,,}    # tolower
