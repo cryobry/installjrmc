@@ -469,7 +469,7 @@ EOF'
             _build_requires=''
         fi
 
-        if [[ "$ID" == "centos" ]]; then
+        if [[ "$ID" != "centos" ]]; then
             _requires='Requires: pangox-compat >= 0.0.2'
         else
             _requires=''
