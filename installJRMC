@@ -241,7 +241,7 @@ EOF
             _install_cmd_nogpg=("sudo" "${_install_cmd_nogpg[@]}")
             _update_cmd=("sudo" "${_update_cmd[@]}")
             _bash_cmd=("sudo" "${_bash_cmd[@]}")
-            _bash_cmd=("sudo" "${_rm_cmd[@]}")
+            _rm_cmd=("sudo" "${_rm_cmd[@]}")
             _firewall_cmd=("sudo" "${_firewall_cmd[@]}")
             #_pkg_query_cmd=("sudo" "${_pkg_query_cmd[@]}")
         fi
@@ -374,10 +374,8 @@ EOF
 
         _installPackage wget gnupg
 
-        echo "$ID"
-
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-            echo "here!"
+
             "${_bash_cmd[@]}" 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
 [jriver]
 name=JRiver Media Center repo by BryanC
