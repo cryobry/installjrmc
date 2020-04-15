@@ -245,7 +245,7 @@ EOF
         # parse commands
         for _pkg in "$@"; do
             # Clean up package name and handle OS-specific tweaks
-            _packageOverrides "$_pkg"
+            _packageQuirks "$_pkg"
             # Insert the package name to test if already installed
             if [[ "$_pkg" != "" ]] && ! "${_pkg_query_cmd[@]}" "$_pkg" > /dev/null 2>&1; then
                 if [[ -n $_url_pkg ]]; then
@@ -268,7 +268,7 @@ EOF
     }
 
 
-    _packageOverrides () {
+    _packageQuirks () {
 
         unset _url_pkg
 
@@ -434,6 +434,14 @@ EOF'
             _build_requires=''
         fi
 
+        if [[ "$ID" == "centos" ]]; then
+            _requires='Requires: pangox-compat >= 0.0.2'
+        else
+            _requires=''
+        fi
+
+
+
         # Create spec file
         bash -c "cat <<EOF > $_outputdir/SPECS/mediacenter.spec
 Name:    MediaCenter
@@ -460,7 +468,7 @@ Requires: gtk3 >= 3.14
 Requires: mesa-libGL
 Requires: libglvnd-glx
 Requires: pango >= 1.36
-Requires: pangox-compat >= 0.0.2
+$_requires
 Requires: xdg-utils
 Requires: libgomp >= 4.9
 Requires: gstreamer1 >= 1.4.4
