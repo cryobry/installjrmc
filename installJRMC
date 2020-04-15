@@ -384,7 +384,7 @@ gpgcheck=0
 EOF'
             [[ -n $_debug ]] && cat /etc/yum.repos.d/jriver.repo
             echo "Installing latest JRiver Media Center from repo..."
-            if "${_update_cmd[@]}" && "${_install_cmd[@]}" MediaCenter > /dev/null 2>&1; then
+            if "${_update_cmd[@]}" > /dev/null 2>&1 && "${_install_cmd[@]}" MediaCenter > /dev/null 2>&1; then
                 echo "JRiver Media Center installed successfully!"
                 echo "You can check for future MC updates by running \"sudo dnf update\""
             else
