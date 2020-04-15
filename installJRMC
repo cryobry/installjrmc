@@ -46,10 +46,10 @@ USAGE:
 
 OPTIONS
         --rpmbuild
-            Build RPM from source DEB (Default: install MC from repository)
-            This will build the RPM on all OSes, and additionally install it on Fedora/CentOS
+            Debian/Ubuntu: Build RPM from source DEB
+            Fedora/CentOS: Build RPM from source DEB and install it
         --outputdir PATH
-            Generate rpmbuild output in this directory (Default: the current working directory)
+            Generate rpmbuild output in this directory (Default: $PWD/outputdir)
         --mcversion VERSION
             Build or install a specific version (Default: scrape the latest version from Interact)
         --restorefile RESTOREFILE
@@ -324,7 +324,7 @@ EOF
     _sanityChecks () {
 
         # Cannot create a repo without an rpm
-        if [[ -n $_createrepo ]]; then
+        if [[ -n $_createrepo || -n $_mcversion ]]; then
             _rpmbuild="true"
         fi
 
@@ -647,11 +647,7 @@ EOF"
 
     _setVNCPass () {
 
-        if [[ "$_user" == "root" ]]; then
-            _vncpassfile="/root/.vnc/jrmc_passwd"
-        else
-            _vncpassfile="$HOME/.vnc/jrmc_passwd"
-        fi
+        _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
         if [[ -n $_vncpass ]]; then
             # Remove existing password file if it exists and write a new one
@@ -666,14 +662,14 @@ EOF"
 
     _systemctlReloadAndEnable () {
 
-        [[ -n $_debug ]] && echo "Enabling $1"
+        echo "Enabling $1"
 
         if [[ "$_user" == "root" ]]; then
             systemctl daemon-reload
-            systemctl enable --now "$1"
+            systemctl enable --now "$1" > /dev/null 2>&1
         else
             sudo systemctl daemon-reload
-            sudo systemctl enable --now "$1"
+            sudo systemctl enable --now "$1" > /dev/null 2>&1
         fi
     }
 
@@ -806,12 +802,12 @@ EOF"
             && "${_rm_cmd[@]}" "/etc/apt/sources.list.d/jriver.list"
         if [[ -x $(command -v firewall-cmd) ]]; then
             echo "Removing firewall rules"
-            sudo firewall-cmd --permanent --remove-service=jriver
-            sudo firewall-cmd --permanent --delete-service=jriver
-            sudo firewall-cmd --reload
+            sudo firewall-cmd --permanent --remove-service=jriver > /dev/null 2>&1
+            sudo firewall-cmd --permanent --delete-service=jriver > /dev/null 2>&1
+            sudo firewall-cmd --reload > /dev/null 2>&1
         elif [[ -x $(command -v ufw) ]]; then
             echo "Removing firewall rules"
-            sudo ufw delete allow jriver
+            sudo ufw delete allow jriver  > /dev/null 2>&1
             [[ -f "/etc/ufw/applications.d/jriver.service" ]] \
                 && "${_rm_cmd[@]}" /etc/ufw/applications.d/jriver.service
         fi
@@ -824,7 +820,6 @@ EOF"
         echo "JRiver Media Center has been completely uninstalled"
         echo "Your library files will remain at $HOME/.jriver"
     }
-
 
 
     __main () {
