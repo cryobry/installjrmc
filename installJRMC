@@ -245,7 +245,7 @@ EOF
         # parse commands
         for _pkg in "$@"; do
             # Clean up package name and handle OS-specific tweaks
-            _pkg=$(_packageOverrides "$_pkg")
+            _packageOverrides "$_pkg"
             # Insert the package name to test if already installed
             if [[ "$_pkg" != "" ]] && ! "${_pkg_query_cmd[@]}" "$_pkg" > /dev/null 2>&1; then
                 if [[ -n $_url_pkg ]]; then
@@ -265,8 +265,6 @@ EOF
             echo "Installing: " "${_url_pkg_array[@]}"
             "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}" > /dev/null 2>&1
         fi
-
-
     }
 
 
@@ -275,23 +273,23 @@ EOF
         unset _url_pkg
 
         if [[ "$1" == "rpm-build" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            echo "rpm"
+            _pkg="rpm"
         elif [[ "$1" == "createrepo_c" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            echo "createrepo"
+            _pkg="createrepo"
         elif [[ "$1" == "rpmfusion-free-release" ]]; then
             if [[ "$ID" == "fedora" ]]; then
                 _url_pkg="https://download1.rpmfusion.org/free/$ID/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-                echo "$1"
+                _pkg="$1"
             elif [[ "$ID" == "centos" ]]; then
                 _url_pkg="https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-                echo "$1"
+                _pkg="$1"
             else
-                echo ""
+                _pkg=""
             fi
         elif [[ "$1" == "epel-release" && "$ID" != "centos" ]]; then
-            echo ""
+            _pkg=""
         else
-            echo "$1"
+            _pkg="$1"
         fi
     }
 
