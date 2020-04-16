@@ -318,8 +318,10 @@ EOF
             _pkg="createrepo"
         elif [[ "$1" == "rpmfusion-free-release" ]]; then
             if [[ "$ID" == "fedora" ]]; then
-                _url_pkg="https://download1.rpmfusion.org/free/$ID/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-                _pkg="$1"
+                # As of MC26 and Fedora 32 I don't believe that the rpmfusion repo is necessary
+                #_url_pkg="https://download1.rpmfusion.org/free/$ID/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                #_pkg="$1"
+                _pkg=""
             elif [[ "$ID" == "centos" ]]; then
                 _url_pkg="https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
                 _pkg="$1"
@@ -817,13 +819,13 @@ EOF"
         if [[ "$_novncauth" == "true" ]]; then
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -nopw"
         else
-            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -rfbauth $HOME/.vnc/jrmc_passwd -auth guess -forever -bg"
+            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
         fi
 
         "${_bash_cmd[@]}" "cat <<-EOF > $_service_fname
 [Unit]
 Description=x11vnc
-After=display-manager.service
+After=multi.service
 
 [Service]
 $_user_specifier
@@ -834,7 +836,7 @@ Restart=always
 RestartSec=10
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 EOF"
         _systemctlReloadAndEnable "$_service_name"
     }
