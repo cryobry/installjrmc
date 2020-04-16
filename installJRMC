@@ -766,6 +766,7 @@ After=graphical.target
 $_user_specifier
 Type=simple
 Environment=DISPLAY=$_display
+Environment=XAUTHORITY=$XAUTHORITY
 ExecStart=/usr/bin/mediacenter$_mversion /MediaServer
 Restart=always
 RestartSec=10
