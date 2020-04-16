@@ -883,7 +883,8 @@ EOF"
             sudo apt-get remove "mediacenter$_mversion" -y
         fi
         echo "JRiver Media Center has been completely uninstalled"
-        echo "Your library files will remain at $HOME/.jriver"
+        echo "If you wish to remove your library files: rm -rf $HOME/.jriver"
+        echo "If you wish to remove your rpmbuild output files: rm -rf $_outputdir"
     }
 
 
