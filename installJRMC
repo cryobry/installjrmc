@@ -278,12 +278,30 @@ EOF
 
         if [[ ${#_pkg_array[@]} -ge 1 ]]; then
             echo "Installing: " "${_pkg_array[@]}"
-            "${_install_cmd[@]}" "${_pkg_array[@]}" > /dev/null 2>&1
+            if [[ -n $_debug ]]; then
+                if ! "${_install_cmd[@]}" "${_pkg_array[@]}"; then
+                    echo "Failed to install dependency. Try running with --debug for more info!"
+                    _printHelpAndExit 1
+                fi
+            else
+                if ! "${_install_cmd[@]}" "${_pkg_array[@]}" > /dev/null 2>&1; then
+                    exit 1
+                fi
+            fi
         fi
 
         if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
             echo "Installing: " "${_url_pkg_array[@]}"
-            "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}" > /dev/null 2>&1
+            if [[ -n $_debug ]]; then
+                if ! "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}"; then
+                    echo "Failed to install dependency. Try running with --debug for more info!"
+                    _printHelpAndExit 1
+                fi
+            else
+                if ! "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}" > /dev/null 2>&1; then
+                    exit 1
+                fi
+            fi
         fi
     }
 
@@ -614,12 +632,19 @@ EOF"
         # install rpm
         if [[ -f "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" ]]; then
             echo "Attempting to install version $_mcversion..."
-            if "${_install_cmd[@]}" "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"; then
-                echo "JRiver Media Center $_mcversion was installed successfully!"
+            if [[ -n $_debug ]]; then
+                if ! "${_install_cmd[@]}" "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"; then
+                    echo "JRiver Media Center $_mcversion installation failed!"
+                    exit 1
+                fi
             else
-                echo "JRiver Media Center $_mcversion installation failed!"
-                exit 1
+                if ! "${_install_cmd[@]}" "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" > /dev/null 2>&1; then
+                    echo "JRiver Media Center $_mcversion installation failed!"
+                    echo "Try running with --debug for more info!"
+                    exit 1
+                fi
             fi
+            echo "JRiver Media Center $_mcversion was installed successfully!"
         else
             echo "$_outputdir/RPMS/x86_64/MediaCenter-${_mcversion}.x86_64.rpm is missing!"
             echo "JRiver Media Center ${_mcversion} installation failed!"
@@ -851,7 +876,7 @@ EOF"
 
         _runDebug "${FUNCNAME[0]}"
 
-        read -r -p "Do you really want to uninstall all JRiver Media Center files? [y/N] " _response
+        read -r -p "Do you really want to uninstall JRiver Media Center? [y/N] " _response
         _response=${_response,,}    # tolower
         [[ ! "$_response" =~ ^(yes|y)$ ]] && echo "Cancelling uninstall..." && exit 0
         echo "Stopping and disabling all Media Center services"
