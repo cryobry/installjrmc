@@ -1,44 +1,35 @@
 #!/usr/bin/env bash
+shopt -s extglob
+#######################################
 # This script will download, build, and install JRiver Media Center with optional systemd services
 # on Fedora, CentOS, Debian, and Ubuntu
+#
+# Run installJRMC --help to see available options
 #
 # To-dos:
 #   1. Raspberry Pi support -- do not own one so difficult to test
 #   2. Arch support -- would love some testing and PRs
 #   3. ncurses graphical installer
-shopt -s extglob
+#   4. Refactor to generalize functions
+#
+# installJRMC can be run directly or sourced as a function (by sourcing this file)
+# Arguments:
+#   see _printHelpAndExit() and/or check getopt's in _parseInput() for available options
+# Returns:
+#   0 if critical functions complete successfully
+#######################################
+installJRMC() {
 
-installJRMC () {
+    _scriptversion="0.2"
+    _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
+    _outputdir="$_basedir/output"
+    _createrepo_webroot="/srv/jriver"
+    _createrepo_user="$(whoami)"
+    _user="$(whoami)"
+    _available_services=("createrepo" "x11vnc" "mediaserver" "mediacenter" "vnc")
 
-    ########################
-    ####### DEFAULTS #######
-    ########################
 
-    _scriptversion="0.1"
-
-    [[ -z "$_boardurl" ]] && \
-        _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
-
-    [[ -z "$_outputdir" ]] && \
-        _outputdir="$_basedir/output"
-
-    [[ -z $_createrepo_webroot ]] && \
-        _createrepo_webroot="/srv/jriver"
-
-    [[ -z $_createrepo_user ]] && \
-        _createrepo_user="$(whoami)"
-
-    [[ -z $_user ]] && \
-        _user="$(whoami)"
-
-    [[ -z $_display ]] && \
-        _display="${DISPLAY:-":0"}"
-
-    ########################
-    ###### FUNCTIONS #######
-    ########################
-
-    _printHelpAndExit () {
+    _printHelpAndExit() {
 
         _runDebug "${FUNCNAME[0]}"
 
@@ -47,9 +38,14 @@ USAGE:
     installJRMC [[OPTION] [VALUE]]...
 
 OPTIONS
+        --repo-install
+            Install JRiver MediaCenter from repository using package manager (Default)
+            DEB-based OSes: Official package repository
+            RPM-based OSes: BryanC unofficial repository
+        --rpmbuild-install
+             (RPM-based OSes only!) Build RPM from source DEB and install it
         --rpmbuild
-            Debian/Ubuntu: Build RPM from source DEB
-            Fedora/CentOS: Build RPM from source DEB and install it
+            Build RPM from source DEB
         --outputdir PATH
             Generate rpmbuild output in this directory (Default: $PWD/outputdir)
         --mcversion VERSION
@@ -58,44 +54,49 @@ OPTIONS
             Restore file location for registration (Default: skip registration)
         --betapass PASSWORD
             Enter beta team password for access to beta builds
-        --service SERVICE
-            See SERVICES section below for a list of possible service to install
-        -v|--version
-            Print this script version and exit
-        -d|--debug
-            Enter debug mode
-        -h|--help
-            Print help dialog and exit
-        -u|--uninstall
-            Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove
-            library files)
-
-    CREATEREPO
+        --service, -s SERVICE
+            See SERVICES section below for a list of possible services to install
         --createrepo
             Build rpm, copy to webroot, and run createrepo
-
-            --createrepo-webroot PATH
-                The webroot directory to install the repo (Default: /srv/jriver/)
-            --createrepo-user USER
-                The web server user (Default: current user)
+        --createrepo-webroot PATH
+            The webroot directory to install the repo (Default: /srv/jriver/)
+        --createrepo-user USER
+            The web server user (Default: current user)
+        --version, -v
+            Print this script version and exit
+        --debug, -d
+            Enter debug mode
+        --force, -f
+            Force reinstallation and ignore/overwrite previous output
+        --help, -h
+            Print help dialog and exit
+        --uninstall, -u
+            Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 
     SERVICES
-        mediaserver
-            Create and enable a JRiver MC Media Server systemd service for the current user
 
-        x11vnc-mediaserver
-            Create and enable a JRiver MC mediaserver service and x11vnc (for headless
-            installations without an existing X server) service for the current user
+        mediaserver
+            Create and enable a mediaserver systemd service (requires an existing X server)
+
+        mediacenter
+            Create and enable a mediacenter systemd service (requires an existing X server)
+
+        x11vnc
+            Create and enable an x11vnc server (requires an existing X server)
+            --vncpass and --display are valid options (see below)
+
+        vnc
+            Create and enable a new VNC X server
 
             --vncpass PASSWORD
-                Set vnc password for x11vnc access. If no password is set, the script will either use
-                existing password stored in ~/.vnc/jrmc_passwd or use no password
+                Set vnc password for x11vnc access. If no password is set, the script will either
+                use existing password stored in ~/.vnc/jrmc_passwd or use no password
             --display DISPLAY
-                Start X11VNC on this display (Default: The current display or :0 if current display is
-                unaccessible)
+                Start X11VNC on this display (Default: The current display or :0 if current display
+                is unaccessible)
 
         createrepo
-            Install service to build latest MC RPM and run createrepo hourly for the current user
+            Install hourly service to build latest MC RPM and run createrepo
 EOF
 
         # Exit using passed exit code
@@ -103,14 +104,21 @@ EOF
     }
 
 
-    _parseInput () {
+    _parseInput() {
 
         _runDebug "${FUNCNAME[0]}"
 
-        if _input=$(getopt -o +vdhu -l rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
+        if _input=$(getopt -o +vdhus: -l repo-install,rpmbuild-install,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,force,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
             eval set -- "$_input"
             while true; do
                 case "$1" in
+                    --repo-install)
+                        _repoinstall="true"
+                        ;;
+                    --rpmbuild-install)
+                        _rpminstall="true"
+                        _rpmbuild="true"
+                        ;;
                     --rpmbuild)
                         _rpmbuild="true"
                         ;;
@@ -126,8 +134,8 @@ EOF
                     --betapass)
                         shift && _betapass="$1"
                         ;;
-                    --service)
-                        shift && _service="$1"
+                    --service|-s)
+                        shift && _services+=("$1")
                         ;;
                     --version|-v)
                         echo "Version: $_scriptversion"
@@ -137,6 +145,9 @@ EOF
                         echo "Debugging on"
                         _debug="true"
                         ;;
+                    --force|-f)
+                        _force="true"
+                        ;;
                     --help|-h)
                         _printHelpAndExit 0
                         ;;
@@ -145,6 +156,7 @@ EOF
                         ;;
                     --createrepo)
                         _createrepo="true"
+                        _rpmbuild="true"
                         ;;
                     --createrepo-webroot)
                         shift && _createrepo_webroot="$1"
@@ -166,19 +178,41 @@ EOF
                 shift
             done
         else
-            echo "Incorrect options provided"
+            err "Incorrect options provided"
             _printHelpAndExit 1
         fi
     }
 
 
-    _runDebug () {
+    err() {
+
+      echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2
+    }
+
+
+    #######################################
+    # Call this at the beginning of every function in order to track
+    #######################################
+    _runDebug() {
 
         [[ -n $_debug ]] && echo "Running: " "$@"
     }
 
 
-    _checkUser () {
+    #######################################
+    # Prepend this to any command that you wish to execute with sudo (i.e. when _user is NOT root)
+    #######################################
+    _ifSudo() {
+
+        if [[ "$_user" != "root" ]]; then
+            sudo "$@"
+        else
+            "$@"
+        fi
+    }
+
+
+    _checkUser() {
 
         _runDebug "${FUNCNAME[0]}"
 
@@ -197,15 +231,19 @@ EOF
     }
 
 
-    _getOS () {
+    #######################################
+    # Sources /etc/os-release so we know which OS we're running on
+    # Used in: _buildCommands()
+    #######################################
+    _getOS() {
 
         _runDebug "${FUNCNAME[0]}"
 
         if [[ -e /etc/os-release ]]; then
             source /etc/os-release
         else
-            echo "No /etc/os-release found!"
-            echo "Your OS is unsupported"
+            err "No /etc/os-release found!"
+            err "Your OS is unsupported"
             _printHelpAndExit 1
         fi
 
@@ -213,100 +251,179 @@ EOF
     }
 
 
-    _buildCommands () {
+    #######################################
+    # Creates some OS-specific functions to query, install, and remove packages and edit
+    # firewalls, run bash, remove and copy files, etc.
+    # Requires:
+    #   ID
+    #   _createrepo_user
+    #   _createrepo_webroot
+    # Globals:
+    #   _bash_cmd
+    #   _rm_cmd
+    #   _cp_cmd
+    #   _mkdir_cmd
+    #   _ln_cmd
+    #   _createrepo_cmd
+    #   _pkg_install
+    #   _pkg_reinstall
+    #   _pkg_install_nogpg
+    #   _pkg_remove
+    #   _pkg_update
+    #   _pkg_query
+    #   _firewall_cmd
+    #   _systemctl_reload
+    #   _systemctl_enable
+    #   _systemctl_disable
+    #######################################
+    _buildCommands() {
+
+        # Detect OS
+        _getOS
 
         _runDebug "${FUNCNAME[0]}"
 
-        # build some basic command arrays based on OS and user input
+        # Agnostic commands
+        _bash_cmd(){ _ifSudo bash -c "$@"; }
+        _rm_cmd(){ _ifSudo rm -rf "$@"; }
+        _cp_cmd(){ _ifSudo cp -n "$@"; }
+        _mkdir_cmd(){ _ifSudo mkdir -p "$@"; }
+        _ln_cmd(){ _ifSudo ln -s "$@"; }
+        _systemctl_reload(){ _ifSudo systemctl daemon-reload; }
+        _systemctl_enable(){ _ifSudo systemctl enable --now "$@"; }
+        _systemctl_disable(){ _ifSudo systemctl disable --now "$@"; }
+
+        # OS-specific commands
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-            _install_cmd=("dnf" "install" "-y")
-            _update_cmd=("dnf" "makecache" "-y")
-            _pkg_query_cmd=("rpm" "-q")
-            _firewall_cmd=("firewall-cmd")
+            _pkg_install(){ _ifSudo dnf install -y "$@"; }
+            _pkg_reinstall(){ _ifSudo dnf reinstall -y "$@"; }
+            _pkg_install_nogpg(){ _ifSudo dnf install --nogpgcheck -y "$@"; }
+            _pkg_remove(){ _ifSudo dnf remove -y "$@"; }
+            _pkg_update(){ _ifSudo dnf makecache; }
+            _pkg_query(){ _ifSudo rpm -q "$@"; }
+            _firewall_cmd(){ _ifSudo firewall-cmd "$@"; }
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            _install_cmd=("apt-get" "install" "-y")
-            _update_cmd=("apt-get" "update" "-y")
-            _pkg_query_cmd=("dpkg" "-l")
-            _firewall_cmd=("ufw")
+            _pkg_install(){ _ifSudo apt-get install -y "$@"; }
+            _pkg_reinstall(){ _ifSudo apt-get reinstall -y "$@"; }
+            _pkg_install_nogpg(){ _ifSudo apt-get install -y "$@"; }
+            _pkg_remove(){ _ifSudo apt-get remove -y "$@"; }
+            _pkg_update(){ _ifSudo apt-get update -y; }
+            _pkg_query(){ _ifSudo dpkg -l "$@"; }
+            _firewall_cmd(){ _ifSudo ufw "$@"; }
         fi
 
-        _bash_cmd=("bash" "-c")
-        _rm_cmd=("rm" "-rf")
-
-        _install_cmd_nogpg=("${_install_cmd[@]}" "--nogpgcheck")
-
-        # append sudo for non-root users
-        if [[ "$_user" != "root" ]]; then
-            _install_cmd=("sudo" "${_install_cmd[@]}")
-            _install_cmd_nogpg=("sudo" "${_install_cmd_nogpg[@]}")
-            _update_cmd=("sudo" "${_update_cmd[@]}")
-            _bash_cmd=("sudo" "${_bash_cmd[@]}")
-            _rm_cmd=("sudo" "${_rm_cmd[@]}")
-            _firewall_cmd=("sudo" "${_firewall_cmd[@]}")
-            #_pkg_query_cmd=("sudo" "${_pkg_query_cmd[@]}")
+        # Some additional commands specifically for createrepo (primarily to handle user rights)
+        # Could also go in runCreateRepo() but let's leave it here for now
+        if [[ $_createrepo_user != "root" ]]; then
+            if [[ -d "$_createrepo_webroot/repodata" ]]; then
+                _createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q --update "$@"; }
+            else
+                _createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q "$@"; }
+            fi
+            _mkdir_cmd(){ sudo -u "$_createrepo_user" mkdir -p "$@"; }
+            _cp_cmd(){ sudo -u "$_createrepo_user" cp -n "$@"; }
+        else
+            if [[ -d "$_createrepo_webroot/repodata" ]]; then
+                _createrepo_cmd(){ createrepo -q --update "$@"; }
+            else
+                _createrepo_cmd(){ createrepo -q "$@"; }
+            fi
         fi
 
-        [[ -n $_debug ]] && \
-            echo "Install command: " "${_install_cmd[@]}" && \
-            echo "Update command: " "${_update_cmd[@]}" && \
-            echo "Bash command: " "${_bash_cmd[@]}" && \
-            echo "Package query command: " "${_pkg_query_cmd[@]}"
     }
 
 
-    _installPackage () {
+    #######################################
+    # Installs a package using the system package manager
+    # Arguments:
+    #   One or more package names
+    # Options:
+    #   --noquery, -n: Do not query the package state (useful if installing a local RPM)
+    # Returns:
+    #   Will exit 1 if failed
+    #######################################
+    _installPackage() {
 
         _runDebug "${FUNCNAME[0]}" "$@"
+
+        if _input=$(getopt -o +n -l noquery -- "$@"); then
+            eval set -- "$_input"
+            while true; do
+                case "$1" in
+                    --noquery|-n)
+                        local _noquery="true"
+                        ;;
+                    --)
+                        shift
+                        break
+                        ;;
+                esac
+                shift
+            done
+        else
+            err "Incorrect options provided"
+            _printHelpAndExit 1
+        fi
 
         # We will add packages to this array if their command is not available
         local -a _pkg_array
         local -a _url_pkg_array
 
-        # parse commands
+        # parse arguments (packages)
         for _pkg in "$@"; do
             # Clean up package name and handle OS-specific tweaks
             _packageQuirks "$_pkg"
             # Insert the package name to test if already installed
-            if [[ "$_pkg" != "" ]] && ! "${_pkg_query_cmd[@]}" "$_pkg" > /dev/null 2>&1; then
-                if [[ -n $_url_pkg ]]; then
-                    _url_pkg_array+=("$_url_pkg")
-                else
-                    _pkg_array+=("$_pkg")
+            if [[ "$_pkg" != "" ]]; then
+                if [[ -n $_noquery ]] || ! _pkg_query "$_pkg" > /dev/null 2>&1; then
+                    if [[ -n $_url_pkg ]]; then
+                        _url_pkg_array+=("$_url_pkg")
+                    else
+                        _pkg_array+=("$_pkg")
+                    fi
                 fi
             fi
         done
 
+        # Install from package name (with gpg check)
         if [[ ${#_pkg_array[@]} -ge 1 ]]; then
-            echo "Installing: " "${_pkg_array[@]}"
+            echo "Installing:" "${_pkg_array[@]}"
             if [[ -n $_debug ]]; then
-                if ! "${_install_cmd[@]}" "${_pkg_array[@]}"; then
-                    echo "Failed to install dependency. Try running with --debug for more info!"
-                    _printHelpAndExit 1
-                fi
-            else
-                if ! "${_install_cmd[@]}" "${_pkg_array[@]}" > /dev/null 2>&1; then
+                if ! _pkg_install "${_pkg_array[@]}"; then
+                    err "Failed to install required package"
                     exit 1
                 fi
+            elif ! _pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
+                err "Failed to install dependency."
+                _printHelpAndExit 1
             fi
         fi
 
+        # Install from package url (without gpg check)
         if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
-            echo "Installing: " "${_url_pkg_array[@]}"
+            echo "Installing:" "${_url_pkg_array[@]}"
             if [[ -n $_debug ]]; then
-                if ! "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}"; then
-                    echo "Failed to install dependency. Try running with --debug for more info!"
-                    _printHelpAndExit 1
-                fi
-            else
-                if ! "${_install_cmd_nogpg[@]}" "${_url_pkg_array[@]}" > /dev/null 2>&1; then
+                if ! _pkg_install_nogpg "${_url_pkg_array[@]}"; then
+                    err "Failed to install required package from url"
                     exit 1
                 fi
+            elif ! _pkg_install_nogpg "${_url_pkg_array[@]}" > /dev/null 2>&1; then
+                err "Failed to install required package from url"
+                _printHelpAndExit 1
             fi
         fi
     }
 
 
-    _packageQuirks () {
+    #######################################
+    # Handles OS-specific package name tweaks and source urls
+    # Arguments:
+    #   A package name
+    # Globals:
+    #   _pkg
+    #   _url_pkg
+    #######################################
+    _packageQuirks() {
 
         _runDebug "${FUNCNAME[0]}" "$@"
 
@@ -330,13 +447,24 @@ EOF
             fi
         elif [[ "$1" == "epel-release" && "$ID" != "centos" ]]; then
             _pkg=""
+        elif [[ "$1" == "tigervnc-server" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            _pkg="tigervnc-standalone-server"
         else
             _pkg="$1"
         fi
     }
 
 
-    _setVersion () {
+    #######################################
+    # Get our MC working version from input argument or scraping Interact
+    # Requires:
+    #   _boardurl
+    #   _installPackage
+    # Globals:
+    #   _mcversion (i.e. "26.0.12")
+    #   _mversion (i.e. "26")
+    #######################################
+    _setVersion() {
 
         _runDebug "${FUNCNAME[0]}"
 
@@ -345,133 +473,187 @@ EOF
             _installPackage wget
 
             # Get latest version from Interact
-            echo -n "Scraping latest MC version number from Interact..."
+            echo "Scraping latest MC version number from Interact..."
             if ! _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
-                echo "MC version could not be scraped. Please specify a version manually using --mcversion or check your --boardurl"
+                err "MC version could not be scraped. Please specify a version manually using --mcversion or check your --boardurl"
+                _printHelpAndExit 1
+            else
+                echo "$_mcversion"
             fi
         fi
 
-        if [[ "$_mcversion" =~ ^[0-9]+.[0-9].[0-9]+ ]]; then
-            echo "$_mcversion"
-        else
-            echo "MC version: $_mcversion could not be parsed!"
-            _printHelpAndExit 1
-        fi
+        echo "Using version: $_mcversion"
 
-        # Extract major and variation version numbers
+        # Extract major version number
         _mversion="${_mcversion%%.*}"
+
+        # Saving this substituion in case it's needed in the future
         #_variation="${_mcversion##*.}"
     }
 
-    _sanityChecks () {
+
+    #######################################
+    # Check if an argument exists in an array
+    # Arguments:
+    #   The first argument is the string to match to the following arguments
+    # Example:
+    #   _inArray "zebra" "${animals_arr[@]}"
+    # Returns:
+    #   0 if a match is found, 1 if not
+    #######################################
+    _inArray() {
+
+        local _match="$1"
+        shift
+
+        local _item
+        for _item in "$@"; do
+            [[ "$_item" == "$_match" ]] && return 0
+        done
+
+        return 1
+    }
+
+
+    #######################################
+    # Clean up nonsensical user input
+    # Notes:
+    #   I try to keep this function as short as possible and provide better input options and
+    #   sensible defaults than workarounds
+    # Test:
+    #   _installJRMC should run sucessfully even without running _sanityChecks()
+    #######################################
+    _sanityChecks() {
 
         _runDebug "${FUNCNAME[0]}"
-
-        # Cannot create a repo without an rpm
-        if [[ -n $_createrepo || "$_service" == "createrepo" ]]; then
-            _rpmbuild="true"
-        fi
 
         # Check for bad service name
-        if [[ -n $_service && ! "$_service" =~ ^(mediaserver|x11vnc-mediaserver|createrepo)$ ]]; then
-            echo "Incorrect service type provided!"
-            _printHelpAndExit 1
-        fi
+        #
+        _checkServices() {
+            for _service in "${_services[@]}"; do
+                if ! _inArray "$_service" "${_available_services[@]}"; then
+                    echo "Incorrect service type provided!"
+                    _printHelpAndExit 1
+                fi
+            done
+        }
+
+        _checkMCInstalled() {
+
+            if [[ "${_services[*]}" =~ ^(mediacenter|mediaserver)$ ]]; then
+                if [[ -z $_repoinstall && -z $_rpminstall ]]; then
+                    if [[ -x $(command -v "mediacenter$_mversion") ]]; then
+                        err "You are attempting to install a service that relies on mediacenter$_mversion but --repo-install/--rpmbuild-install are not set and mediacenter$_mversion is not present"
+                        _printHelpAndExit 1
+                    fi
+                fi
+            fi
+
+
+        }
+
+        # Disable sanity checks for now to simplify debugging
+        _checkServices
+        _checkMCInstalled
     }
 
 
-    _installExternalRepos () {
+    #######################################
+    # Installs JRiver Media Center from a repository
+    # Returns:
+    #   0 if JRiver Media Center installed sucessfully, 1 if installation failed
+    #######################################
+    _installMCFromRepo() {
 
         _runDebug "${FUNCNAME[0]}"
 
-        _installPackage rpmfusion-free-release epel-release
-    }
+        echo "Installing latest JRiver Media Center from repo..."
 
-
-    _installRepo () {
-
-        _runDebug "${FUNCNAME[0]}"
-
-        _installPackage wget gnupg
-
+        # Add repositories to OS-specific package managers
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
 
-            "${_bash_cmd[@]}" 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
+            _bash_cmd 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
 [jriver]
 name=JRiver Media Center repo by BryanC
 baseurl=https://repos.bryanroessler.com/jriver
 gpgcheck=0
 EOF'
-            [[ -n $_debug ]] && cat /etc/yum.repos.d/jriver.repo
-            echo "Installing latest JRiver Media Center from repo..."
-            if "${_update_cmd[@]}" > /dev/null 2>&1 && "${_install_cmd[@]}" MediaCenter > /dev/null 2>&1; then
-                echo "JRiver Media Center installed successfully!"
-                echo "You can check for future MC updates by running \"sudo dnf update\""
-            else
-                echo "JRiver Media Center installation failed!"
-                _printHelpAndExit 1
-            fi
-
+            local _mcpkg="MediaCenter"
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            if [[ $_user != "root" ]]; then
-                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - > /dev/null 2>&1
-                sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list" > /dev/null 2>&1
-            else
-                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - > /dev/null 2>&1
-                wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list" > /dev/null 2>&1
-            fi
+            wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
+            _ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list" > /dev/null 2>&1
+            local _mcpkg="mediacenter$_mversion"
+        fi
 
-            [[ -n $_debug ]] && cat "/etc/apt/sources.list.d/jriver.list"
-            echo "Installing JRiver Media Center from repo..."
-            if "${_update_cmd[@]}" > /dev/null 2>&1 && "${_install_cmd[@]}" "mediacenter$_mversion" > /dev/null 2>&1; then
-                echo "JRiver Media Center installed successfully!"
-                echo "You can check for future MC updates by running \"apt-get update && apt-get dist-upgrade\""
-            else
-                echo "JRiver Media Center installation failed!"
-                _printHelpAndExit 1
-            fi
+        # Update packages and install JRiver MediaCenter
+        if _pkg_update > /dev/null 2>&1 && _pkg_install "$_mcpkg" > /dev/null 2>&1; then
+            echo "JRiver Media Center installed successfully!"
+            return 0
+        else
+            err "JRiver Media Center installation failed!"
+            return 1
         fi
 
     }
 
 
-    _acquireDeb () {
+    #######################################
+    # Acquire the source DEB package from JRiver's servers
+    # Returns:
+    #   0 if DEB file downloaded successfully, 1 if failed
+    #######################################
+    _acquireDeb() {
 
         _runDebug "${FUNCNAME[0]}"
+
+        local _debfilename="$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb"
 
         # If necessary, create SOURCES dir
         [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
 
         # If deb file already exists, skip download
-        if [[ -f "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" ]]; then
-            echo "Using local DEB file: $_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb"
+        if [[ -f "$_debfilename" ]]; then
+            echo "Using local DEB file: $_debfilename"
         # Else check beta repo
         elif [[ -n $_betapass ]]; then
-            if wget -q -O "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" \
+            if wget -q -O "$_debfilename" \
             "https://files.jriver.com/mediacenter/channels/v${_mversion}/beta/${_betapass}/MediaCenter-${_mcversion}-amd64.deb"; then
                 true
             fi
         # Else check test repo
-        elif wget -q -O "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" \
+        elif wget -q -O "$_debfilename" \
         "https://files.jriver.com/mediacenter/test/MediaCenter-${_mcversion}-amd64.deb"; then
             true
         # Else check latest repo
-        elif wget -q -O "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" \
+        elif wget -q -O "$_debfilename" \
         "https://files.jriver.com/mediacenter/channels/v${_mversion}/latest/MediaCenter-${_mcversion}-amd64.deb"; then
             true
         else
-            echo "Cannot find DEB file. Exiting..." && exit 1
+            err "Cannot find DEB file. Exiting..."
+            exit 1
         fi
 
-        if [[ ! -f "$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb" ]]; then
-            echo "Downloaded DEB file missing or corrupted, exiting..."
+        if [[ ! -f "$_debfilename" ]]; then
+            err "Downloaded DEB file missing or corrupted, exiting..."
             exit 1
         fi
     }
 
 
-
-    _buildRPM () {
+    #######################################
+    # Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
+    # Requires:
+    #   _outputdir
+    #   ID
+    #   _mcversion
+    #   _mversion
+    #   _installPackage
+    # Globals:
+    #   _mcrpm
+    # Returns:
+    #   0 if rpmbuild is successful, 1 if not
+    #######################################
+    _buildRPM() {
 
         _runDebug "${FUNCNAME[0]}"
 
@@ -484,17 +666,16 @@ EOF'
         # rpmbuild uses rpm to check for build dependencies
         # this will fail on non-rpm distros
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-            _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
+            local _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
         else
-            _build_requires=''
+            local _build_requires=''
         fi
 
         if [[ "$ID" != "centos" ]]; then
-            _requires='Requires: pangox-compat >= 0.0.2'
+            local _requires='Requires: pangox-compat >= 0.0.2'
         else
-            _requires='Requires: libXScrnSaver'
+            local _requires='Requires: libXScrnSaver'
         fi
-
 
 
         # Create spec file
@@ -560,120 +741,107 @@ dpkg -x %{S:0} %{buildroot}
 /etc/security/limits.d/*
 EOF"
 
+        declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
+
         # skip rebuilding the rpm if it already exists
-        if [[ -f "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" ]]; then
-            echo "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm already exists! Skipping build step..."
+        if [[ -f "$_mcrpm" && -z "$_force" ]]; then
+            echo "$_mcrpm already exists! Skipping build step..."
+            return 0 # this is fine
         else
             # Run rpmbuild
             echo "Building version $_mcversion, please wait..."
-            if rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"; then
-                echo "Build complete!"
-                echo "The RPM is located at $_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
+            if [[ -n $_debug ]]; then
+                rpmbuild --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"
             else
-                echo "Build failed! Exiting..."
+                rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec" > /dev/null 2>&1
+            fi
+
+            # Check return code
+            # shellcheck disable=SC2181
+            if [[ $? -ne 0 || ! -f "$_mcrpm" ]]; then
+                err "Build failed! Exiting..."
                 exit 1
             fi
         fi
     }
 
 
-    _runCreateRepo () {
+    #######################################
+    # Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
+    # Arguments:
+    #   Requires one argument, the path to the RPM file (typically _mcrpm)
+    # Requires:
+    #   _createrepo_webroot
+    # Returns:
+    #   0 if createrepo is successful, 1 if not
+    #######################################
+    _runCreateRepo() {
 
         _runDebug "${FUNCNAME[0]}"
 
         _installPackage createrepo_c
 
-        unset _prefix
-        if [[ $_createrepo_user != "root" ]]; then
-            _prefix=("sudo" "-u" "$_createrepo_user")
-        fi
-
-        _createrepo_cmd=("createrepo" "-q")
-
         # If the webroot does not exist, create it
         if [[ ! -d "$_createrepo_webroot" ]]; then
-            if ! "${_prefix[@]}" mkdir -p "$_createrepo_webroot"; then
-                echo "Could not create the createrepo-webroot path!"
-                echo "Make sure that the createrepo-webroot is writeable by createrepo-user!"
+            if ! _mkdir_cmd "$_createrepo_webroot"; then
+                err "Could not create the createrepo-webroot path!"
+                err "Make sure that the createrepo-webroot is writeable by createrepo-user!"
+                return 1
             fi
         fi
 
         # Copy built rpms to webroot
-        if "${_prefix[@]}" cp -n "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" "$_createrepo_webroot"; then
-            echo "Copied $_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm to $_createrepo_webroot/MediaCenter-$_mcversion.x86_64.rpm"
-        else
-            echo "Could not copy the RPM to the createrepo-webroot path!"
-            echo "Make sure that the createrepo-webroot path is writeable by createrepo-user!"
+        if ! _cp_cmd "$1" "$_createrepo_webroot"; then
+            err "Could not copy the RPM to the createrepo-webroot path!"
+            err "Make sure that the createrepo-webroot path is writeable by createrepo-user!"
+            return 1
         fi
 
-        # If repodata exists, append --update to createrepo command
-        [[ -d "$_createrepo_webroot/repodata" ]] && _createrepo_cmd+=("--update")
-
         # Run createrepo
-        if "${_prefix[@]}" "${_createrepo_cmd[@]}" "$_createrepo_webroot"; then
+        if _createrepo_cmd "$_createrepo_webroot"; then
             echo "Successfully updated repo!"
+            return 0
         else
-            echo "Update repo failed!"
+            err "Update repo failed!"
             return 1
         fi
     }
 
 
-    _installRPM () {
-
-        _runDebug "${FUNCNAME[0]}"
-
-        # skip installing same version
-        _installed_ver="$(rpm --query MediaCenter)"
-        _to_be_installed_ver="MediaCenter-$_mcversion.x86_64"
-        if [[ $_installed_ver == "$_to_be_installed_ver" ]]; then
-            echo "JRiver Media Center $_mcversion is already installed! Skipping installation..."
-            return
-        fi
-
-        # install rpm
-        if [[ -f "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" ]]; then
-            echo "Attempting to install version $_mcversion..."
-            if [[ -n $_debug ]]; then
-                if ! "${_install_cmd[@]}" "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"; then
-                    echo "JRiver Media Center $_mcversion installation failed!"
-                    exit 1
-                fi
-            else
-                if ! "${_install_cmd[@]}" "$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm" > /dev/null 2>&1; then
-                    echo "JRiver Media Center $_mcversion installation failed!"
-                    echo "Try running with --debug for more info!"
-                    exit 1
-                fi
-            fi
-            echo "JRiver Media Center $_mcversion was installed successfully!"
-        else
-            echo "$_outputdir/RPMS/x86_64/MediaCenter-${_mcversion}.x86_64.rpm is missing!"
-            echo "JRiver Media Center ${_mcversion} installation failed!"
-            exit 1
-        fi
-    }
-
-
-    _symlinkCerts () {
+    #######################################
+    # Symlink certificates where JRiver MediaCenter expects them to be on Fedora/CentOS
+    # them on Debian/Ubuntu
+    # Returns:
+    #   0 if symlinking is unecessary or successful, 1 if not
+    #######################################
+    _symlinkCerts() {
 
         _runDebug "${FUNCNAME[0]}"
 
         if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
         -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-            echo "Symlinking /etc/ssl/certs/ca-certificates.crt to /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
-            if [[ "$_user" == "root" ]]; then
-                ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
-            else
-                sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
+            if ! _ln_cmd /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt; then
+                err "Symlinking certificates failed!"
+                return 1
             fi
         fi
     }
 
 
-    _restoreLicense () {
+    #######################################
+    # Automatically restore the mjr license file if it is found next to installJRMC or _restorefile
+    # is set
+    # Requires:
+    #   _restorefile OR _basedir
+    #   _mversion
+    # Returns:
+    #   0 if license restored successfully or skipped, 1 if unsuccessful
+    #######################################
+    _restoreLicense() {
 
         _runDebug "${FUNCNAME[0]}"
+
+        local _mjr
 
         # Allow user to drop an mjr file next to installJRMC
         if [[ -z $_restorefile ]]; then
@@ -685,45 +853,79 @@ EOF"
         # Restore license
         if [[ -f "$_restorefile" ]]; then
             if ! "mediacenter${_mversion}" /RestoreFromFile "$_restorefile"; then
-                echo "Automatic license restore failed"
+                err "Automatic license restore failed"
+                return 1
             fi
         fi
     }
 
 
-    _openFirewall () {
+    #######################################
+    # Open the default JRiver MediaCenter ports using the system firewall tool
+    # Requires:
+    #   ID
+    #   _bash_cmd
+    #   _firewall_cmd
+    # Returns:
+    #   0 if ports opened sucessfully, 1 if not
+    #######################################
+    _openFirewall() {
 
         _runDebug "${FUNCNAME[0]}"
 
-        # RHEL
         if [[ "$ID" =~ ^(fedora|centos)$ ]] && [[ -x $(command -v firewall-cmd) ]]; then
             if ! firewall-cmd --get-services | grep -q jriver; then
-                # shellcheck disable=SC2140,SC1079,SC1078
-                "${_firewall_cmd[@]}" --permanent --new-service=jriver > /dev/null 2>&1
-                "${_firewall_cmd[@]}" --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
-                "${_firewall_cmd[@]}" --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
-                "${_firewall_cmd[@]}" --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
-                "${_firewall_cmd[@]}" --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
-                "${_firewall_cmd[@]}" --reload > /dev/null 2>&1
+                if [[ -n $_debug ]]; then
+                    _firewall_cmd --permanent --new-service=jriver
+                    _firewall_cmd --permanent --service=jriver --set-description="JRiver Media Center Media Server"
+                    _firewall_cmd --permanent --service=jriver --set-short="jriver"
+                    _firewall_cmd --permanent --service=jriver --add-port=52100-52200/tcp
+                    _firewall_cmd --permanent --service=jriver --add-port=1900/udp
+                    _firewall_cmd --reload
+                else
+                    _firewall_cmd --permanent --new-service=jriver > /dev/null 2>&1
+                    _firewall_cmd --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
+                    _firewall_cmd --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
+                    _firewall_cmd --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
+                    _firewall_cmd --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
+                    _firewall_cmd --reload > /dev/null 2>&1
+                fi
             fi
-
-        # Ubuntu
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
             if [[ ! -f "/etc/ufw/applications.d/jriver.service" ]]; then
-                "${_bash_cmd[@]}" "cat <<-EOF > /etc/ufw/applications.d/jriver.service
+                _bash_cmd "cat <<-EOF > /etc/ufw/applications.d/jriver.service
 [jriver]
 title=JRiver Media Center
 description=Allows JRiver Media Server access
 ports=52100:52200/tcp|1900/udp
 EOF"
             fi
+            if [[ -n $_debug ]]; then
+                _firewall_cmd allow jriver
+            else
+                _firewall_cmd allow jriver > /dev/null 2>&1
+            fi
+        fi
 
-            "${_firewall_cmd[@]}" allow jriver > /dev/null 2>&1
+        # shellcheck disable=SC2181
+        # Rationale: much more concise to check exit codes at the end
+        if [[ $? -ne 0 ]]; then
+            err "Firewall ports could not be opened"
+            return 1
         fi
     }
 
 
-    _setVNCPass () {
+    #######################################
+    # Create the VNC password file
+    # Requires:
+    #   _vncpass
+    # Globals:
+    #   _novncauth
+    # Returns:
+    #   0 if ports opened sucessfully, 1 if not
+    #######################################
+    _setVNCPass() {
 
         _runDebug "${FUNCNAME[0]}"
 
@@ -732,59 +934,46 @@ EOF"
         if [[ -n $_vncpass ]]; then
             # Remove existing password file if it exists and write a new one
             [[ -f "$_vncpassfile" ]] && rm -f "$_vncpassfile"
-            x11vnc -storepasswd "$_vncpass" "$_vncpassfile"
-        # Else disable authentication
+            if ! x11vnc -storepasswd "$_vncpass" "$_vncpassfile"; then
+                err "Could not create VNC password file"
+                return 1
+            fi
         elif [[ ! -f "$_vncpassfile" ]]; then
             _novncauth="true"
         fi
     }
 
 
-    _systemctlReloadAndEnable () {
-
-        _runDebug "${FUNCNAME[0]}"
-
-        echo "Enabling $1"
-
-        if [[ "$_user" == "root" ]]; then
-            systemctl daemon-reload
-            systemctl enable --now "$1" > /dev/null 2>&1
-        else
-            sudo systemctl daemon-reload
-            sudo systemctl enable --now "$1" > /dev/null 2>&1
-        fi
-    }
-
-
-    _generateServiceVars () {
-
-        _runDebug "${FUNCNAME[0]}"
-
-        unset _service_fname _service_name _timer_fname _timer_name _user_specifier
+    #######################################
+    # Create associated service variables based on service name
+    # Arguments:
+    #   Requires exactly one argument, the name of the service to parse
+    #######################################
+    _servicePrep() {
 
         if [[ "$_user" == "root" ]]; then
-            _service_fname="/usr/lib/systemd/system/$1.service"
-            _timer_fname="/usr/lib/systemd/system/$1.timer"
-            _service_name="$1.service"
-            _timer_name="$1.timer"
+            _service_fname="/usr/lib/systemd/system/jriver-${1}.service"
+            _timer_fname="/usr/lib/systemd/system/jriver-${1}.timer"
+            _service_name="jriver-${1}.service"
+            _timer_name="jriver-${1}}.timer"
             _user_specifier=""
         else
-            _service_fname="/usr/lib/systemd/system/$1@.service"
-            _timer_fname="/usr/lib/systemd/system/$1@.timer"
-            _service_name="$1@$_user.service"
-            _timer_name="$1@$_user.timer"
+            _service_fname="/usr/lib/systemd/system/jriver-${1}@.service"
+            _timer_fname="/usr/lib/systemd/system/jriver-${1}@.timer"
+            _service_name="jriver-${1}@$_user.service"
+            _timer_name="jriver-${1}@$_user.timer"
             _user_specifier="User=%I"
         fi
+
+        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
     }
 
 
-    _serviceMediaserver () {
+    _serviceMediaserver() {
 
         _runDebug "${FUNCNAME[0]}"
 
-        _generateServiceVars "jriver-mediaserver"
-
-        "${_bash_cmd[@]}" "cat <<-EOF > $_service_fname
+        _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
 Description=JRiver Media Center $_mversion Media Server
 After=graphical.target
@@ -803,18 +992,86 @@ TimeoutStopSec=30
 [Install]
 WantedBy=graphical.target
 EOF"
-        _systemctlReloadAndEnable "$_service_name"
+        _systemctl_reload && _systemctl_enable "$_service_name"
     }
 
 
-    _serviceX11VNC () {
+    _serviceMediacenter() {
+
+        _runDebug "${FUNCNAME[0]}"
+
+        _bash_cmd "cat <<-EOF > $_service_fname
+[Unit]
+Description=JRiver Media Center $_mversion
+After=graphical.target
+
+[Service]
+$_user_specifier
+Type=simple
+Environment=DISPLAY=$_display
+Environment=XAUTHORITY=$XAUTHORITY
+ExecStart=/usr/bin/mediacenter$_mversion
+Restart=always
+RestartSec=10
+KillSignal=SIGHUP
+TimeoutStopSec=30
+
+[Install]
+WantedBy=graphical.target
+EOF"
+        _systemctl_reload && _systemctl_enable "$_service_name"
+    }
+
+
+    _serviceVNC() {
+
+        _runDebug "${FUNCNAME[0]}"
+
+        _setVNCPass
+
+        _installPackage tigervnc-server
+
+        if [[ -z $_display ]]; then
+            if [[ -n $DISPLAY ]]; then
+                _display=$(( ${DISPLAY#:} + 1 ))
+                _display=":$_display"
+            else
+                _display=":0"
+            fi
+        fi
+
+        if [[ "$_novncauth" == "true" ]]; then
+            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg"
+        else
+            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd"
+        fi
+
+        _bash_cmd "cat <<-EOF > $_service_fname
+[Unit]
+Description=Remote desktop service (VNC)
+After=syslog.target network.target
+
+[Service]
+Type=simple
+$_user_specifier
+ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_display > /dev/null 2>&1 || :'
+ExecStart=$_exec_start_cmd
+ExecStop=/usr/bin/vncserver -kill $_display
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+        _systemctl_reload && _systemctl_enable "$_service_name"
+    }
+
+
+    _serviceX11VNC() {
 
         _runDebug "${FUNCNAME[0]}"
 
         _installPackage x11vnc
-        _setVNCPass
 
-        _generateServiceVars "jriver-x11vnc"
+        _setVNCPass
 
         if [[ "$_novncauth" == "true" ]]; then
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -nopw"
@@ -822,7 +1079,7 @@ EOF"
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
         fi
 
-        "${_bash_cmd[@]}" "cat <<-EOF > $_service_fname
+        _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
 Description=x11vnc
 After=multi.service
@@ -838,17 +1095,15 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF"
-        _systemctlReloadAndEnable "$_service_name"
+        _systemctl_reload && _systemctl_enable "$_service_name"
     }
 
 
-    _serviceCreaterepo () {
+    _serviceCreaterepo() {
 
         _runDebug "${FUNCNAME[0]}"
 
-        _generateServiceVars "jriver-createrepo"
-
-        "${_bash_cmd[@]}" "cat <<-EOF > $_service_fname
+        _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
 Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
 
@@ -859,7 +1114,7 @@ ExecStart=$_basedir/installJRMC --outputdir $_outputdir --createrepo --createrep
 [Install]
 WantedBy=default.target
 EOF"
-        "${_bash_cmd[@]}" "cat <<-EOF > $_timer_fname
+        _bash_cmd "cat <<-EOF > $_timer_fname
 [Unit]
 Description=Run JRiver MC rpmbuild hourly
 
@@ -870,45 +1125,48 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF"
-        _systemctlReloadAndEnable "$_timer_name"
+        _systemctl_reload && _systemctl_enable "$_timer_name"
     }
 
 
-    _uninstall () {
+    _uninstall() {
 
         _runDebug "${FUNCNAME[0]}"
 
         read -r -p "Do you really want to uninstall JRiver Media Center? [y/N] " _response
         _response=${_response,,}    # tolower
         [[ ! "$_response" =~ ^(yes|y)$ ]] && echo "Cancelling uninstall..." && exit 0
-        echo "Stopping and disabling all Media Center services"
-        sudo systemctl disable --now jriver-createrepo.timer jriver-x11vnc.service jriver-mediaserver.service
-        echo "Removing repo and service files"
-        for _service in "jriver-mediaserver" "jriver-x11vnc" "jriver-createrepo"; do
-            _generateServiceVars _service
-            [[ -f "$_service_fname" ]] && "${_rm_cmd[@]}" "$_service_fname"
-            [[ -f "$_timer_fname" ]] && "${_rm_cmd[@]}" "$_timer_fname"
+
+        # Uninstall services
+        echo "Stopping and removing all associated Media Center services"
+        for _service in "${_available_services[@]}"; do
+            _servicePrep "$_service"
+            _systemctl_disable "$_service_name"
+            _systemctl_disable "$_timer_name"
+            [[ -f "$_service_fname" ]] && _rm_cmd "$_service_fname"
+            [[ -f "$_timer_fname" ]] && _rm_cmd "$_timer_fname"
         done
+
         [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
-            && "${_rm_cmd[@]}" "/etc/yum.repos.d/jriver.repo"
+            && _rm_cmd "/etc/yum.repos.d/jriver.repo"
         [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
-            && "${_rm_cmd[@]}" "/etc/apt/sources.list.d/jriver.list"
+            && _rm_cmd "/etc/apt/sources.list.d/jriver.list"
         if [[ -x $(command -v firewall-cmd) ]]; then
             echo "Removing firewall rules"
-            sudo firewall-cmd --permanent --remove-service=jriver > /dev/null 2>&1
-            sudo firewall-cmd --permanent --delete-service=jriver > /dev/null 2>&1
-            sudo firewall-cmd --reload > /dev/null 2>&1
+            _firewall_cmd --permanent --remove-service=jriver
+            _firewall_cmd --permanent --delete-service=jriver
+            _firewall_cmd --reload
         elif [[ -x $(command -v ufw) ]]; then
             echo "Removing firewall rules"
-            sudo ufw delete allow jriver  > /dev/null 2>&1
+            _firewall_cmd delete allow jriver
             [[ -f "/etc/ufw/applications.d/jriver.service" ]] \
-                && "${_rm_cmd[@]}" /etc/ufw/applications.d/jriver.service
+                && _rm_cmd /etc/ufw/applications.d/jriver.service
         fi
         echo "Uninstalling Media Center"
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-            sudo dnf remove MediaCenter -y
+            _pkg_remove MediaCenter
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            sudo apt-get remove "mediacenter$_mversion" -y
+            _pkg_remove "mediacenter$_mversion"
         fi
         echo "JRiver Media Center has been completely uninstalled"
         echo "If you wish to remove your library files: rm -rf $HOME/.jriver"
@@ -916,7 +1174,7 @@ EOF"
     }
 
 
-    __main () {
+    __main() {
 
         # Check user
         _checkUser
@@ -924,10 +1182,7 @@ EOF"
         # Parse input
         _parseInput "$@"
 
-        # Detect OS
-        _getOS
-
-        # Build some commands based on the selected OS
+        # Build some OS-specific commands based on the selected OS
         _buildCommands
 
         # Set version to install/uninstall
@@ -942,46 +1197,65 @@ EOF"
             return $?
         fi
 
-        # Install external repos
-        _installExternalRepos
-
-        # install MC using package manager (default)
-        if [[ -z $_rpmbuild ]]; then
-            _installRepo
+        # Install MC using package manager
+        if [[ -n $_repoinstall ]]; then
+            _installPackage rpmfusion-free-release epel-release
+            _installMCFromRepo
             _symlinkCerts
             _restoreLicense
             _openFirewall
-        else
+        fi
+
+        # Build RPM from source DEB
+        if [[ -n $_rpmbuild ]]; then
             _acquireDeb
             _buildRPM
-            if [[ -n $_createrepo ]]; then
-                _runCreateRepo
-            # Go ahead and install MC from RPM if on a supported platform
-            elif [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                _installRPM
+        fi
+
+        # Run createrepo
+        if [[ -n $_createrepo ]]; then
+            _runCreateRepo "$_mcrpm"
+        fi
+
+        # Install the rpm
+        if [[ -n $_rpminstall ]]; then
+            if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                _installPackage rpmfusion-free-release epel-release
+                _installPackage --noquery "$_mcrpm"
                 _symlinkCerts
                 _restoreLicense
                 _openFirewall
             fi
         fi
 
-        # Install systemd services
-        if [[ "$_service" == "createrepo" ]]; then
-            _serviceCreaterepo
-        elif [[ "$_service" == "x11vnc-mediaserver" ]]; then
-            _serviceMediaserver
-            _serviceX11VNC
-        elif [[ "$_service" == "mediaserver"  ]]; then
-            _serviceMediaserver
-        fi
+        # Install services
+        for _service in "${_services[@]}"; do
+            _servicePrep "$_service"
+            case "$_service" in
+                createrepo)
+                    _serviceCreaterepo
+                    ;;
+                x11vnc)
+                    _serviceX11VNC
+                    ;;
+                mediaserver)
+                    _serviceMediaserver
+                    ;;
+                mediacenter)
+                    _serviceMediacenter
+                    ;;
+                vnc)
+                    _serviceVNC
+                    ;;
+                *)
+            esac
+        done
     }
-
-    # Execute main function when called
-    __main "$@"
 }
 
 # Allow this file to be executed directly if not being sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _basedir=$(dirname "$(readlink -f "$0")")
-    installJRMC "$@"
+    installJRMC
+    __main "$@"
 fi
