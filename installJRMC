@@ -26,7 +26,7 @@ installJRMC() {
     _createrepo_webroot="/srv/jriver"
     _createrepo_user="$(whoami)"
     _user="$(whoami)"
-    _available_services=("createrepo" "x11vnc" "mediaserver" "mediacenter" "vncserver")
+    _available_services=("createrepo" "x11vnc" "mediaserver" "mediacenter" "mediacenter-vncserver")
     #_available_containers=("mediacenter-vncserver" "createrepo")
 
 
