@@ -44,7 +44,7 @@ OPTIONS
             DEB-based OSes: Official package repository
             RPM-based OSes: BryanC unofficial repository
         --install-rpmbuild
-             (RPM-based OSes only!) Build RPM from source DEB and install it
+             (RPM-based OSes only) Build RPM from source DEB and install it
         --rpmbuild
             Build RPM from source DEB
         --outputdir PATH
@@ -83,21 +83,20 @@ OPTIONS
             Enable and start a mediacenter systemd service (requires an existing X server)
         x11vnc
             Enable and start x11vnc for the local desktop (requires an existing X server)
-            --vncpass and --display are valid options (see below)
+            --vncpass and --display are also valid options (see below)
         mediacenter-vncserver
             Enable and start a vncserver running JRiver Media Center
             --vncpass PASSWORD
                 Set vnc password for x11vnc access. If no password is set, the script will either
                 use existing password stored in ~/.vnc/jrmc_passwd or use no password
             --display DISPLAY
-                Display to start vncserver/x11vnc (Default: The current display or :0 if current display
-                is unaccessible)
+                Display to start vncserver/x11vnc (Default: The current display (x11vnc) or next available display (vncserver))
         createrepo
             Install hourly service to build latest MC RPM and run createrepo
 
     CONTAINERS
-        mediacenter-vncserver (Under construction!)
-        createrepo (Under construction!)
+        mediacenter-vncserver (Under construction)
+        createrepo (Under construction)
 EOF
 
         # Exit using passed exit code
@@ -252,7 +251,7 @@ EOF
         if [[ -e /etc/os-release ]]; then
             source /etc/os-release
         else
-            err "No /etc/os-release found!"
+            err "No /etc/os-release found"
             err "Your OS is unsupported"
             _printHelpAndExit 1
         fi
@@ -487,8 +486,6 @@ EOF
             if ! _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
                 err "MC version could not be scraped. Please specify a version manually using --mcversion or check your --boardurl"
                 _printHelpAndExit 1
-            else
-                echo "$_mcversion"
             fi
         fi
 
@@ -542,18 +539,28 @@ EOF
         _checkServices() {
             for _service in "${_services[@]}"; do
                 if ! _inArray "$_service" "${_available_services[@]}"; then
-                    echo "Incorrect service type provided!"
+                    echo "Incorrect service type provided"
                     _printHelpAndExit 1
                 fi
             done
         }
+
+
+        _createrepoBuild() {
+
+            if _inArray "createrepo" "${_services[@]}"; then
+                echo "Incorrect service type provided"
+                _printHelpAndExit 1
+            fi
+        }
+
 
         _checkMCInstalled() {
 
             if [[ "${_services[*]}" =~ ^(mediacenter|mediaserver)$ ]]; then
                 if [[ -z $_repoinstall && -z $_rpminstall ]]; then
                     if [[ -x $(command -v "mediacenter$_mversion") ]]; then
-                        err "You are attempting to install a service that relies on mediacenter$_mversion but --repo-install/--rpmbuild-install are not set and mediacenter$_mversion is not present"
+                        err "You are attempting to install a service that relies on mediacenter$_mversion but --install-repo/--install-rpmbuild are not set and mediacenter$_mversion is not installed"
                         _printHelpAndExit 1
                     fi
                 fi
@@ -562,9 +569,10 @@ EOF
 
         }
 
-        # Disable sanity checks for now to simplify debugging
+        # Enable/disable sanity checks
         _checkServices
         _checkMCInstalled
+        #_createrepoBuild
     }
 
 
@@ -609,10 +617,10 @@ EOF'
         # shellcheck disable=SC2181
         # Rationale: More compact to check this once
         if [[ $? -eq 0 ]]; then
-            echo "JRiver Media Center installed successfully!"
+            echo "JRiver Media Center installed successfully"
             return 0
         else
-            err "JRiver Media Center installation failed!"
+            err "JRiver Media Center installation failed"
             exit 1
         fi
     }
@@ -766,7 +774,7 @@ EOF"
 
         # skip rebuilding the rpm if it already exists
         if [[ -f "$_mcrpm" && -z "$_force" ]]; then
-            echo "$_mcrpm already exists! Skipping build step..."
+            echo "$_mcrpm already exists. Skipping build step..."
             return 0 # this is fine
         else
             # Run rpmbuild
@@ -780,7 +788,7 @@ EOF"
             # Check return code
             # shellcheck disable=SC2181
             if [[ $? -ne 0 || ! -f "$_mcrpm" ]]; then
-                err "Build failed! Exiting..."
+                err "Build failed. Exiting..."
                 exit 1
             fi
         fi
@@ -806,24 +814,24 @@ EOF"
         if [[ ! -d "$_createrepo_webroot" ]]; then
             if ! _mkdir_cmd "$_createrepo_webroot"; then
                 err "Could not create the createrepo-webroot path!"
-                err "Make sure that the createrepo-webroot is writeable by createrepo-user!"
+                err "Make sure that the createrepo-webroot is writeable by createrepo-user"
                 return 1
             fi
         fi
 
         # Copy built rpms to webroot
         if ! _cp_cmd "$1" "$_createrepo_webroot"; then
-            err "Could not copy the RPM to the createrepo-webroot path!"
-            err "Make sure that the createrepo-webroot path is writeable by createrepo-user!"
+            err "Could not copy the RPM to the createrepo-webroot path"
+            err "Make sure that the createrepo-webroot path is writeable by createrepo-user"
             return 1
         fi
 
         # Run createrepo
         if _createrepo_cmd "$_createrepo_webroot"; then
-            echo "Successfully updated repo!"
+            echo "Successfully updated repo"
             return 0
         else
-            err "Update repo failed!"
+            err "Update repo failed"
             return 1
         fi
     }
@@ -842,7 +850,7 @@ EOF"
         if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
         -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
             if ! _ln_cmd /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt; then
-                err "Symlinking certificates failed!"
+                err "Symlinking certificates failed"
                 return 1
             fi
         fi
