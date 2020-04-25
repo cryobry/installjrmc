@@ -919,6 +919,7 @@ EOF"
                 _firewall_cmd --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
                 _firewall_cmd --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
                 _firewall_cmd --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
+                _firewall-cmd --add-service jriver --permanent > /dev/null 2>&1
                 _firewall_cmd --reload > /dev/null 2>&1
             fi
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
@@ -930,11 +931,7 @@ description=Allows JRiver Media Server access
 ports=52100:52200/tcp|1900/udp
 EOF"
             fi
-            if [[ -n $_debug ]]; then
-                _firewall_cmd allow jriver
-            else
-                _firewall_cmd allow jriver > /dev/null 2>&1
-            fi
+            _firewall_cmd allow jriver > /dev/null 2>&1
         fi
 
         # shellcheck disable=SC2181
