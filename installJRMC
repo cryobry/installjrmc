@@ -1060,6 +1060,7 @@ EOF"
 
         _runDebug "${FUNCNAME[0]}"
 
+        # Set the display to use
         [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
@@ -1099,6 +1100,7 @@ EOF"
             _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd -xstartup /usr/bin/mediacenter$_mversion"
         fi
 
+        # Set the display to use
         if [[ -z $_display ]]; then
             # If we are running on existing X server then increment DISPLAY by one
             if [[ -n $DISPLAY ]]; then
@@ -1109,6 +1111,7 @@ EOF"
             fi
         fi
 
+        # Alert user to the likely vnc port
         local _port=$(( ${_display#:} + 5900 ))
 
         _bash_cmd "cat <<-EOF > $_service_fname
@@ -1140,10 +1143,15 @@ EOF"
 
         _setX11VNCPass
 
+        # Get current desktop resolution
+        # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
+        local _res
+        _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
+
         if [[ -n $_novncauth ]]; then
-            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -nopw"
+            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -nopw"
         else
-            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
+            _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
         fi
 
         _bash_cmd "cat <<-EOF > $_service_fname
