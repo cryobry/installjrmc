@@ -299,7 +299,15 @@ EOF
         _mkdir_cmd(){ _ifSudo mkdir -p "$@"; }
         _ln_cmd(){ _ifSudo ln -s "$@"; }
         _systemctl_reload(){ _ifSudo systemctl daemon-reload; }
-        _systemctl_enable(){ _ifSudo systemctl enable --now "$@"; }
+        _systemctl_start(){
+            echo "Starting $*"
+            if ! _ifSudo systemctl start "$@"; then
+                err "Could not start $*"
+                err "Check service status using \"sudo systemctl status $*\""
+                return 1
+            fi
+        }
+        _systemctl_enable(){ _ifSudo systemctl enable "$@"; }
         _systemctl_disable(){ _ifSudo systemctl disable --now "$@"; }
 
         # OS-specific commands
@@ -1066,7 +1074,9 @@ TimeoutStopSec=30
 [Install]
 WantedBy=graphical.target
 EOF"
-        _systemctl_reload && _systemctl_enable "$_service_name"
+        _systemctl_reload && \
+        _systemctl_start "$_service_name" && \
+        _systemctl_enable "$_service_name"
     }
 
 
@@ -1096,7 +1106,9 @@ TimeoutStopSec=30
 [Install]
 WantedBy=graphical.target
 EOF"
-        _systemctl_reload && _systemctl_enable "$_service_name"
+        _systemctl_reload && \
+        _systemctl_start "$_service_name" && \
+        _systemctl_enable "$_service_name"
     }
 
 
@@ -1143,9 +1155,10 @@ ExecStop=/usr/bin/vncserver -kill $_display
 [Install]
 WantedBy=multi-user.target
 EOF"
-        _systemctl_reload && _systemctl_enable "$_service_name"
-        echo "vncserver service should be running on localhost:$_port"
-        echo "You can diagnose issues using \"sudo systemctl status $_service_name\""
+        _systemctl_reload && \
+        _systemctl_start "$_service_name" && \
+        _systemctl_enable "$_service_name" && \
+        echo "vncserver running on localhost:$_port"
     }
 
 
@@ -1186,7 +1199,9 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF"
-        _systemctl_reload && _systemctl_enable "$_service_name"
+        _systemctl_reload && \
+        _systemctl_start "$_service_name" && \
+        _systemctl_enable "$_service_name"
     }
 
 
@@ -1216,7 +1231,9 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF"
-        _systemctl_reload && _systemctl_enable "$_timer_name"
+        _systemctl_reload && \
+        _systemctl_start "$_timer_name" && \
+        _systemctl_enable "$_timer_name"
     }
 
 
