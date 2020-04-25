@@ -109,6 +109,12 @@ EOF
 
         _runDebug "${FUNCNAME[0]}"
 
+        # set default behavior
+        if [[ $# == 0 ]]; then
+            _repoinstall="true"
+            return 1
+        fi
+
         if _input=$(getopt -o +vdhus:c: -l install-repo,install-rpmbuild,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,force,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
             eval set -- "$_input"
             while true; do
