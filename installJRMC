@@ -1143,6 +1143,8 @@ EOF"
 
         _setX11VNCPass
 
+        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
+
         # Get current desktop resolution
         # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
         local _res
@@ -1213,6 +1215,10 @@ EOF"
 
 
     _containerVNC() {
+        :
+    }
+
+    _containerMC() {
         :
     }
 
@@ -1347,6 +1353,9 @@ EOF"
                     ;;
                 mediacenter-vncserver)
                     _containerVNC
+                    ;;
+                mediacenter)
+                    _containerMC
                     ;;
                 *)
             esac
