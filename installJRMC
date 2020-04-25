@@ -26,7 +26,8 @@ installJRMC() {
     _createrepo_webroot="/srv/jriver"
     _createrepo_user="$(whoami)"
     _user="$(whoami)"
-    _available_services=("createrepo" "x11vnc" "mediaserver" "mediacenter" "vnc")
+    _available_services=("createrepo" "x11vnc" "mediaserver" "mediacenter" "vncserver")
+    #_available_containers=("mediacenter-vncserver" "createrepo")
 
 
     _printHelpAndExit() {
@@ -38,11 +39,11 @@ USAGE:
     installJRMC [[OPTION] [VALUE]]...
 
 OPTIONS
-        --repo-install
-            Install JRiver MediaCenter from repository using package manager (Default)
+        --install-repo
+            Install JRiver Media Center from repository using package manager (Default)
             DEB-based OSes: Official package repository
             RPM-based OSes: BryanC unofficial repository
-        --rpmbuild-install
+        --install-rpmbuild
              (RPM-based OSes only!) Build RPM from source DEB and install it
         --rpmbuild
             Build RPM from source DEB
@@ -56,6 +57,8 @@ OPTIONS
             Enter beta team password for access to beta builds
         --service, -s SERVICE
             See SERVICES section below for a list of possible services to install
+        --container, -c CONTAINER
+            See CONTAINERS section below for a list of possible services to install
         --createrepo
             Build rpm, copy to webroot, and run createrepo
         --createrepo-webroot PATH
@@ -65,7 +68,7 @@ OPTIONS
         --version, -v
             Print this script version and exit
         --debug, -d
-            Enter debug mode
+            Print debug output
         --force, -f
             Force reinstallation and ignore/overwrite previous output
         --help, -h
@@ -74,29 +77,27 @@ OPTIONS
             Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 
     SERVICES
-
         mediaserver
-            Create and enable a mediaserver systemd service (requires an existing X server)
-
+            Enable and start a mediaserver systemd service (requires an existing X server)
         mediacenter
-            Create and enable a mediacenter systemd service (requires an existing X server)
-
+            Enable and start a mediacenter systemd service (requires an existing X server)
         x11vnc
-            Create and enable an x11vnc server (requires an existing X server)
+            Enable and start x11vnc for the local desktop (requires an existing X server)
             --vncpass and --display are valid options (see below)
-
-        vnc
-            Create and enable a new VNC X server
-
+        mediacenter-vncserver
+            Enable and start a vncserver running JRiver Media Center
             --vncpass PASSWORD
                 Set vnc password for x11vnc access. If no password is set, the script will either
                 use existing password stored in ~/.vnc/jrmc_passwd or use no password
             --display DISPLAY
-                Start X11VNC on this display (Default: The current display or :0 if current display
+                Display to start vncserver/x11vnc (Default: The current display or :0 if current display
                 is unaccessible)
-
         createrepo
             Install hourly service to build latest MC RPM and run createrepo
+
+    CONTAINERS
+        mediacenter-vncserver (Under construction!)
+        createrepo (Under construction!)
 EOF
 
         # Exit using passed exit code
@@ -108,16 +109,16 @@ EOF
 
         _runDebug "${FUNCNAME[0]}"
 
-        if _input=$(getopt -o +vdhus: -l repo-install,rpmbuild-install,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,force,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display: -- "$@"); then
+        if _input=$(getopt -o +vdhus:c: -l install-repo,install-rpmbuild,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,force,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
             eval set -- "$_input"
             while true; do
                 case "$1" in
-                    --repo-install)
+                    --install-repo)
                         _repoinstall="true"
                         ;;
-                    --rpmbuild-install)
-                        _rpminstall="true"
+                    --install-rpmbuild)
                         _rpmbuild="true"
+                        _rpminstall="true"
                         ;;
                     --rpmbuild)
                         _rpmbuild="true"
@@ -136,6 +137,9 @@ EOF
                         ;;
                     --service|-s)
                         shift && _services+=("$1")
+                        ;;
+                    --container|-c)
+                        shift && _containers+=("$1")
                         ;;
                     --version|-v)
                         echo "Version: $_scriptversion"
@@ -561,7 +565,7 @@ EOF
     #######################################
     # Installs JRiver Media Center from a repository
     # Returns:
-    #   0 if JRiver Media Center installed sucessfully, 1 if installation failed
+    #   0 if JRiver Media Center installed sucessfully
     #######################################
     _installMCFromRepo() {
 
@@ -581,19 +585,30 @@ EOF'
             local _mcpkg="MediaCenter"
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
-            _ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/jriver.list" > /dev/null 2>&1
+            _bash_cmd 'cat <<-EOF > /etc/apt/sources.list.d/jriver.list
+deb [arch=amd64,i386,armhf] http://dist.jriver.com/latest/mediacenter/ jessie main
+EOF'
             local _mcpkg="mediacenter$_mversion"
         fi
 
-        # Update packages and install JRiver MediaCenter
-        if _pkg_update > /dev/null 2>&1 && _pkg_install "$_mcpkg" > /dev/null 2>&1; then
+        # Update packages and install JRiver Media Center
+        if [[ -n $_debug ]]; then
+            _pkg_update && \
+            _pkg_install "$_mcpkg"
+        else
+            _pkg_update > /dev/null 2>&1 && \
+            _pkg_install "$_mcpkg" > /dev/null 2>&1
+        fi
+
+        # shellcheck disable=SC2181
+        # Rationale: More compact to check this once
+        if [[ $? -eq 0 ]]; then
             echo "JRiver Media Center installed successfully!"
             return 0
         else
             err "JRiver Media Center installation failed!"
-            return 1
+            exit 1
         fi
-
     }
 
 
@@ -809,7 +824,7 @@ EOF"
 
 
     #######################################
-    # Symlink certificates where JRiver MediaCenter expects them to be on Fedora/CentOS
+    # Symlink certificates where JRiver Media Center expects them to be on Fedora/CentOS
     # them on Debian/Ubuntu
     # Returns:
     #   0 if symlinking is unecessary or successful, 1 if not
@@ -861,7 +876,7 @@ EOF"
 
 
     #######################################
-    # Open the default JRiver MediaCenter ports using the system firewall tool
+    # Open the default JRiver Media Center ports using the system firewall tool
     # Requires:
     #   ID
     #   _bash_cmd
@@ -917,13 +932,45 @@ EOF"
 
 
     #######################################
-    # Create the VNC password file
-    # Requires:
-    #   _vncpass
+    # Create the x11vnc password file
     # Globals:
     #   _novncauth
     # Returns:
-    #   0 if ports opened sucessfully, 1 if not
+    #   0 if password created sucessfully, 1 if not
+    #######################################
+    _setX11VNCPass() {
+
+        _runDebug "${FUNCNAME[0]}"
+
+        _vncpassfile="$HOME/.vnc/jrmc_passwd"
+
+        [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
+
+        if [[ -f "$_vncpassfile" ]]; then
+            if [[ -z $_vncpass ]]; then
+                err "Refusing to overwrite existing $_vncpassfile with an empty password"
+                err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
+                exit 1
+            else
+                rm -f "$_vncpassfile"
+            fi
+        fi
+
+        if [[ -n $_vncpass ]]; then
+            if ! x11vnc -storepasswd "$_vncpass" "$_vncpassfile"; then
+                err "Could not create VNC password file"
+                return 1
+            fi
+        else
+            _novncauth="true"
+        fi
+    }
+
+
+    #######################################
+    # Create the vncserver password file
+    # Returns:
+    #   0 if password created sucessfully, 1 if not
     #######################################
     _setVNCPass() {
 
@@ -931,14 +978,24 @@ EOF"
 
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
+        [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
+
+        if [[ -f "$_vncpassfile" ]]; then
+            if [[ -z $_vncpass ]]; then
+                err "Refusing to overwrite existing $_vncpassfile with an empty password"
+                err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
+                exit 1
+            else
+                rm -f "$_vncpassfile"
+            fi
+        fi
+
         if [[ -n $_vncpass ]]; then
-            # Remove existing password file if it exists and write a new one
-            [[ -f "$_vncpassfile" ]] && rm -f "$_vncpassfile"
-            if ! x11vnc -storepasswd "$_vncpass" "$_vncpassfile"; then
+            if ! echo "$_vncpass" | vncpasswd -f > "$_vncpassfile"; then
                 err "Could not create VNC password file"
                 return 1
             fi
-        elif [[ ! -f "$_vncpassfile" ]]; then
+        else
             _novncauth="true"
         fi
     }
@@ -964,14 +1021,17 @@ EOF"
             _timer_name="jriver-${1}@$_user.timer"
             _user_specifier="User=%I"
         fi
-
-        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
     }
 
 
+    #######################################
+    # SERVICES
+    #######################################
     _serviceMediaserver() {
 
         _runDebug "${FUNCNAME[0]}"
+
+        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1000,6 +1060,8 @@ EOF"
 
         _runDebug "${FUNCNAME[0]}"
 
+        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
+
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
 Description=JRiver Media Center $_mversion
@@ -1027,11 +1089,18 @@ EOF"
 
         _runDebug "${FUNCNAME[0]}"
 
-        _setVNCPass
-
         _installPackage tigervnc-server
 
+        _setVNCPass
+
+        if [[ -n $_novncauth ]]; then
+            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -SecurityTypes None -xstartup /usr/bin/mediacenter$_mversion"
+        else
+            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd -xstartup /usr/bin/mediacenter$_mversion"
+        fi
+
         if [[ -z $_display ]]; then
+            # If we are running on existing X server then increment DISPLAY by one
             if [[ -n $DISPLAY ]]; then
                 _display=$(( ${DISPLAY#:} + 1 ))
                 _display=":$_display"
@@ -1040,11 +1109,7 @@ EOF"
             fi
         fi
 
-        if [[ "$_novncauth" == "true" ]]; then
-            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg"
-        else
-            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd"
-        fi
+        local _port=$(( ${_display#:} + 5900 ))
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1062,6 +1127,8 @@ ExecStop=/usr/bin/vncserver -kill $_display
 WantedBy=multi-user.target
 EOF"
         _systemctl_reload && _systemctl_enable "$_service_name"
+        echo "vncserver service should be running on localhost:$_port"
+        echo "You can diagnose issues using \"sudo systemctl status $_service_name\""
     }
 
 
@@ -1071,9 +1138,9 @@ EOF"
 
         _installPackage x11vnc
 
-        _setVNCPass
+        _setX11VNCPass
 
-        if [[ "$_novncauth" == "true" ]]; then
+        if [[ -n $_novncauth ]]; then
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -nopw"
         else
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry 1920x1080 -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
@@ -1126,6 +1193,19 @@ Persistent=true
 WantedBy=timers.target
 EOF"
         _systemctl_reload && _systemctl_enable "$_timer_name"
+    }
+
+
+    #######################################
+    # CONTAINERS
+    #######################################
+    _containerCreaterepo() {
+        :
+    }
+
+
+    _containerVNC() {
+        :
     }
 
 
@@ -1244,8 +1324,21 @@ EOF"
                 mediacenter)
                     _serviceMediacenter
                     ;;
-                vnc)
+                mediacenter-vncserver)
                     _serviceVNC
+                    ;;
+                *)
+            esac
+        done
+
+        # Install containers
+        for _container in "${_containers[@]}"; do
+            case "$_container" in
+                createrepo)
+                    _containerCreaterepo
+                    ;;
+                mediacenter-vncserver)
+                    _containerVNC
                     ;;
                 *)
             esac
