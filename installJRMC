@@ -20,7 +20,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.2"
+    _scriptversion="0.3"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
