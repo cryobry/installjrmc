@@ -565,7 +565,7 @@ EOF
 
         _checkMCInstalled() {
 
-            if [[ "${_services[*]}" =~ ^(mediacenter|mediaserver)$ ]]; then
+            if [[ "${_services[*]}" =~ ^(mediacenter|mediaserver|mediacenter-vncserver)$ ]]; then
                 if [[ -z $_repoinstall && -z $_rpminstall ]]; then
                     if [[ -x $(command -v "mediacenter$_mversion") ]]; then
                         err "You are attempting to install a service that relies on mediacenter$_mversion but --install-repo/--install-rpmbuild are not set and mediacenter$_mversion is not installed"
@@ -1367,10 +1367,7 @@ EOF"
                     _serviceMediacenter
                     ;;
                 mediacenter-vncserver)
-                    # important to run _serviceVNC before _serviceMediacenter in order to match
-                    # the correct $_display if --display is not specified by the user
                     _serviceVNC
-                    _serviceMediacenter
                     ;;
                 *)
             esac
