@@ -330,7 +330,7 @@ EOF
         fi
 
         # Some additional commands specifically for createrepo (primarily to handle user rights)
-        # Could also go in runCreateRepo() but let's leave it here for now
+        # Could also go in runCreaterepo() but let's leave it here for now
         if [[ $_createrepo_user != "root" ]]; then
             if [[ -d "$_createrepo_webroot/repodata" ]]; then
                 _createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q --update "$@"; }
@@ -812,11 +812,13 @@ EOF"
     # Returns:
     #   0 if createrepo is successful, 1 if not
     #######################################
-    _runCreateRepo() {
+    _runCreaterepo() {
 
         _runDebug "${FUNCNAME[0]}"
 
         _installPackage createrepo_c
+
+        local _rpmfile="$1"
 
         # If the webroot does not exist, create it
         if [[ ! -d "$_createrepo_webroot" ]]; then
@@ -828,7 +830,7 @@ EOF"
         fi
 
         # Copy built rpms to webroot
-        if ! _cp_cmd "$1" "$_createrepo_webroot"; then
+        if ! _cp_cmd "$_rpmfile" "$_createrepo_webroot"; then
             err "Could not copy the RPM to the createrepo-webroot path"
             err "Make sure that the createrepo-webroot path is writeable by createrepo-user"
             return 1
@@ -912,21 +914,12 @@ EOF"
 
         if [[ "$ID" =~ ^(fedora|centos)$ ]] && [[ -x $(command -v firewall-cmd) ]]; then
             if ! firewall-cmd --get-services | grep -q jriver; then
-                if [[ -n $_debug ]]; then
-                    _firewall_cmd --permanent --new-service=jriver
-                    _firewall_cmd --permanent --service=jriver --set-description="JRiver Media Center Media Server"
-                    _firewall_cmd --permanent --service=jriver --set-short="jriver"
-                    _firewall_cmd --permanent --service=jriver --add-port=52100-52200/tcp
-                    _firewall_cmd --permanent --service=jriver --add-port=1900/udp
-                    _firewall_cmd --reload
-                else
-                    _firewall_cmd --permanent --new-service=jriver > /dev/null 2>&1
-                    _firewall_cmd --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
-                    _firewall_cmd --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
-                    _firewall_cmd --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
-                    _firewall_cmd --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
-                    _firewall_cmd --reload > /dev/null 2>&1
-                fi
+                _firewall_cmd --permanent --new-service=jriver > /dev/null 2>&1
+                _firewall_cmd --permanent --service=jriver --set-description="JRiver Media Center Media Server" > /dev/null 2>&1
+                _firewall_cmd --permanent --service=jriver --set-short="jriver" > /dev/null 2>&1
+                _firewall_cmd --permanent --service=jriver --add-port=52100-52200/tcp > /dev/null 2>&1
+                _firewall_cmd --permanent --service=jriver --add-port=1900/udp > /dev/null 2>&1
+                _firewall_cmd --reload > /dev/null 2>&1
             fi
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
             if [[ ! -f "/etc/ufw/applications.d/jriver.service" ]]; then
@@ -1249,6 +1242,7 @@ EOF"
         :
     }
 
+
     _containerMC() {
         :
     }
@@ -1272,27 +1266,30 @@ EOF"
             [[ -f "$_timer_fname" ]] && _rm_cmd "$_timer_fname"
         done
 
+        echo "Removing repo files"
         [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
             && _rm_cmd "/etc/yum.repos.d/jriver.repo"
         [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
             && _rm_cmd "/etc/apt/sources.list.d/jriver.list"
+
+        echo "Removing firewall rules"
         if [[ -x $(command -v firewall-cmd) ]]; then
-            echo "Removing firewall rules"
             _firewall_cmd --permanent --remove-service=jriver
             _firewall_cmd --permanent --delete-service=jriver
             _firewall_cmd --reload
         elif [[ -x $(command -v ufw) ]]; then
-            echo "Removing firewall rules"
             _firewall_cmd delete allow jriver
             [[ -f "/etc/ufw/applications.d/jriver.service" ]] \
                 && _rm_cmd /etc/ufw/applications.d/jriver.service
         fi
+
         echo "Uninstalling Media Center"
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             _pkg_remove MediaCenter
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             _pkg_remove "mediacenter$_mversion"
         fi
+
         echo "JRiver Media Center has been completely uninstalled"
         echo "If you wish to remove your library files: rm -rf $HOME/.jriver"
         echo "If you wish to remove your rpmbuild output files: rm -rf $_outputdir"
@@ -1319,7 +1316,7 @@ EOF"
         # Uninstall and exit
         if [[ -n $_uninstall ]]; then
             _uninstall
-            return $?
+            exit $?
         fi
 
         # Install MC using package manager
@@ -1339,7 +1336,7 @@ EOF"
 
         # Run createrepo
         if [[ -n $_createrepo ]]; then
-            _runCreateRepo "$_mcrpm"
+            _runCreaterepo "$_mcrpm"
         fi
 
         # Install the rpm
@@ -1370,7 +1367,10 @@ EOF"
                     _serviceMediacenter
                     ;;
                 mediacenter-vncserver)
+                    # important to run _serviceVNC before _serviceMediacenter in order to match
+                    # the correct $_display if --display is not specified by the user
                     _serviceVNC
+                    _serviceMediacenter
                     ;;
                 *)
             esac
