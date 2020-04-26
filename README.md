@@ -5,27 +5,12 @@ This script will help install [JRiver Media Center](https://www.jriver.com/) and
 ## Notes
 
 1.  This script will not point major upgrades (i.e. from v25 to v26) to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
-2.  It is recommended to run `installJRMC` as your normal system user (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services like `createrepo` (see services section below for more information).
-
-## Installing
-
-1.  Extract:
-```
-unzip ./installJRMC.zip
-```
-2.  You may need to make the script executable:
-```
-chmod +x ./installJRMC
-```
-3.  Run the script using default options (see Options section below):
-```
-./installJRMC
-```
-You will be prompted to enter your sudo password to install dependencies, etc.
+2.  In **most** cases `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services like `createrepo` (see services section below for more information). Doing so may lead to permissions issues.
+3.  I do my best to test on Fedora/CentOS/Ubuntu/Debian but there are a lot of quirks to support
 
 ## Options
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my unofficial repository (Fedora/CentOS) using the system package manager.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager.
 
 Here is a list of additional options that can be passed to the script. You can always find the latest supported options by running `installJRMC --help`.
 ```text
@@ -34,7 +19,7 @@ Here is a list of additional options that can be passed to the script. You can a
     DEB-based OSes: Official package repository
     RPM-based OSes: BryanC unofficial repository
 --install-rpmbuild
-     (RPM-based OSes only!) Build RPM from source DEB and install it
+     (RPM-based OSes only) Build RPM from source DEB and install it
 --rpmbuild
     Build RPM from source DEB
 --outputdir PATH
@@ -45,6 +30,8 @@ Here is a list of additional options that can be passed to the script. You can a
     Restore file location for registration (Default: skip registration)
 --betapass PASSWORD
     Enter beta team password for access to beta builds
+--service-user USER
+    Install systemd services and containers for USER
 --service, -s SERVICE
     See SERVICES section below for a list of possible services to install
 --container, -c CONTAINER
@@ -66,32 +53,33 @@ Here is a list of additional options that can be passed to the script. You can a
 --uninstall, -u
     Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 ```
-**Some options are incompatible** with each other, for example it is not possible to install the `mediaserver` service on Ubuntu/Debian when using `--rpmbuild` or `--createrepo` since those options do not actually install Media Center. `installJRMC` does perform sanity checks to automatically fix conflicting options, but it may not catch all edge cases.
+**Some options are incompatible**, for example it is not possible to install the `mediaserver` service on Ubuntu/Debian when using `--rpmbuild` or `--createrepo` since those options do not actually install Media Center. `installJRMC` does perform sanity checks to automatically fix conflicting options, but it may not catch all edge cases.
 
 
 
 #### services
 When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root.
+
+It is possible to specify multiple services: `installJRMC --service x11vnc --service mediacenter`
 ```text
-mediaserver
+jriver-mediaserver
     Enable and start a mediaserver systemd service (requires an existing X server)
-mediacenter
+jriver-mediacenter
     Enable and start a mediacenter systemd service (requires an existing X server)
-x11vnc
+jriver-x11vnc
     Enable and start x11vnc for the local desktop (requires an existing X server)
-    --vncpass and --display are valid options (see below)
-mediacenter-vncserver
-    Enable and start a vncserver
+    --vncpass and --display are also valid options (see below)
+jriver-vnc-mediacenter
+    Enable and start a vncserver running JRiver Media Center
     --vncpass PASSWORD
-        Set vnc password for x11vnc access. If no password is set, the script will either
-        use existing password stored in ~/.vnc/jrmc_passwd or use no password
+        Set vnc password for x11vnc/vncserver access. If no password is set, the script
+        will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
     --display DISPLAY
-        Display to start vncserver/x11vnc (Default: The current display or :0 if current display
-        is unaccessible)
-createrepo
+        Display to start vncserver/x11vnc (Default: The current display (x11vnc) or next
+        available display (vncserver))
+jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
 ```
-I utilize `--service createrepo` to build the rpm repository used by Fedora/CentOS.
 
 #### containers
 
@@ -103,30 +91,33 @@ I utilize `--service createrepo` to build the rpm repository used by Fedora/Cent
 
     Installs the latest version of JRiver Media Center from the repository.
 
-*   `installJRMC --service mediaserver`
+*   `installJRMC --install-repo --service jriver-mediaserver`
 
     Installs JRiver Media Center from the repository and starts/enables the mediaserver service.
 
 *   `installJRMC --install-rpmbuild --restorefile /path/to/license.mjr --mcversion 26.0.56`
 
-     Builds JRiver Media Center version 26.0.56 RPM from the source DEB, installs it, and activates it using the specified .mjr license file (Fedora/CentOS only).
+    Builds JRiver Media Center version 26.0.56 RPM from the source DEB, installs it (RPM distros only), and activates it using the specified .mjr license file.
 
 *   `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
      Builds the RPM, moves it to the webroot, and runs createrepo as `www-user`.
 
-*   `installJRMC --service createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
+*   `installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
-    Installs the jriver-createrepo timer and service to build the RPM, move it to the webroot, and run createrepo as `www-user`.
+    Installs the jriver-createrepo timer and service to build the RPM, move it to the webroot, and runs createrepo as `www-user`.
 
-*   `installJRMC --service x11vnc --service mediacenter --vncpass "letmein"`
+*   `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
 
-    Installs services to share the existing local desktop via VNC and automatically run Media Center
+    Installs services to share the existing local desktop via VNC and automatically run Media Center.
 
-*   `installJRMC --service mediacenter-vncserver --vncpass "letmein"`
+*   `installJRMC --install-repo --service jriver-vnc-mediacenter`
 
-    Installs a service that starts a vncserver containing Media Center
+    Installs a service that starts a vncserver containing Media Center.
 
 *   `installJRMC --uninstall`
 
     Uninstalls JRiver Media Center and its associated services and firewall rules. This will **not** remove your media library and database in case you want to reinstall.
+
+### Donations
+Did you find `installJRMC` useful? [Buy me a coffee!](https://paypal.me/bryanroessler?locale.x=en_US)
