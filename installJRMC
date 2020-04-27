@@ -943,7 +943,7 @@ EOF"
     #######################################
     _openFirewall() {
 
-        debug "Running: ${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}" "$@"
 
         # Create OS-specific port rules based on argument (service) name
         local -a _f_ports # for firewall_cmd
@@ -1076,10 +1076,19 @@ EOF"
     _setDisplayAndPort() {
 
         # Check _display, else DISPLAY, else set to :0 by default
-        [[ -z $_display ]] && _display="${DISPLAY-":0"}"
+        if [[ -n $_display ]]; then
+            _next_display="$_display"
+        elif [[ -n $DISPLAY ]]; then
+            _display="${DISPLAY}"
+            _displaynum="${_display#:}" # strip colon
+            _displaynum="${_displaynum%.*}" # strip suffix
+            _next_displaynum=$(( _displaynum + 1 ))
+            _next_display=":$_next_displaynum"
+        else
+            _display=":0"
+            _next_display=":1"
+        fi
 
-        _displaynum="${_display#:}" # strip colon
-        _displaynum="${_displaynum%.*}" # strip suffix
         _port=$(( _displaynum + 5900 ))
     }
 
@@ -1182,16 +1191,12 @@ EOF"
 
         _installPackage tigervnc-server
 
-        local _next_displaynum=$(( _displaynum + 1 ))
-        _next_display=":$_next_displaynum"
-        #local _service_port=$(( _port + 1 ))
-
         _setVNCPass
 
         if [[ -n $_novncauth ]]; then
-            _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -fg -SecurityTypes None -xstartup /usr/bin/mediacenter$_mversion"
+            _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$_mversion"
         else
-            _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd -xstartup /usr/bin/mediacenter$_mversion"
+            _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$_mversion"
         fi
 
         _bash_cmd "cat <<-EOF > $_service_fname
@@ -1205,6 +1210,7 @@ $_user_specifier
 ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_next_display > /dev/null 2>&1 || :'
 ExecStart=$_exec_start_cmd
 ExecStop=/usr/bin/vncserver -kill $_next_display
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
@@ -1212,7 +1218,6 @@ EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
-        vncserver --list && \
         _openFirewall "xvnc" && \
         _openFirewall "jriver"
     }
@@ -1232,7 +1237,7 @@ EOF"
 
             debug "Running: ${FUNCNAME[0]}"
 
-            installPackage xorg-x11-utils
+            _installPackage xorg-x11-utils
             _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
         }
         _getResolution
@@ -1401,6 +1406,7 @@ EOF"
 
         # Build RPM from source DEB
         if [[ -n $_rpmbuild ]]; then
+            _installPackage epel-release
             _acquireDeb
             _buildRPM
         fi
