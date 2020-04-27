@@ -302,12 +302,12 @@ EOF
             _pkg_query(){ _ifSudo rpm -q "$@"; }
             _firewall_cmd(){ _ifSudo firewall-cmd "$@"; }
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            _pkg_install(){ _ifSudo apt-get install -y "$@"; }
-            _pkg_reinstall(){ _ifSudo apt-get reinstall -y "$@"; }
-            _pkg_install_nogpg(){ _ifSudo apt-get install -y "$@"; }
-            _pkg_remove(){ _ifSudo apt-get remove -y "$@"; }
-            _pkg_update(){ _ifSudo apt-get update -y; }
-            _pkg_query(){ _ifSudo dpkg -l "$@"; }
+            _pkg_install(){ _ifSudo apt-get install -y -q0 "$@"; }
+            _pkg_reinstall(){ _ifSudo apt-get reinstall -y -q0 "$@"; }
+            _pkg_install_nogpg(){ _ifSudo apt-get install -y -q0 "$@"; }
+            _pkg_remove(){ _ifSudo apt-get remove -y -q0 "$@"; }
+            _pkg_update(){ _ifSudo apt-get update -y -q0; }
+            _pkg_query(){ _ifSudo dpkg -s "$@"; }
             _firewall_cmd(){ _ifSudo ufw "$@"; }
         fi
 
@@ -826,6 +826,8 @@ EOF"
             if [[ $? -ne 0 || ! -f "$_mcrpm" ]]; then
                 err "Build failed. Exiting..."
                 exit 1
+            else
+                echo "Build successful. The RPM file is located at: $_mcrpm"
             fi
         fi
     }
