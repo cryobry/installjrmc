@@ -46,8 +46,6 @@ Here is a list of additional options that can be passed to the script. You can a
     Print this script version and exit
 --debug, -d
     Print debug output
---force, -f
-    Force reinstallation and ignore/overwrite previous output
 --help, -h
     Print help dialog and exit
 --uninstall, -u
@@ -66,20 +64,26 @@ jriver-mediaserver
     Enable and start a mediaserver systemd service (requires an existing X server)
 jriver-mediacenter
     Enable and start a mediacenter systemd service (requires an existing X server)
-jriver-x11vnc
+jriver-x11vnc-mediacenter
     Enable and start x11vnc for the local desktop (requires an existing X server)
-    --vncpass and --display are also valid options (see below)
-jriver-vnc-mediacenter
-    Enable and start a vncserver running JRiver Media Center
     --vncpass PASSWORD
-        Set vnc password for x11vnc/vncserver access. If no password is set, the script
+        Set vnc password for x11vnc/Xvnc access. If no password is set, the script
         will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
     --display DISPLAY
-        Display to start vncserver/x11vnc (Default: The current display (x11vnc) or next
-        available display (vncserver))
+        Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
+        current display incremented by 1 (Xvnc))
+jriver-xvnc-mediacenter
+    Enable and start an Xvnc session running JRiver Media Center
+    --vncpass and --display are also valid options (see above)
 jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
 ```
+
+#### `jriver-x11vnc-mediacenter` versus `jriver-xvnc-mediacenter`
+`x11vnc` shares your existing X display via vnc, `xvnc` creates a new display and shares it via vnc. Both services will also start a Media Center service on their respective displays.
+
+**Note**: If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in 99% of cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
+
 
 #### containers
 
@@ -107,7 +111,7 @@ jriver-createrepo
 
     Installs the jriver-createrepo timer and service to build the RPM, move it to the webroot, and runs createrepo as `www-user`.
 
-*   `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
+*   `installJRMC --install-repo --service jriver-x11vnc-mediacenter --service jriver-mediacenter --vncpass "letmein"`
 
     Installs services to share the existing local desktop via VNC and automatically run Media Center.
 
