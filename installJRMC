@@ -20,19 +20,18 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.3"
+    _scriptversion="0.4"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
-    _createrepo_user="$(whoami)"
-    _user="$(whoami)"
-    _available_services=("createrepo" "x11vnc" "mediaserver" "mediacenter" "mediacenter-vncserver")
-    #_available_containers=("mediacenter-vncserver" "createrepo")
+    _exec_user="$(whoami)"
+    _available_services=("jriver-createrepo" "jriver-x11vnc-mediacenter" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
+    #_available_containers=("mediacenter-xvnc" "createrepo")
 
 
     _printHelpAndExit() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         cat <<-'EOF'
 USAGE:
@@ -55,6 +54,8 @@ OPTIONS
             Restore file location for registration (Default: skip registration)
         --betapass PASSWORD
             Enter beta team password for access to beta builds
+        --service-user USER
+            Install systemd services and containers for USER
         --service, -s SERVICE
             See SERVICES section below for a list of possible services to install
         --container, -c CONTAINER
@@ -69,33 +70,32 @@ OPTIONS
             Print this script version and exit
         --debug, -d
             Print debug output
-        --force, -f
-            Force reinstallation and ignore/overwrite previous output
         --help, -h
             Print help dialog and exit
         --uninstall, -u
             Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 
     SERVICES
-        mediaserver
+        jriver-mediaserver
             Enable and start a mediaserver systemd service (requires an existing X server)
-        mediacenter
+        jriver-mediacenter
             Enable and start a mediacenter systemd service (requires an existing X server)
-        x11vnc
+        jriver-x11vnc-mediacenter
             Enable and start x11vnc for the local desktop (requires an existing X server)
             --vncpass and --display are also valid options (see below)
-        mediacenter-vncserver
-            Enable and start a vncserver running JRiver Media Center
+        jriver-xvnc-mediacenter
+            Enable and start an Xvnc session running JRiver Media Center
             --vncpass PASSWORD
-                Set vnc password for x11vnc access. If no password is set, the script will either
-                use existing password stored in ~/.vnc/jrmc_passwd or use no password
+                Set vnc password for x11vnc/Xvnc access. If no password is set, the script
+                will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
             --display DISPLAY
-                Display to start vncserver/x11vnc (Default: The current display (x11vnc) or next available display (vncserver))
-        createrepo
+                Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
+                current display incremented by 1 (Xvnc))
+        jriver-createrepo
             Install hourly service to build latest MC RPM and run createrepo
 
     CONTAINERS
-        mediacenter-vncserver (Under construction)
+        mediacenter-xvnc (Under construction)
         createrepo (Under construction)
 EOF
 
@@ -106,15 +106,14 @@ EOF
 
     _parseInput() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         # set default behavior
-        if [[ $# == 0 ]]; then
+        if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" == "--debug" ]]; then
             _repoinstall="true"
-            return 1
         fi
 
-        if _input=$(getopt -o +vdhus:c: -l install-repo,install-rpmbuild,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service:,version,debug,force,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
+        if _input=$(getopt -o +vdhus:c: -l install-repo,install-rpmbuild,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
             eval set -- "$_input"
             while true; do
                 case "$1" in
@@ -140,6 +139,9 @@ EOF
                     --betapass)
                         shift && _betapass="$1"
                         ;;
+                    --service-user)
+                        shift && _service_user="$1"
+                        ;;
                     --service|-s)
                         shift && _services+=("$1")
                         ;;
@@ -153,9 +155,6 @@ EOF
                     --debug|-d)
                         echo "Debugging on"
                         _debug="true"
-                        ;;
-                    --force|-f)
-                        _force="true"
                         ;;
                     --help|-h)
                         _printHelpAndExit 0
@@ -195,47 +194,30 @@ EOF
 
     err() {
 
-      echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2
+      echo "Error: $*" >&2
     }
 
 
     #######################################
     # Call this at the beginning of every function in order to track
     #######################################
-    _runDebug() {
+    debug() {
 
-        [[ -n $_debug ]] && echo "Running: " "$@"
+        [[ -n $_debug ]] && echo "Debug: $*"
     }
 
 
     #######################################
-    # Prepend this to any command that you wish to execute with sudo (i.e. when _user is NOT root)
+    # Prepend this to any command that you wish to execute with sudo
+    # Requires:
+    #   _exec_user
     #######################################
     _ifSudo() {
 
-        if [[ "$_user" != "root" ]]; then
+        if [[ "$_exec_user" != "root" ]]; then
             sudo "$@"
         else
             "$@"
-        fi
-    }
-
-
-    _checkUser() {
-
-        _runDebug "${FUNCNAME[0]}"
-
-        if [[ "$_user" == "root" ]]; then
-
-            cat <<EOF
-Warning! You are currently running installJRMC as the root user. This is not recommended! When
-running as a regular user, installJRMC will ask you for your sudo password when necessary.
-
-Installation will continue but any systemd services will be installed as system services and you
-may run into permissions issues.
-EOF
-        else
-            [[ -n $_debug ]] && echo "Installing as user: $_user"
         fi
     }
 
@@ -246,10 +228,10 @@ EOF
     #######################################
     _getOS() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
-        if [[ -e /etc/os-release ]]; then
-            source /etc/os-release
+        if [[ -e "/etc/os-release" ]]; then
+            source "/etc/os-release"
         else
             err "No /etc/os-release found"
             err "Your OS is unsupported"
@@ -290,7 +272,7 @@ EOF
         # Detect OS
         _getOS
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         # Agnostic commands
         _bash_cmd(){ _ifSudo bash -c "$@"; }
@@ -337,8 +319,8 @@ EOF
             else
                 _createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q "$@"; }
             fi
-            _mkdir_cmd(){ sudo -u "$_createrepo_user" mkdir -p "$@"; }
-            _cp_cmd(){ sudo -u "$_createrepo_user" cp -n "$@"; }
+            _cr_mkdir_cmd(){ sudo -u "$_createrepo_user" mkdir -p "$@"; }
+            _cr_cp_cmd(){ sudo -u "$_createrepo_user" cp -n "$@"; }
         else
             if [[ -d "$_createrepo_webroot/repodata" ]]; then
                 _createrepo_cmd(){ createrepo -q --update "$@"; }
@@ -347,6 +329,21 @@ EOF
             fi
         fi
 
+    }
+
+
+    #######################################
+    # Sets default user variables
+    # Requires:
+    #   _exec_user
+    # Globals
+    #   _service_user
+    #   _createrepo_user
+    #######################################
+    _setUser() {
+
+        [[ -z $_service_user ]] && _service_user="$_exec_user"
+        [[ -z $_createrepo_user ]] && _createrepo_user="$_exec_user"
     }
 
 
@@ -361,7 +358,7 @@ EOF
     #######################################
     _installPackage() {
 
-        _runDebug "${FUNCNAME[0]}" "$@"
+        debug "Running: ${FUNCNAME[0]}" "$@"
 
         if _input=$(getopt -o +n -l noquery -- "$@"); then
             eval set -- "$_input"
@@ -407,11 +404,11 @@ EOF
             echo "Installing:" "${_pkg_array[@]}"
             if [[ -n $_debug ]]; then
                 if ! _pkg_install "${_pkg_array[@]}"; then
-                    err "Failed to install required package"
+                    err "Failed to install package"
                     exit 1
                 fi
             elif ! _pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
-                err "Failed to install dependency."
+                err "Failed to install package."
                 _printHelpAndExit 1
             fi
         fi
@@ -442,7 +439,7 @@ EOF
     #######################################
     _packageQuirks() {
 
-        _runDebug "${FUNCNAME[0]}" "$@"
+        debug "Running: ${FUNCNAME[0]}" "$@"
 
         unset _url_pkg
 
@@ -483,7 +480,7 @@ EOF
     #######################################
     _setVersion() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         if [[ -z "$_mcversion" ]]; then
 
@@ -540,11 +537,13 @@ EOF
     #######################################
     _sanityChecks() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         # Check for bad service name
-        #
         _checkServices() {
+
+            debug "Running: ${FUNCNAME[0]}"
+
             for _service in "${_services[@]}"; do
                 if ! _inArray "$_service" "${_available_services[@]}"; then
                     echo "Incorrect service type provided"
@@ -554,33 +553,44 @@ EOF
         }
 
 
-        _createrepoBuild() {
-
-            if _inArray "createrepo" "${_services[@]}"; then
-                echo "Incorrect service type provided"
-                _printHelpAndExit 1
-            fi
-        }
-
-
         _checkMCInstalled() {
 
-            if [[ "${_services[*]}" =~ ^(mediacenter|mediaserver|mediacenter-vncserver)$ ]]; then
-                if [[ -z $_repoinstall && -z $_rpminstall ]]; then
-                    if [[ -x $(command -v "mediacenter$_mversion") ]]; then
-                        err "You are attempting to install a service that relies on mediacenter$_mversion but --install-repo/--install-rpmbuild are not set and mediacenter$_mversion is not installed"
-                        _printHelpAndExit 1
-                    fi
+            debug "Running: ${FUNCNAME[0]}"
+
+            for _service in "${_services[@]}"; do
+                if [[ "$_service" =~ ^(jriver-mediacenter|jriver-mediaserver|jriver-xvnc-mediacenter)$ ]] \
+                && [[ -z $_repoinstall && -z $_rpminstall ]] \
+                && [[ ! -x $(command -v "mediacenter$_mversion") ]]; then
+                    err "You are attempting to install a service that depends on JRiver Media Center"
+                    err "without installing JRiver Media Center"
+                    err "Automatically enabling --repo-install"
+                    _repoinstall="true"
                 fi
-            fi
-
-
+            done
         }
 
+
+        _checkUser() {
+
+            debug "Running: ${FUNCNAME[0]}"
+
+            if [[ "$_exec_user" == "root" && -z "$_service_user" && "${_services[*]}" ]]; then
+                err "Attempting to install services as the root user"
+                err "This is not recommended and we are exiting now to prevent permission hell"
+                err "You can override this safety check by manually specifying --user root"
+                return 1
+            fi
+        }
+
+
         # Enable/disable sanity checks
-        _checkServices
-        _checkMCInstalled
-        #_createrepoBuild
+        if _checkServices && _checkMCInstalled && _checkUser; then
+            debug "Sanity checks passed!"
+            return 0
+        else
+            err "Sanity checks failed!"
+            exit 1
+        fi
     }
 
 
@@ -591,9 +601,11 @@ EOF
     #######################################
     _installMCFromRepo() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         echo "Installing latest JRiver Media Center from repo..."
+
+        local _mcpkg
 
         # Add repositories to OS-specific package managers
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -604,22 +616,39 @@ name=JRiver Media Center repo by BryanC
 baseurl=https://repos.bryanroessler.com/jriver
 gpgcheck=0
 EOF'
-            local _mcpkg="MediaCenter"
+            _mcpkg="MediaCenter"
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
             _bash_cmd 'cat <<-EOF > /etc/apt/sources.list.d/jriver.list
 deb [arch=amd64,i386,armhf] http://dist.jriver.com/latest/mediacenter/ jessie main
 EOF'
-            local _mcpkg="mediacenter$_mversion"
         fi
 
-        # Update packages and install JRiver Media Center
+        # Update package list
+        if ! _pkg_update; then
+            err "Package update failed!"
+            exit 1
+        fi
+
+        # Find latest mversion to install on Ubuntu/Debian
+        if [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            # Try parsing the latest mediacenter?? version from the repo
+            if _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}'); then
+                _mcpkg="${_mcpkg%\'}"
+                _mcpkg="${_mcpkg#\'}"
+            fi
+            # If that fails, fall back to scraping Interact
+            if ! [[ "$_mcpkg" =~ ^[0-9][0-9]\.[0-9]\.[0-9]\+$ ]]; then
+                _setVersion
+                _mcpkg="mediacenter$_mversion"
+            fi
+        fi
+
+
         if [[ -n $_debug ]]; then
-            _pkg_update && \
-            _pkg_install "$_mcpkg"
+            _installPackage "$_mcpkg"
         else
-            _pkg_update > /dev/null 2>&1 && \
-            _pkg_install "$_mcpkg" > /dev/null 2>&1
+            _installPackage "$_mcpkg" > /dev/null 2>&1
         fi
 
         # shellcheck disable=SC2181
@@ -641,7 +670,7 @@ EOF'
     #######################################
     _acquireDeb() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         local _debfilename="$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb"
 
@@ -692,7 +721,7 @@ EOF'
     #######################################
     _buildRPM() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         # install build dependencies
         _installPackage wget dpkg rpm-build
@@ -708,12 +737,10 @@ EOF'
             local _build_requires=''
         fi
 
-        if [[ "$ID" != "centos" ]]; then
+        if [[ "$ID" == "fedora" && -n $_rpminstall ]]; then
+            # TODO: find out why this is required since it's not easily available on CentOS
             local _requires='Requires: pangox-compat >= 0.0.2'
-        else
-            local _requires='Requires: libXScrnSaver'
         fi
-
 
         # Create spec file
         bash -c "cat <<EOF > $_outputdir/SPECS/mediacenter.spec
@@ -742,6 +769,7 @@ Requires: mesa-libGL
 Requires: libglvnd-glx
 Requires: pango >= 1.36
 $_requires
+Requires: libXScrnSaver
 Requires: xdg-utils
 Requires: libgomp >= 4.9
 Requires: gstreamer1 >= 1.4.4
@@ -781,7 +809,7 @@ EOF"
         declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
         # skip rebuilding the rpm if it already exists
-        if [[ -f "$_mcrpm" && -z "$_force" ]]; then
+        if [[ -f "$_mcrpm" ]]; then
             echo "$_mcrpm already exists. Skipping build step..."
             return 0 # this is fine
         else
@@ -814,7 +842,7 @@ EOF"
     #######################################
     _runCreaterepo() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _installPackage createrepo_c
 
@@ -822,7 +850,7 @@ EOF"
 
         # If the webroot does not exist, create it
         if [[ ! -d "$_createrepo_webroot" ]]; then
-            if ! _mkdir_cmd "$_createrepo_webroot"; then
+            if ! _cr_mkdir_cmd "$_createrepo_webroot"; then
                 err "Could not create the createrepo-webroot path!"
                 err "Make sure that the createrepo-webroot is writeable by createrepo-user"
                 return 1
@@ -830,7 +858,7 @@ EOF"
         fi
 
         # Copy built rpms to webroot
-        if ! _cp_cmd "$_rpmfile" "$_createrepo_webroot"; then
+        if ! _cr_cp_cmd "$_rpmfile" "$_createrepo_webroot"; then
             err "Could not copy the RPM to the createrepo-webroot path"
             err "Make sure that the createrepo-webroot path is writeable by createrepo-user"
             return 1
@@ -855,7 +883,7 @@ EOF"
     #######################################
     _symlinkCerts() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
         -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
@@ -878,7 +906,7 @@ EOF"
     #######################################
     _restoreLicense() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         local _mjr
 
@@ -913,7 +941,7 @@ EOF"
     #######################################
     _openFirewall() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         # Create OS-specific port rules based on argument (service) name
         local -a _f_ports # for firewall_cmd
@@ -921,13 +949,17 @@ EOF"
         if [[ "$1" == "jriver" ]]; then
             _f_ports=("52100-52200/tcp" "1900/udp")
             _u_ports="52100:52200/tcp|1900/udp"
-        elif [[ "$1" =~ ^(x11vnc|vncserver)$ ]]; then
+        elif [[ "$1" =~ ^(x11vnc|xvnc)$ ]]; then
             _f_ports=("$_port/tcp")
             _u_ports="$_port/tcp"
+        else
+            err "_openFirewall unrecognized service name"
+            exit 1
         fi
 
         # Open the ports
-        if [[ "$ID" =~ ^(fedora|centos)$ ]] && [[ -x $(command -v firewall-cmd) ]]; then
+        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+            [[ ! -x $(command -v firewall-cmd) ]] && _installPackage firewalld
             if ! _firewall_cmd --get-services | grep -q "$1"; then
                 _firewall_cmd --permanent --new-service="$1" > /dev/null 2>&1
                 _firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" > /dev/null 2>&1
@@ -938,7 +970,9 @@ EOF"
                 _firewall-cmd --add-service "$1" --permanent > /dev/null 2>&1
                 _firewall_cmd --reload > /dev/null 2>&1
             fi
-        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -x $(command -v ufw) ]]; then
+        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            # Debian ufw package state is broken on fresh installations
+            [[ ! -x $(command -v ufw) ]] && _installPackage --noquery ufw
             if [[ ! -f "/etc/ufw/applications.d/$1.service" ]]; then
                 _bash_cmd "cat <<-EOF > /etc/ufw/applications.d/$1.service
 [$1]
@@ -969,7 +1003,7 @@ EOF"
     #######################################
     _setX11VNCPass() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
@@ -997,13 +1031,13 @@ EOF"
 
 
     #######################################
-    # Create the vncserver password file
+    # Create the Xvnc password file
     # Returns:
     #   0 if password created sucessfully, 1 if not
     #######################################
     _setVNCPass() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
@@ -1031,23 +1065,47 @@ EOF"
 
 
     #######################################
+    # Set display and port variables
+    # Globals:
+    #   _display
+    #   _displaynum
+    #   _port
+    #######################################
+    _setDisplayAndPort() {
+
+        # Check _display, else DISPLAY, else set to :0 by default
+        [[ -z $_display ]] && _display="${DISPLAY-":0"}"
+
+        _displaynum="${_display#:}" # strip colon
+        _displaynum="${_displaynum%.*}" # strip suffix
+        _port=$(( _displaynum + 5900 ))
+    }
+
+
+    #######################################
     # Create associated service variables based on service name
-    # Arguments:
-    #   Requires exactly one argument, the name of the service to parse
+    # Requires:
+    #   _service_user
+    # Globals:
+    #   _service_fname
+    #   _timer_fname
+    #   _service_name
+    #   _timer_name
+    #   _user_specifier
     #######################################
     _servicePrep() {
 
-        if [[ "$_user" == "root" ]]; then
-            _service_fname="/usr/lib/systemd/system/jriver-${1}.service"
-            _timer_fname="/usr/lib/systemd/system/jriver-${1}.timer"
+        if [[ "$_service_user" == "root" ]]; then
+            _service_fname="/usr/lib/systemd/system/${1}.service"
+            _timer_fname="/usr/lib/systemd/system/${1}.timer"
             _service_name="jriver-${1}.service"
             _timer_name="jriver-${1}}.timer"
             _user_specifier=""
         else
-            _service_fname="/usr/lib/systemd/system/jriver-${1}@.service"
-            _timer_fname="/usr/lib/systemd/system/jriver-${1}@.timer"
-            _service_name="jriver-${1}@$_user.service"
-            _timer_name="jriver-${1}@$_user.timer"
+            _service_fname="/usr/lib/systemd/system/${1}@.service"
+            _timer_fname="/usr/lib/systemd/system/${1}@.timer"
+            _service_name="${1}@$_service_user.service"
+            _timer_name="${1}@$_service_user.timer"
             _user_specifier="User=%I"
         fi
     }
@@ -1056,11 +1114,9 @@ EOF"
     #######################################
     # SERVICES
     #######################################
-    _serviceMediaserver() {
+    _service_jriver-mediaserver() {
 
-        _runDebug "${FUNCNAME[0]}"
-
-        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1083,16 +1139,14 @@ WantedBy=graphical.target
 EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
-        _systemctl_enable "$_service_name"
+        _systemctl_enable "$_service_name" && \
+        _openFirewall "jriver"
     }
 
 
-    _serviceMediacenter() {
+    _service_jriver-mediacenter() {
 
-        _runDebug "${FUNCNAME[0]}"
-
-        # Set the display to use
-        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1115,36 +1169,28 @@ WantedBy=graphical.target
 EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
-        _systemctl_enable "$_service_name"
+        _systemctl_enable "$_service_name" && \
+        _openFirewall "jriver"
     }
 
 
-    _serviceVNC() {
+    _service_jriver-xvnc-mediacenter() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _installPackage tigervnc-server
+
+        local _next_displaynum=$(( _displaynum + 1 ))
+        _next_display=":$_next_displaynum"
+        #local _service_port=$(( _port + 1 ))
 
         _setVNCPass
 
         if [[ -n $_novncauth ]]; then
-            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -SecurityTypes None -xstartup /usr/bin/mediacenter$_mversion"
+            _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -fg -SecurityTypes None -xstartup /usr/bin/mediacenter$_mversion"
         else
-            _exec_start_cmd="/usr/bin/vncserver $_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd -xstartup /usr/bin/mediacenter$_mversion"
+            _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -fg -rfbauth $HOME/.vnc/jrmc_passwd -xstartup /usr/bin/mediacenter$_mversion"
         fi
-
-        # Set the display to use
-        if [[ -z $_display ]]; then
-            # If we are running on existing X server then increment DISPLAY by one
-            if [[ -n $DISPLAY ]]; then
-                _display=$(( ${DISPLAY#:} + 1 ))
-                _display=":$_display"
-            else
-                _display=":0"
-            fi
-        fi
-
-        declare -g _port=$(( ${_display#:} + 5900 ))
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1154,9 +1200,9 @@ After=syslog.target network.target
 [Service]
 Type=simple
 $_user_specifier
-ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_display > /dev/null 2>&1 || :'
+ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_next_display > /dev/null 2>&1 || :'
 ExecStart=$_exec_start_cmd
-ExecStop=/usr/bin/vncserver -kill $_display
+ExecStop=/usr/bin/vncserver -kill $_next_display
 
 [Install]
 WantedBy=multi-user.target
@@ -1164,21 +1210,19 @@ EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
-        echo "vncserver running on localhost:$_port"
+        vncserver --list && \
+        _openFirewall "xvnc" && \
+        _openFirewall "jriver"
     }
 
 
-    _serviceX11VNC() {
+    _service_jriver-x11vnc-mediacenter() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _installPackage x11vnc
 
         _setX11VNCPass
-
-        [[ -z $_display ]] && _display="${DISPLAY:-":0"}"
-
-        declare -g _port=$(( ${_display#:} + 5900 ))
 
         # Get current desktop resolution
         # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
@@ -1209,14 +1253,17 @@ WantedBy=multi-user.target
 EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
-        _systemctl_enable "$_service_name"
-        echo "x11vnc running on localhost:$_port"
+        _systemctl_enable "$_service_name" && \
+        echo "x11vnc running on localhost:$_port" && \
+        _openFirewall "x11vnc"
+
+        _service_jriver-mediacenter
     }
 
 
-    _serviceCreaterepo() {
+    _service_jriver-createrepo() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1266,7 +1313,7 @@ EOF"
 
     _uninstall() {
 
-        _runDebug "${FUNCNAME[0]}"
+        debug "Running: ${FUNCNAME[0]}"
 
         read -r -p "Do you really want to uninstall JRiver Media Center? [y/N] " _response
         _response=${_response,,}    # tolower
@@ -1314,26 +1361,17 @@ EOF"
 
     __main() {
 
-        # Check user
-        _checkUser
-
         # Parse input
         _parseInput "$@"
-
-        # Build some OS-specific commands based on the selected OS
-        _buildCommands
-
-        # Set version to install/uninstall
-        _setVersion
 
         # Sanity checks
         _sanityChecks
 
-        # Uninstall and exit
-        if [[ -n $_uninstall ]]; then
-            _uninstall
-            exit $?
-        fi
+        # Set user variables
+        _setUser
+
+        # Build some OS-specific commands based on the selected OS
+        _buildCommands
 
         # Install MC using package manager
         if [[ -n $_repoinstall ]]; then
@@ -1342,6 +1380,15 @@ EOF"
             _symlinkCerts
             _restoreLicense
             _openFirewall "jriver"
+        fi
+
+        # Set version to install/uninstall
+        _setVersion
+
+        # Uninstall and exit
+        if [[ -n $_uninstall ]]; then
+            _uninstall
+            exit $?
         fi
 
         # Build RPM from source DEB
@@ -1367,44 +1414,15 @@ EOF"
         fi
 
         # Install services
+        _setDisplayAndPort
         for _service in "${_services[@]}"; do
             _servicePrep "$_service"
-            case "$_service" in
-                createrepo)
-                    _serviceCreaterepo
-                    ;;
-                x11vnc)
-                    _serviceX11VNC
-                    _openFirewall "x11vnc"
-                    ;;
-                mediaserver)
-                    _serviceMediaserver
-                    ;;
-                mediacenter)
-                    _serviceMediacenter
-                    ;;
-                mediacenter-vncserver)
-                    _serviceVNC
-                    _openFirewall "vncserver"
-                    ;;
-                *)
-            esac
+            "_service_$_service"
         done
 
         # Install containers
         for _container in "${_containers[@]}"; do
-            case "$_container" in
-                createrepo)
-                    _containerCreaterepo
-                    ;;
-                mediacenter-vncserver)
-                    _containerVNC
-                    ;;
-                mediacenter)
-                    _containerMC
-                    ;;
-                *)
-            esac
+            "_container_$_container"
         done
     }
 }
