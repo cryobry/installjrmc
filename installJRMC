@@ -8,9 +8,7 @@ shopt -s extglob
 #
 # To-dos:
 #   1. Raspberry Pi support -- do not own one so difficult to test
-#   2. Arch support -- would love some testing and PRs
-#   3. ncurses graphical installer
-#   4. Refactor to generalize functions
+#   2. Interactive installation (ncurses?)
 #
 # installJRMC can be run directly or sourced as a function (by sourcing this file)
 # Arguments:
@@ -443,7 +441,9 @@ EOF
 
         unset _url_pkg
 
-        if [[ "$1" == "rpm-build" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        if [[ "$1" == "xorg-x11-utils" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            _pkg="x11-utils"
+        elif [[ "$1" == "rpm-build" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
             _pkg="rpm"
         elif [[ "$1" == "createrepo_c" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
             _pkg="createrepo"
@@ -1228,8 +1228,14 @@ EOF"
 
         # Get current desktop resolution
         # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
-        local _res
-        _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
+        _getResolution() {
+
+            debug "Running: ${FUNCNAME[0]}"
+
+            installPackage xorg-x11-utils
+            _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
+        }
+        _getResolution
 
         if [[ -n $_novncauth ]]; then
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -nopw"
