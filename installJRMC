@@ -976,8 +976,8 @@ EOF"
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             # Debian ufw package state is broken on fresh installations
             [[ ! -x $(command -v ufw) ]] && _installPackage ufw
-            if [[ ! -f "/etc/ufw/applications.d/$1.service" ]]; then
-                _bash_cmd "cat <<-EOF > /etc/ufw/applications.d/$1.service
+            if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
+                _bash_cmd "cat <<-EOF > /etc/ufw/applications.d/$1
 [$1]
 title=$1
 description=$1 installed by installJRMC
@@ -1366,8 +1366,8 @@ EOF"
             _firewall_cmd --reload
         elif [[ -x $(command -v ufw) ]]; then
             _firewall_cmd delete allow jriver
-            [[ -f "/etc/ufw/applications.d/jriver.service" ]] \
-                && _rm_cmd /etc/ufw/applications.d/jriver.service
+            [[ -f "/etc/ufw/applications.d/jriver" ]] \
+                && _rm_cmd /etc/ufw/applications.d/jriver
         fi
 
         echo "Uninstalling Media Center"
