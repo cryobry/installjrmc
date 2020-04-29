@@ -975,7 +975,7 @@ EOF"
             fi
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
             # Debian ufw package state is broken on fresh installations
-            [[ ! -x $(command -v ufw) ]] && _installPackage --noquery ufw
+            [[ ! -x $(command -v ufw) ]] && _installPackage ufw
             if [[ ! -f "/etc/ufw/applications.d/$1.service" ]]; then
                 _bash_cmd "cat <<-EOF > /etc/ufw/applications.d/$1.service
 [$1]
