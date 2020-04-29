@@ -626,7 +626,7 @@ EOF'
         fi
 
         # Update package list
-        if ! _pkg_update; then
+        if ! _pkg_update > /dev/null 2>&1; then
             err "Package update failed!"
             exit 1
         fi
