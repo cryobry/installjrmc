@@ -23,7 +23,7 @@ installJRMC() {
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
     _exec_user="$(whoami)"
-    _available_services=("jriver-createrepo" "jriver-x11vnc-mediacenter" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
+    _available_services=("jriver-createrepo" "jriver-x11vnc-mediaserver" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
     #_available_containers=("mediacenter-xvnc" "createrepo")
 
 
@@ -56,7 +56,7 @@ OPTIONS
             Install systemd services and containers for USER
         --service, -s SERVICE
             See SERVICES section below for a list of possible services to install
-        --container, -c CONTAINER
+        --container, -c CONTAINER (TODO: Under construction)
             See CONTAINERS section below for a list of possible services to install
         --createrepo
             Build rpm, copy to webroot, and run createrepo
@@ -78,11 +78,12 @@ OPTIONS
             Enable and start a mediaserver systemd service (requires an existing X server)
         jriver-mediacenter
             Enable and start a mediacenter systemd service (requires an existing X server)
-        jriver-x11vnc-mediacenter
-            Enable and start x11vnc for the local desktop (requires an existing X server)
+        jriver-x11vnc-mediaserver
+            Enable and start x11vnc for the local desktop (requires an existing X server) and
+            JRiver Media Server
             --vncpass and --display are also valid options (see below)
         jriver-xvnc-mediacenter
-            Enable and start an Xvnc session running JRiver Media Center
+            Enable and start a new Xvnc session running JRiver Media Center
             --vncpass PASSWORD
                 Set vnc password for x11vnc/Xvnc access. If no password is set, the script
                 will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
@@ -92,9 +93,9 @@ OPTIONS
         jriver-createrepo
             Install hourly service to build latest MC RPM and run createrepo
 
-    CONTAINERS
-        mediacenter-xvnc (Under construction)
-        createrepo (Under construction)
+    CONTAINERS (TODO: Under construction)
+        mediacenter-xvnc
+        createrepo
 EOF
 
         # Exit using passed exit code
@@ -558,7 +559,7 @@ EOF
             debug "Running: ${FUNCNAME[0]}"
 
             for _service in "${_services[@]}"; do
-                if [[ "$_service" =~ ^(jriver-mediacenter|jriver-mediaserver|jriver-xvnc-mediacenter)$ ]] \
+                if [[ "$_service" =~ ^(jriver-mediacenter|jriver-mediaserver|jriver-xvnc-mediacenter|jriver-x11vnc-mediaserver)$ ]] \
                 && [[ -z $_repoinstall && -z $_rpminstall ]] \
                 && [[ ! -x $(command -v "mediacenter$_mversion") ]]; then
                     err "You are attempting to install a service that depends on JRiver Media Center"
@@ -951,7 +952,7 @@ EOF"
         if [[ "$1" == "jriver" ]]; then
             _f_ports=("52100-52200/tcp" "1900/udp")
             _u_ports="52100:52200/tcp|1900/udp"
-        elif [[ "$1" =~ ^(x11vnc|xvnc)$ ]]; then
+        elif [[ "$1" =~ ^(jriver-x11vnc|jriver-xvnc)$ ]]; then
             _f_ports=("$_port/tcp")
             _u_ports="$_port/tcp"
         else
@@ -1071,9 +1072,10 @@ EOF"
     # Globals:
     #   _display
     #   _displaynum
-    #   _port
+    #   _next_display
+    #   _next_displaynum
     #######################################
-    _setDisplayAndPort() {
+    _setDisplay() {
 
         # Check _display, else DISPLAY, else set to :0 by default
         if [[ -n $_display ]]; then
@@ -1089,7 +1091,9 @@ EOF"
             _next_display=":1"
         fi
 
-        _port=$(( _displaynum + 5900 ))
+        _displaynum="${_display#:}" # strip colon
+        _displaynum="${_displaynum%.*}" # strip suffix
+        _next_displaynum=$(( _displaynum + 1 ))
     }
 
 
@@ -1125,36 +1129,14 @@ EOF"
     #######################################
     # SERVICES
     #######################################
-    _service_jriver-mediaserver() {
 
-        debug "Running: ${FUNCNAME[0]}"
-
-        _bash_cmd "cat <<-EOF > $_service_fname
-[Unit]
-Description=JRiver Media Center $_mversion Media Server
-After=graphical.target
-
-[Service]
-$_user_specifier
-Type=simple
-Environment=DISPLAY=$_display
-Environment=XAUTHORITY=$XAUTHORITY
-ExecStart=/usr/bin/mediacenter$_mversion /MediaServer
-Restart=always
-RestartSec=10
-KillSignal=SIGHUP
-TimeoutStopSec=30
-
-[Install]
-WantedBy=graphical.target
-EOF"
-        _systemctl_reload && \
-        _systemctl_start "$_service_name" && \
-        _systemctl_enable "$_service_name" && \
-        _openFirewall "jriver"
-    }
-
-
+    #######################################
+    # Starts and enables (at startup) a JRiver Media Center service
+    # Arguments:
+    #   Passes arguments as startup options to /usr/bin/mediacenter26
+    # Requires:
+    #   XAUTHORITY
+    #######################################
     _service_jriver-mediacenter() {
 
         debug "Running: ${FUNCNAME[0]}"
@@ -1169,7 +1151,7 @@ $_user_specifier
 Type=simple
 Environment=DISPLAY=$_display
 Environment=XAUTHORITY=$XAUTHORITY
-ExecStart=/usr/bin/mediacenter$_mversion
+ExecStart=/usr/bin/mediacenter$_mversion $*
 Restart=always
 RestartSec=10
 KillSignal=SIGHUP
@@ -1185,6 +1167,20 @@ EOF"
     }
 
 
+    #######################################
+    # Starts and enables (at startup) a JRiver Media Server service
+    #######################################
+    _service_jriver-mediaserver() {
+
+        debug "Running: ${FUNCNAME[0]}"
+
+        _service_jriver-mediacenter "/MediaServer"
+    }
+
+
+    #######################################
+    # Starts and enables (at startup) JRiver Media Center in a new Xvnc session
+    #######################################
     _service_jriver-xvnc-mediacenter() {
 
         debug "Running: ${FUNCNAME[0]}"
@@ -1192,6 +1188,8 @@ EOF"
         _installPackage tigervnc-server
 
         _setVNCPass
+
+        local _port=$(( _next_displaynum + 5900 ))
 
         if [[ -n $_novncauth ]]; then
             _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$_mversion"
@@ -1218,18 +1216,24 @@ EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
-        _openFirewall "xvnc" && \
+        echo "Xvnc running on localhost:$_port" && \
+        _openFirewall "jriver-xvnc" && \
         _openFirewall "jriver"
     }
 
 
-    _service_jriver-x11vnc-mediacenter() {
+    #######################################
+    # Starts and enables (at startup) JRiver Media Server and x11vnc sharing the local desktop
+    #######################################
+    _service_jriver-x11vnc-mediaserver() {
 
         debug "Running: ${FUNCNAME[0]}"
 
         _installPackage x11vnc
 
         _setX11VNCPass
+
+        local _port=$(( _displaynum + 5900 ))
 
         # Get current desktop resolution
         # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
@@ -1268,12 +1272,16 @@ EOF"
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
         echo "x11vnc running on localhost:$_port" && \
-        _openFirewall "x11vnc"
+        _openFirewall "jriver-x11vnc"
 
-        _service_jriver-mediacenter
+        _service_jriver-mediacenter "/MediaServer"
     }
 
 
+    #######################################
+    # Starts and enables (at startup) an hourly service to build the latest version of JRiver Media
+    # Center RPM from the source DEB and create/update an RPM repository
+    #######################################
     _service_jriver-createrepo() {
 
         debug "Running: ${FUNCNAME[0]}"
@@ -1324,6 +1332,9 @@ EOF"
     }
 
 
+    #######################################
+    # Complete uninstall
+    #######################################
     _uninstall() {
 
         debug "Running: ${FUNCNAME[0]}"
@@ -1428,7 +1439,7 @@ EOF"
         fi
 
         # Install services
-        _setDisplayAndPort
+        _setDisplay
         for _service in "${_services[@]}"; do
             _servicePrep "$_service"
             "_service_$_service"
