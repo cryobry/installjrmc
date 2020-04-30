@@ -5,7 +5,7 @@ This program will install [JRiver Media Center](https://www.jriver.com/) and ass
 ## README
 
 1.  This script will not point major upgrades (i.e. from v25 to v26) to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
-2.  In *most* cases `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services. Doing so may lead to permissions issues. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
+2.  Typically `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services. Doing so may lead to permissions issues. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
 
 ## Executing
 
@@ -87,8 +87,7 @@ It is possible to install multiple services at one time using multiple `--servic
 ##### `jriver-x11vnc` versus `jriver-xvnc-mediacenter`
 [jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [jriver-xvnc-mediacenter](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display. The requisite firewall rules will also be added to the system firewall to enable remote access.
 
-**Notes**:
-1.   If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in 99% of cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
+**Note**: If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in most cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
 
 ### Firewall Rules
 
