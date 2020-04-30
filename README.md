@@ -2,16 +2,20 @@
 
 This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on Fedora (>=29), CentOS (>=8), Ubuntu (>=16.04), and Debian (>=9).
 
-## Notes
+## README
 
 1.  This script will not point major upgrades (i.e. from v25 to v26) to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
 2.  In *most* cases `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services. Doing so may lead to permissions issues. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
 
+## Executing
+
+`installJRMC [--option [ARGUMENT]]`
+
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If any other option is specified then the default install method will need to be specified using `--install-repo` (or `--install-rpm`). This makes it possible to install services, containers, repos, etc. independent from Media Center.
+
 ## Options
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If any other option is specified then the default install method will need to be specified using `--install-repo` (or `--install-rpm`). This makes it possible to create services, containers, repos, etc. separate from installing Media Center.
-
-Here is a list of additional options that can be passed to the script. You can always find the latest supported options by running `installJRMC --help`.
+Here is a list of possible options that can be passed to the script. You can always find the latest supported options by running `installJRMC --help`.
 
 ```text
 --install-repo
@@ -25,8 +29,7 @@ Here is a list of additional options that can be passed to the script. You can a
 --outputdir PATH
     Generate rpmbuild output in this directory (Default: $PWD/outputdir)
 --mcversion VERSION
-    Build or install a specific version (Default: scrape the latest version from Interact)
-    TODO: Currently this only works with rpmbuild options, installing from repo will always install the latest version by default
+    Build or install a specific version (Default: install the latest version)
 --restorefile RESTOREFILE
     Restore file location for registration (Default: skip registration)
 --betapass PASSWORD
@@ -56,7 +59,7 @@ Here is a list of additional options that can be passed to the script. You can a
 
 
 ### services
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root. If so, use `--service-user root`.
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root. If so, use `--service-user root` to override sanity checks.
 
 
 ```text
@@ -65,7 +68,7 @@ jriver-mediaserver
 jriver-mediacenter
     Enable and start a mediacenter systemd service (requires an existing X server)
 jriver-x11vnc
-    Enable and start x11vnc for the local desktop (requires an existing X server)
+    Enable and start x11vnc for the local desktop (requires an existing X server, does NOT support Wayland)
     --vncpass and --display are also valid options (see below)
 jriver-xvnc-mediacenter
     Enable and start a new Xvnc session running JRiver Media Center
@@ -79,13 +82,19 @@ jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
 ```
 
-It is possible to install multiple services at one time using additional `--service` arguments: `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter`
+It is possible to install multiple services at one time using multiple `--service` blocks: `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter`
 
 ##### `jriver-x11vnc` versus `jriver-xvnc-mediacenter`
-[jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [xvnc](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display. The requisite firewall rules will also be added to the system firewall to enable remote access.
+[jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [jriver-xvnc-mediacenter](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display. The requisite firewall rules will also be added to the system firewall to enable remote access.
 
-**Note**: If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in 99% of cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
+**Notes**:
+1.   If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in 99% of cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
 
+### Firewall Rules
+
+`installJRMC` will automatically install and enable port forwarding firewall rules to enable remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on Fedora/CentOS and `ufw` on Ubuntu/Debian.
+
+**Note:** `ufw` is not installed by default on Debian but will be installed by `installJRMC`. To prevent user lock-out (i.e. SSH), Debian users that have not already enabled `ufw` will need to do so (`sudo ufw enable`) after running `installJRMC` and inspecting their rules.
 
 ### containers
 
