@@ -23,7 +23,7 @@ installJRMC() {
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
     _exec_user="$(whoami)"
-    _available_services=("jriver-createrepo" "jriver-x11vnc-mediaserver" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
+    _available_services=("jriver-createrepo" "jriver-x11vnc" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
     #_available_containers=("mediacenter-xvnc" "createrepo")
 
 
@@ -78,9 +78,9 @@ OPTIONS
             Enable and start a mediaserver systemd service (requires an existing X server)
         jriver-mediacenter
             Enable and start a mediacenter systemd service (requires an existing X server)
-        jriver-x11vnc-mediaserver
-            Enable and start x11vnc for the local desktop (requires an existing X server) and
-            JRiver Media Server
+        jriver-x11vnc
+            Enable and start x11vnc for the local desktop (requires an existing X server)
+            Usually combined with jriver-mediaserver or jriver-mediacenter services
             --vncpass and --display are also valid options (see below)
         jriver-xvnc-mediacenter
             Enable and start a new Xvnc session running JRiver Media Center
@@ -559,7 +559,7 @@ EOF
             debug "Running: ${FUNCNAME[0]}"
 
             for _service in "${_services[@]}"; do
-                if [[ "$_service" =~ ^(jriver-mediacenter|jriver-mediaserver|jriver-xvnc-mediacenter|jriver-x11vnc-mediaserver)$ ]] \
+                if [[ "$_service" =~ ^(jriver-mediacenter|jriver-mediaserver|jriver-xvnc-mediacenter|jriver-x11vnc)$ ]] \
                 && [[ -z $_repoinstall && -z $_rpminstall ]] \
                 && [[ ! -x $(command -v "mediacenter$_mversion") ]]; then
                     err "You are attempting to install a service that depends on JRiver Media Center"
@@ -1181,7 +1181,7 @@ EOF"
     #######################################
     # Starts and enables (at startup) JRiver Media Center in a new Xvnc session
     #######################################
-    _service_jriver-xvnc-mediacenter() {
+    _service_jriver-xvnc() {
 
         debug "Running: ${FUNCNAME[0]}"
 
@@ -1225,7 +1225,7 @@ EOF"
     #######################################
     # Starts and enables (at startup) JRiver Media Server and x11vnc sharing the local desktop
     #######################################
-    _service_jriver-x11vnc-mediaserver() {
+    _service_jriver-x11vnc() {
 
         debug "Running: ${FUNCNAME[0]}"
 
@@ -1273,8 +1273,6 @@ EOF"
         _systemctl_enable "$_service_name" && \
         echo "x11vnc running on localhost:$_port" && \
         _openFirewall "jriver-x11vnc"
-
-        _service_jriver-mediacenter "/MediaServer"
     }
 
 
