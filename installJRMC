@@ -970,7 +970,7 @@ EOF"
                 for _f_port in "${_f_ports[@]}"; do
                     _firewall_cmd --permanent --service="$1" --add-port="$_f_port" > /dev/null 2>&1
                 done
-                _firewall-cmd --add-service "$1" --permanent > /dev/null 2>&1
+                _firewall_cmd --add-service "$1" --permanent > /dev/null 2>&1
                 _firewall_cmd --reload > /dev/null 2>&1
             fi
         elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
