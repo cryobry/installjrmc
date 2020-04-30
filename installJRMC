@@ -628,6 +628,7 @@ EOF'
         _addRepo
 
         # Update package list
+        [[ -n $_debug ]] && echo "Updating package list"
         if ! _pkg_update > /dev/null 2>&1; then
             err "Package update failed!"
             exit 1
@@ -636,8 +637,10 @@ EOF'
         # If user specifies a version, use that
         if [[ -n $_mcversion ]]; then
             _setVersion
-            _specific_version="$_mcversion"
+            local _specific_version="true"
         fi
+
+        local _mcpkg
 
         # Fedora/CentOS use a universal package name -- easy
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -645,15 +648,24 @@ EOF'
         fi
 
         # Ubuntu/Debian incorporate the mversion into the package name -- more fun!
-        if [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -z $_mversion ]]; then
-            # Try parsing the latest mversion from the repo
-            _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}')
-            _mcpkg="${_mcpkg%\'}"
-            _mcpkg="${_mcpkg#\'}"
-            # If the version is missing or bad then fall back to scraping Interact
-            if [[ ! "$_mcpkg" =~ ^mediacenter[0-9][0-9]$ ]]; then
-                _setVersion
+        if [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            if [[ -z $_mversion ]]; then
+                # Try parsing the latest mversion from the repo
+                if _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}'); then
+                    _mcpkg="${_mcpkg%\'}"
+                    _mcpkg="${_mcpkg#\'}"
+                # Scrape Interact
+                else
+                    _setVersion
+                    _mcpkg="mediacenter$_mversion"
+                fi
+            else
                 _mcpkg="mediacenter$_mversion"
+            fi
+            # Sanity check
+            if [[ ! "$_mcpkg" =~ ^mediacenter[0-9][0-9]$ ]]; then
+                err "Could not parse MC package name"
+                exit 1
             fi
         fi
 
