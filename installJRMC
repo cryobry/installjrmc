@@ -47,7 +47,7 @@ OPTIONS
         --outputdir PATH
             Generate rpmbuild output in this directory (Default: $PWD/outputdir)
         --mcversion VERSION
-            Build or install a specific version (Default: scrape the latest version from Interact)
+            Build or install a specific version (Default: install the latest version)
         --restorefile RESTOREFILE
             Restore file location for registration (Default: skip registration)
         --betapass PASSWORD
@@ -604,26 +604,28 @@ EOF
 
         debug "Running: ${FUNCNAME[0]}"
 
-        echo "Installing latest JRiver Media Center from repo..."
+        echo "Installing JRiver Media Center from repo..."
 
         local _mcpkg
 
-        # Add repositories to OS-specific package managers
-        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-
-            _bash_cmd 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
+        # Add repository files
+        _addRepo() {
+            # Add repositories to OS-specific package managers
+            if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                _bash_cmd 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
 [jriver]
 name=JRiver Media Center repo by BryanC
 baseurl=https://repos.bryanroessler.com/jriver
 gpgcheck=0
 EOF'
-            _mcpkg="MediaCenter"
-        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
-            _bash_cmd 'cat <<-EOF > /etc/apt/sources.list.d/jriver.list
+            elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+                wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
+                _bash_cmd 'cat <<-EOF > /etc/apt/sources.list.d/jriver.list
 deb [arch=amd64,i386,armhf] http://dist.jriver.com/latest/mediacenter/ jessie main
 EOF'
-        fi
+            fi
+        }
+        _addRepo
 
         # Update package list
         if ! _pkg_update > /dev/null 2>&1; then
@@ -631,25 +633,50 @@ EOF'
             exit 1
         fi
 
-        # Find latest mversion to install on Ubuntu/Debian
-        if [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
-            # Try parsing the latest mediacenter?? version from the repo
-            if _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}'); then
-                _mcpkg="${_mcpkg%\'}"
-                _mcpkg="${_mcpkg#\'}"
-            fi
-            # If that fails, fall back to scraping Interact
-            if ! [[ "$_mcpkg" =~ ^[0-9][0-9]\.[0-9]\.[0-9]\+$ ]]; then
+        # If user specifies a version, use that
+        if [[ -n $_mcversion ]]; then
+            _setVersion
+            _specific_version="$_mcversion"
+        fi
+
+        # Fedora/CentOS use a universal package name -- easy
+        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+            _mcpkg="MediaCenter"
+        fi
+
+        # Ubuntu/Debian incorporate the mversion into the package name -- more fun!
+        if [[ "$ID" =~ ^(ubuntu|debian)$ ]] && [[ -z $_mversion ]]; then
+            # Try parsing the latest mversion from the repo
+            _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}')
+            _mcpkg="${_mcpkg%\'}"
+            _mcpkg="${_mcpkg#\'}"
+            # If the version is missing or bad then fall back to scraping Interact
+            if [[ ! "$_mcpkg" =~ ^mediacenter[0-9][0-9]$ ]]; then
                 _setVersion
                 _mcpkg="mediacenter$_mversion"
             fi
         fi
 
-
-        if [[ -n $_debug ]]; then
-            _installPackage "$_mcpkg"
+        if [[ -n $_specific_version ]]; then
+            if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                if [[ -n $_debug ]]; then
+                    _installPackage "$_mcpkg-$_mcversion"
+                else
+                    _installPackage "$_mcpkg-$_mcversion" > /dev/null 2>&1
+                fi
+            elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+                if [[ -n $_debug ]]; then
+                    _installPackage "$_mcpkg=$_mcversion"
+                else
+                    _installPackage "$_mcpkg=$_mcversion" > /dev/null 2>&1
+                fi
+            fi
         else
-            _installPackage "$_mcpkg" > /dev/null 2>&1
+            if [[ -n $_debug ]]; then
+                _installPackage "$_mcpkg"
+            else
+                _installPackage "$_mcpkg" > /dev/null 2>&1
+            fi
         fi
 
         # shellcheck disable=SC2181
