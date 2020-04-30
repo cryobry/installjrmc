@@ -9,15 +9,16 @@ This program will install [JRiver Media Center](https://www.jriver.com/) and ass
 
 ## Options
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If any other option is specified then the default install method will need to be specified using `--install-repo` (or `--install-rpmbuild`). This makes it possible to create services, containers, repos, etc. separate from installing Media Center.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If any other option is specified then the default install method will need to be specified using `--install-repo` (or `--install-rpm`). This makes it possible to create services, containers, repos, etc. separate from installing Media Center.
 
 Here is a list of additional options that can be passed to the script. You can always find the latest supported options by running `installJRMC --help`.
+
 ```text
 --install-repo
     Install JRiver Media Center from repository using package manager (Default)
     DEB-based OSes: Official package repository
     RPM-based OSes: BryanC's unofficial repository
---install-rpmbuild
+--install-rpm
      (RPM-based OSes only) Build RPM from source DEB and install it
 --rpmbuild
     Build RPM from source DEB
@@ -25,6 +26,7 @@ Here is a list of additional options that can be passed to the script. You can a
     Generate rpmbuild output in this directory (Default: $PWD/outputdir)
 --mcversion VERSION
     Build or install a specific version (Default: scrape the latest version from Interact)
+    TODO: Currently this only works with rpmbuild options, installing from repo will always install the latest version by default
 --restorefile RESTOREFILE
     Restore file location for registration (Default: skip registration)
 --betapass PASSWORD
@@ -35,6 +37,7 @@ Here is a list of additional options that can be passed to the script. You can a
     See SERVICES section below for a list of possible services to install
 --container, -c CONTAINER
     See CONTAINERS section below for a list of possible services to install
+    TODO: Containers are a work-in-progress
 --createrepo
     Build rpm, copy to webroot, and run createrepo
 --createrepo-webroot PATH
@@ -53,7 +56,7 @@ Here is a list of additional options that can be passed to the script. You can a
 
 
 ### services
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root.
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root. If so, use `--service-user root`.
 
 
 ```text
@@ -61,23 +64,25 @@ jriver-mediaserver
     Enable and start a mediaserver systemd service (requires an existing X server)
 jriver-mediacenter
     Enable and start a mediacenter systemd service (requires an existing X server)
-jriver-x11vnc-mediacenter
+jriver-x11vnc
     Enable and start x11vnc for the local desktop (requires an existing X server)
+    --vncpass and --display are also valid options (see below)
+jriver-xvnc-mediacenter
+    Enable and start a new Xvnc session running JRiver Media Center
     --vncpass PASSWORD
         Set vnc password for x11vnc/Xvnc access. If no password is set, the script
         will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
     --display DISPLAY
         Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
         current display incremented by 1 (Xvnc))
-jriver-xvnc-mediacenter
-    Enable and start an Xvnc session running JRiver Media Center
-    --vncpass and --display are also valid options (see above)
 jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
 ```
 
-##### `jriver-x11vnc-mediaserver` versus `jriver-xvnc-mediacenter`
-`x11vnc` shares your existing X display via vnc and starts a minimized JRiver Media Center service. Conversely, `xvnc` creates a new VNC display and starts a JRiver Media Center service in the foreground. The requisite firewall rules will also be added to the system firewall to enable remote access.
+It is possible to install multiple services at one time using additional `--service` arguments: `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter`
+
+##### `jriver-x11vnc` versus `jriver-xvnc-mediacenter`
+[jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [xvnc](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display. The requisite firewall rules will also be added to the system firewall to enable remote access.
 
 **Note**: If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in 99% of cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
 
@@ -94,9 +99,9 @@ jriver-createrepo
 
 *   `installJRMC --install-repo --service jriver-mediaserver`
 
-    Installs JRiver Media Center from the repository and starts/enables the mediaserver service.
+    Installs JRiver Media Center from the repository and starts/enables the /MediaServer service.
 
-*   `installJRMC --install-rpmbuild --restorefile /path/to/license.mjr --mcversion 26.0.56`
+*   `installJRMC --install-rpm --restorefile /path/to/license.mjr --mcversion 26.0.56`
 
     Builds JRiver Media Center version 26.0.56 RPM from the source DEB, installs it (RPM distros only), and activates it using the specified .mjr license file.
 
@@ -108,13 +113,13 @@ jriver-createrepo
 
     Installs the jriver-createrepo timer and service to build the RPM, move it to the webroot, and run createrepo as `www-user` hourly.
 
-*   `installJRMC --install-repo --service jriver-x11vnc-mediaserver --vncpass "letmein"`
+*   `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
 
-    Installs services to share the existing local desktop via VNC and automatically run a minimized instance of Media Center (Media Server).
+    Installs services to share the existing local desktop via VNC and automatically run Media Center on startup.
 
 *   `installJRMC --install-repo --service jriver-xvnc-mediacenter --display ":2"`
 
-    Installs a service that starts Xvnc on display ':2' that just runs Media Center.
+    Installs an Xvnc server on display ':2' that starts Media Center.
 
 *   `installJRMC --uninstall`
 
