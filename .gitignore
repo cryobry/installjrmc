@@ -1,3 +1,5 @@
 **/
 *.zip
 testing.sh
+.lock
+tests
