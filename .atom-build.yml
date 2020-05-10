@@ -3,13 +3,11 @@ name: ''
 targets:
   # Fedora
   Run silently in Fedora:
-    cmd: 'buildWrapper podmanRunEasy -m ephemeral -i fedora:latest -n installJRMC -w {FILE_ACTIVE_PATH} --silent --mkexec --systemd {FILE_ACTIVE}'
+    cmd: 'podmanRun -o "--rm --name=installJRMC_{FILE_ACTIVE_NAME_BASE} -v={FILE_ACTIVE_PATH}:{FILE_ACTIVE_PATH}:z -w {FILE_ACTIVE_PATH} fedora:latest {FILE_ACTIVE}'
   Run debug in Fedora:
-    cmd: 'buildWrapper podmanRunEasy -m ephemeral -i fedora:latest -n installJRMC -w {FILE_ACTIVE_PATH} --debug --mkexec --systemd {FILE_ACTIVE}'
+    cmd: 'podmanRun -o "--rm --name=installJRMC_{FILE_ACTIVE_NAME_BASE} -v={FILE_ACTIVE_PATH}:{FILE_ACTIVE_PATH}:z -w {FILE_ACTIVE_PATH} fedora:latest {FILE_ACTIVE} --debug'
   # Ubuntu
-  Run build silently in Ubuntu:
-    cmd: 'buildWrapper podmanRunEasy -m ephemeral -i ubuntu:latest -n installJRMC -w {FILE_ACTIVE_PATH} -d {FILE_ACTIVE_PATH}/RPMS --silent --mkexec {FILE_ACTIVE} --debug --build --container'
-  Run createrepo silently in Ubuntu:
-    cmd: 'buildWrapper podmanRunEasy -m ephemeral -i ubuntu:latest -n installJRMC -w {FILE_ACTIVE_PATH} -d {FILE_ACTIVE_PATH}/output/RPMS --silent --mkexec {FILE_ACTIVE} --debug --createrepo'
-  Run debug in Ubuntu:
-    cmd: 'buildWrapper podmanRunEasy -m ephemeral -i ubuntu:latest -n installJRMC -w {FILE_ACTIVE_PATH} --debug --mkexec {FILE_ACTIVE} --debug --container'
+  Run rpmbuild in Ubuntu:
+    cmd: 'podmanRun -o "--rm --name=installJRMC_{FILE_ACTIVE_NAME_BASE} -v={FILE_ACTIVE_PATH}:{FILE_ACTIVE_PATH}:z -w {FILE_ACTIVE_PATH} ubuntu:latest {FILE_ACTIVE} --rpmbuild'
+  Run createrepo in Ubuntu:
+    cmd: 'podmanRun -o "--rm --name=installJRMC_{FILE_ACTIVE_NAME_BASE} -v={FILE_ACTIVE_PATH}:{FILE_ACTIVE_PATH}:z -w {FILE_ACTIVE_PATH} ubuntu:latest {FILE_ACTIVE} --createrepo'
