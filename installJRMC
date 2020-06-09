@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.6"
+    _scriptversion="0.6-dev"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -191,20 +191,9 @@ EOF
     }
 
 
-    err() {
+    err() { echo "Error: $*" >&2; }
 
-      echo "Error: $*" >&2
-    }
-
-
-    #######################################
-    # Call this at the beginning of every function in order to track
-    #######################################
-    debug() {
-
-        [[ -n $_debug ]] && echo "Debug: $*"
-    }
-
+    debug() { [[ -n $_debug ]] && echo "Debug: $*"; }
 
     #######################################
     # Prepend this to any command that you wish to execute with sudo
