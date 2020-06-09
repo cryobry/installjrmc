@@ -7,7 +7,7 @@ shopt -s extglob
 # Run installJRMC --help to see available options
 #
 # To-dos:
-#   1. Raspberry Pi support -- do not own one so difficult to test
+#   1. Raspberry Pi OS support
 #   2. Interactive installation (ncurses?)
 #
 # installJRMC can be run directly or sourced as a function (by sourcing this file)
