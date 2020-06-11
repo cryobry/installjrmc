@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.6-dev"
+    _scriptversion="0.7"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -392,12 +392,12 @@ EOF
             echo "Installing:" "${_pkg_array[@]}"
             if [[ -n $_debug ]]; then
                 if ! _pkg_install "${_pkg_array[@]}"; then
-                    err "Failed to install package"
-                    exit 1
+                    err "Failed to install package. Attempting to continue..."
+                    return 1
                 fi
             elif ! _pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
-                err "Failed to install package."
-                _printHelpAndExit 1
+                err "Failed to install package. Attempting to continue..."
+                return 1
             fi
         fi
 
@@ -406,12 +406,12 @@ EOF
             echo "Installing:" "${_url_pkg_array[@]}"
             if [[ -n $_debug ]]; then
                 if ! _pkg_install_nogpg "${_url_pkg_array[@]}"; then
-                    err "Failed to install required package from url"
-                    exit 1
+                    err "Failed to install package. Attempting to continue..."
+                    return 1
                 fi
             elif ! _pkg_install_nogpg "${_url_pkg_array[@]}" > /dev/null 2>&1; then
-                err "Failed to install required package from url"
-                _printHelpAndExit 1
+                err "Failed to install package. Attempting to continue..."
+                return 1
             fi
         fi
     }
