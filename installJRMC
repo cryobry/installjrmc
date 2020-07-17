@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.7"
+    _scriptversion="0.8"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,64.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -814,6 +814,8 @@ Provides: mediacenter$_mversion
 License: Copyright 1998-2020, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 URL: http://www.jriver.com/
 
+%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
+
 %description
 Media Center is more than a world class player.
 
@@ -908,7 +910,6 @@ EOF"
 
     #######################################
     # Symlink certificates where JRiver Media Center expects them to be on Fedora/CentOS
-    # them on Debian/Ubuntu
     # Returns:
     #   0 if symlinking is unecessary or successful, 1 if not
     #######################################
@@ -966,7 +967,7 @@ EOF"
     #   ID
     #   _bash_cmd
     #   _firewall_cmd
-    #    _port
+    #   _port
     # Returns:
     #   0 if ports opened sucessfully, 1 if not
     #######################################
