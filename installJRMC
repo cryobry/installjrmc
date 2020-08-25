@@ -801,8 +801,6 @@ $_requires
 Requires: libXScrnSaver
 Requires: xdg-utils
 Requires: libgomp >= 4.9
-Requires: gstreamer1 >= 1.4.4
-Requires: gstreamer1-plugins-base >= 1.4.4
 Requires: nss >= 3.26
 Requires: nspr >= 4.12
 Requires: ca-certificates
