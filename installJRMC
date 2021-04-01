@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.9"
+    _scriptversion="0.9.1"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,67.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -832,6 +832,7 @@ dpkg -x %{S:0} %{buildroot}
 %{_bindir}/mediacenter$_mversion
 %{_libdir}/jriver
 %{_datadir}
+%exclude %{_datadir}/applications/media_center_packageinstaller_$_mversion.desktop
 /etc/security/limits.d/*
 EOF"
 
