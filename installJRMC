@@ -12,13 +12,13 @@ shopt -s extglob
 #
 # installJRMC can be run directly or sourced as a function (by sourcing this file)
 # Arguments:
-#   see _printHelpAndExit() and/or check getopt's in _parseInput() for available options
+#   see _printHelpAndExit() and _parseInput() for available options
 # Returns:
 #   0 if critical functions complete successfully
 #######################################
 installJRMC() {
 
-    _scriptversion="0.9.1"
+    _scriptversion="0.9.2"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,67.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -806,6 +806,7 @@ Requires: nspr >= 4.12
 Requires: ca-certificates
 Requires: python3
 Recommends: vorbis-tools >= 1.4.0
+Recommends: lame >= 3.0
 
 Provides: mediacenter$_mversion
 
@@ -890,7 +891,7 @@ EOF"
         fi
 
         # Copy built rpms to webroot
-        if ! _cr_cp_cmd "$_rpmfile" "$_createrepo_webroot"; then
+        if ! _cr_cp_cmd -f "$_rpmfile" "$_createrepo_webroot"; then
             err "Could not copy the RPM to the createrepo-webroot path"
             err "Make sure that the createrepo-webroot path is writeable by createrepo-user"
             return 1
