@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.9.2"
+    _scriptversion="0.9.3"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,67.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -26,77 +26,75 @@ installJRMC() {
     _available_services=("jriver-createrepo" "jriver-x11vnc" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
     #_available_containers=("mediacenter-xvnc" "createrepo")
 
-
     _printHelpAndExit() {
-
         debug "Running: ${FUNCNAME[0]}"
 
-        cat <<-'EOF'
-USAGE:
-    installJRMC [[OPTION] [VALUE]]...
+        cat <<- 'EOF'
+			USAGE:
+				installJRMC [[OPTION] [VALUE]]...
 
-OPTIONS
-        --install-repo
-            Install JRiver Media Center from repository using package manager (Default)
-            DEB-based OSes: Official package repository
-            RPM-based OSes: BryanC unofficial repository
-        --install-rpm
-             (RPM-based OSes only) Build RPM from source DEB and install it
-        --rpmbuild
-            Build RPM from source DEB
-        --outputdir PATH
-            Generate rpmbuild output in this directory (Default: $PWD/outputdir)
-        --mcversion VERSION
-            Build or install a specific version (Default: install the latest version)
-        --restorefile RESTOREFILE
-            Restore file location for registration (Default: skip registration)
-        --betapass PASSWORD
-            Enter beta team password for access to beta builds
-        --service-user USER
-            Install systemd services and containers for USER
-        --service, -s SERVICE
-            See SERVICES section below for a list of possible services to install
-        --container, -c CONTAINER (TODO: Under construction)
-            See CONTAINERS section below for a list of possible services to install
-        --createrepo
-            Build rpm, copy to webroot, and run createrepo
-        --createrepo-webroot PATH
-            The webroot directory to install the repo (Default: /srv/jriver/)
-        --createrepo-user USER
-            The web server user (Default: current user)
-        --version, -v
-            Print this script version and exit
-        --debug, -d
-            Print debug output
-        --help, -h
-            Print help dialog and exit
-        --uninstall, -u
-            Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
+			OPTIONS
+				--install-repo
+					Install JRiver Media Center from repository using package manager (Default)
+					DEB-based OSes: Official package repository
+					RPM-based OSes: BryanC unofficial repository
+				--install-rpm
+						(RPM-based OSes only) Build RPM from source DEB and install it
+				--rpmbuild
+					Build RPM from source DEB
+				--outputdir PATH
+					Generate rpmbuild output in this directory (Default: $PWD/outputdir)
+				--mcversion VERSION
+					Build or install a specific version (Default: install the latest version)
+				--restorefile RESTOREFILE
+					Restore file location for registration (Default: skip registration)
+				--betapass PASSWORD
+					Enter beta team password for access to beta builds
+				--service-user USER
+					Install systemd services and containers for USER
+				--service, -s SERVICE
+					See SERVICES section below for a list of possible services to install
+				--container, -c CONTAINER (TODO: Under construction)
+					See CONTAINERS section below for a list of possible services to install
+				--createrepo
+					Build rpm, copy to webroot, and run createrepo
+				--createrepo-webroot PATH
+					The webroot directory to install the repo (Default: /srv/jriver/)
+				--createrepo-user USER
+					The web server user (Default: current user)
+				--version, -v
+					Print this script version and exit
+				--debug, -d
+					Print debug output
+				--help, -h
+					Print help dialog and exit
+				--uninstall, -u
+					Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 
-    SERVICES
-        jriver-mediaserver
-            Enable and start a mediaserver systemd service (requires an existing X server)
-        jriver-mediacenter
-            Enable and start a mediacenter systemd service (requires an existing X server)
-        jriver-x11vnc
-            Enable and start x11vnc for the local desktop (requires an existing X server)
-            Usually combined with jriver-mediaserver or jriver-mediacenter services
-            --vncpass and --display are also valid options (see below)
-        jriver-xvnc-mediacenter
-            Enable and start a new Xvnc session running JRiver Media Center
-            --vncpass PASSWORD
-                Set vnc password for x11vnc/Xvnc access. If no password is set, the script
-                will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
-            --display DISPLAY
-                Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
-                current display incremented by 1 (Xvnc))
-        jriver-createrepo
-            Install hourly service to build latest MC RPM and run createrepo
+			SERVICES
+				jriver-mediaserver
+					Enable and start a mediaserver systemd service (requires an existing X server)
+				jriver-mediacenter
+					Enable and start a mediacenter systemd service (requires an existing X server)
+				jriver-x11vnc
+					Enable and start x11vnc for the local desktop (requires an existing X server)
+					Usually combined with jriver-mediaserver or jriver-mediacenter services
+					--vncpass and --display are also valid options (see below)
+				jriver-xvnc-mediacenter
+					Enable and start a new Xvnc session running JRiver Media Center
+					--vncpass PASSWORD
+						Set vnc password for x11vnc/Xvnc access. If no password is set, the script
+						will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+					--display DISPLAY
+						Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
+						current display incremented by 1 (Xvnc))
+				jriver-createrepo
+					Install hourly service to build latest MC RPM and run createrepo
 
-    CONTAINERS (TODO: Under construction)
-        mediacenter-xvnc
-        createrepo
-EOF
+			CONTAINERS (TODO: Under construction)
+				mediacenter-xvnc
+				createrepo
+		EOF
 
         # Exit using passed exit code
         [[ -z $1 ]] && exit 0 || exit "$1"
@@ -104,7 +102,6 @@ EOF
 
 
     _parseInput() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         # set default behavior
@@ -190,7 +187,6 @@ EOF
         fi
     }
 
-
     err() { echo "Error: $*" >&2; }
 
     debug() { [[ -n $_debug ]] && echo "Debug: $*"; }
@@ -201,7 +197,6 @@ EOF
     #   _exec_user
     #######################################
     _ifSudo() {
-
         if [[ "$_exec_user" != "root" ]]; then
             sudo "$@"
         else
@@ -215,7 +210,6 @@ EOF
     # Used in: _buildCommands()
     #######################################
     _getOS() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         if [[ -e "/etc/os-release" ]]; then
@@ -316,7 +310,6 @@ EOF
                 _createrepo_cmd(){ createrepo -q "$@"; }
             fi
         fi
-
     }
 
 
@@ -599,19 +592,21 @@ EOF
 
         # Add repository files
         _addRepo() {
+            debug "Running: ${FUNCNAME[0]}"
             # Add repositories to OS-specific package managers
             if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                _bash_cmd 'cat <<-EOF > /etc/yum.repos.d/jriver.repo
-[jriver]
-name=JRiver Media Center repo by BryanC
-baseurl=https://repos.bryanroessler.com/jriver
-gpgcheck=0
-EOF'
+                _bash_cmd 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
+					[jriver]
+					name=JRiver Media Center repo by BryanC
+					baseurl=https://repos.bryanroessler.com/jriver
+					gpgcheck=0
+				EOF'
             elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+                _installPackage wget
                 wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
-                _bash_cmd 'cat <<-EOF > /etc/apt/sources.list.d/jriver.list
-deb [arch=amd64,i386,armhf] http://dist.jriver.com/latest/mediacenter/ jessie main
-EOF'
+                _bash_cmd 'cat <<- EOF > /etc/apt/sources.list.d/jriver.list
+					deb [arch=amd64,i386,armhf] http://dist.jriver.com/latest/mediacenter/ buster main
+				EOF'
             fi
         }
         _addRepo
@@ -772,77 +767,77 @@ EOF'
         fi
 
         # Create spec file
-        bash -c "cat <<EOF > $_outputdir/SPECS/mediacenter.spec
-Name:    MediaCenter
-Version: $_mcversion
-Release: 1
-Summary: JRiver Media Center
-Group:   Applications/Media
-Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb
-$_build_requires
-BuildArch: x86_64
-%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
+        cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
+			Name:    MediaCenter
+			Version: $_mcversion
+			Release: 1
+			Summary: JRiver Media Center
+			Group:   Applications/Media
+			Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb
+			$_build_requires
+			BuildArch: x86_64
+			%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
-AutoReq:  0
-Requires: glibc >= 2.19
-Requires: alsa-lib >= 1.0.28
-Requires: libuuid >= 2.25
-Requires: libX11 >= 1.6
-Requires: libX11-common >= 1.6
-Requires: libXext >= 1.3
-Requires: libxcb >= 1.1
-Requires: libXdmcp >= 1.1
-Requires: libstdc++ >= 4.9
-Requires: gtk3 >= 3.14
-Requires: mesa-libGL
-Requires: libglvnd-glx
-Requires: pango >= 1.36
-$_requires
-Requires: libXScrnSaver
-Requires: xdg-utils
-Requires: libgomp >= 4.9
-Requires: nss >= 3.26
-Requires: nspr >= 4.12
-Requires: ca-certificates
-Requires: python3
-Recommends: vorbis-tools >= 1.4.0
-Recommends: lame >= 3.0
+			AutoReq:  0
+			Requires: glibc >= 2.19
+			Requires: alsa-lib >= 1.0.28
+			Requires: libuuid >= 2.25
+			Requires: libX11 >= 1.6
+			Requires: libX11-common >= 1.6
+			Requires: libXext >= 1.3
+			Requires: libxcb >= 1.1
+			Requires: libXdmcp >= 1.1
+			Requires: libstdc++ >= 4.9
+			Requires: gtk3 >= 3.14
+			Requires: mesa-libGL
+			Requires: libglvnd-glx
+			Requires: pango >= 1.36
+			$_requires
+			Requires: libXScrnSaver
+			Requires: xdg-utils
+			Requires: libgomp >= 4.9
+			Requires: nss >= 3.26
+			Requires: nspr >= 4.12
+			Requires: ca-certificates
+			Requires: python3
+			Recommends: vorbis-tools >= 1.4.0
+			Recommends: lame >= 3.0
 
-Provides: mediacenter$_mversion
+			Provides: mediacenter$_mversion
 
-License: Copyright 1998-2020, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
-URL: http://www.jriver.com/
+			License: Copyright 1998-2020, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
+			URL: http://www.jriver.com/
 
-%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
+			%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
 
-%description
-Media Center is more than a world class player.
+			%description
+			Media Center is more than a world class player.
 
-%global __os_install_post %{nil}
-%prep
+			%global __os_install_post %{nil}
+			%prep
 
-%build
+			%build
 
-%install
-dpkg -x %{S:0} %{buildroot}
+			%install
+			dpkg -x %{S:0} %{buildroot}
 
-%post -p /sbin/ldconfig
-%postun -p /sbin/ldconfig
+			%post -p /sbin/ldconfig
+			%postun -p /sbin/ldconfig
 
-%files
-%{_bindir}/mediacenter$_mversion
-%{_libdir}/jriver
-%{_datadir}
-%exclude %{_datadir}/applications/media_center_packageinstaller_$_mversion.desktop
-/etc/security/limits.d/*
-EOF"
+			%files
+			%{_bindir}/mediacenter$_mversion
+			%{_libdir}/jriver
+			%{_datadir}
+			%exclude %{_datadir}/applications/media_center_packageinstaller_$_mversion.desktop
+			/etc/security/limits.d/*
+		EOF
 
         declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
         # skip rebuilding the rpm if it already exists
         if [[ -f "$_mcrpm" ]]; then
             echo "$_mcrpm already exists. Skipping build step..."
-            return 0 # this is fine
+            return 0
         else
             # Run rpmbuild
             echo "Building version $_mcversion, please wait..."
@@ -914,7 +909,6 @@ EOF"
     #   0 if symlinking is unecessary or successful, 1 if not
     #######################################
     _symlinkCerts() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
@@ -937,7 +931,6 @@ EOF"
     #   0 if license restored successfully or skipped, 1 if unsuccessful
     #######################################
     _restoreLicense() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         local _mjr
@@ -972,7 +965,6 @@ EOF"
     #   0 if ports opened sucessfully, 1 if not
     #######################################
     _openFirewall() {
-
         debug "Running: ${FUNCNAME[0]}" "$@"
 
         # Create OS-specific port rules based on argument (service) name
@@ -1006,12 +998,12 @@ EOF"
             # Debian ufw package state is broken on fresh installations
             [[ ! -x $(command -v ufw) ]] && _installPackage ufw
             if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
-                _bash_cmd "cat <<-EOF > /etc/ufw/applications.d/$1
-[$1]
-title=$1
-description=$1 installed by installJRMC
-ports=$_u_ports
-EOF"
+                _bash_cmd "cat <<- EOF > /etc/ufw/applications.d/$1
+					[$1]
+					title=$1
+					description=$1 installed by installJRMC
+					ports=$_u_ports
+				EOF"
             fi
             _firewall_cmd app update "$1"
             _firewall_cmd allow "$1" > /dev/null 2>&1
@@ -1034,7 +1026,6 @@ EOF"
     #   0 if password created sucessfully, 1 if not
     #######################################
     _setX11VNCPass() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
@@ -1068,7 +1059,6 @@ EOF"
     #   0 if password created sucessfully, 1 if not
     #######################################
     _setVNCPass() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
@@ -1105,6 +1095,7 @@ EOF"
     #   _next_displaynum
     #######################################
     _setDisplay() {
+        debug "Running: ${FUNCNAME[0]}"
 
         # Check _display, else DISPLAY, else set to :0 by default
         if [[ -n $_display ]]; then
@@ -1138,6 +1129,7 @@ EOF"
     #   _user_specifier
     #######################################
     _servicePrep() {
+        debug "Running: ${FUNCNAME[0]}"
 
         if [[ "$_service_user" == "root" ]]; then
             _service_fname="/usr/lib/systemd/system/${1}.service"
@@ -1167,28 +1159,27 @@ EOF"
     #   XAUTHORITY
     #######################################
     _service_jriver-mediacenter() {
-
         debug "Running: ${FUNCNAME[0]}"
 
-        _bash_cmd "cat <<-EOF > $_service_fname
-[Unit]
-Description=JRiver Media Center $_mversion
-After=graphical.target
+        _bash_cmd "cat <<- EOF > $_service_fname
+			[Unit]
+			Description=JRiver Media Center $_mversion
+			After=graphical.target
 
-[Service]
-$_user_specifier
-Type=simple
-Environment=DISPLAY=$_display
-Environment=XAUTHORITY=$XAUTHORITY
-ExecStart=/usr/bin/mediacenter$_mversion $*
-Restart=always
-RestartSec=10
-KillSignal=SIGHUP
-TimeoutStopSec=30
+			[Service]
+			$_user_specifier
+			Type=simple
+			Environment=DISPLAY=$_display
+			Environment=XAUTHORITY=$XAUTHORITY
+			ExecStart=/usr/bin/mediacenter$_mversion $*
+			Restart=always
+			RestartSec=10
+			KillSignal=SIGHUP
+			TimeoutStopSec=30
 
-[Install]
-WantedBy=graphical.target
-EOF"
+			[Install]
+			WantedBy=graphical.target
+		EOF"
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
@@ -1200,7 +1191,6 @@ EOF"
     # Starts and enables (at startup) a JRiver Media Server service
     #######################################
     _service_jriver-mediaserver() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         _service_jriver-mediacenter "/MediaServer"
@@ -1210,8 +1200,7 @@ EOF"
     #######################################
     # Starts and enables (at startup) JRiver Media Center in a new Xvnc session
     #######################################
-    _service_jriver-xvnc() {
-
+    _service_jriver-xvnc-mediacenter() {
         debug "Running: ${FUNCNAME[0]}"
 
         _installPackage tigervnc-server
@@ -1226,22 +1215,23 @@ EOF"
             _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$_mversion"
         fi
 
-        _bash_cmd "cat <<-EOF > $_service_fname
-[Unit]
-Description=Remote desktop service (VNC)
-After=syslog.target network.target
+        _bash_cmd "cat <<- EOF > $_service_fname
+			[Unit]
+			Description=Remote desktop service (VNC)
+			After=syslog.target network.target
 
-[Service]
-Type=simple
-$_user_specifier
-ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_next_display > /dev/null 2>&1 || :'
-ExecStart=$_exec_start_cmd
-ExecStop=/usr/bin/vncserver -kill $_next_display
-Restart=always
+			[Service]
+			Type=simple
+			$_user_specifier
+			ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_next_display > /dev/null 2>&1 || :'
+			ExecStart=$_exec_start_cmd
+			ExecStop=/usr/bin/vncserver -kill $_next_display
+			Restart=always
 
-[Install]
-WantedBy=multi-user.target
-EOF"
+			[Install]
+			WantedBy=multi-user.target
+		EOF"
+
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
@@ -1255,7 +1245,6 @@ EOF"
     # Starts and enables (at startup) JRiver Media Server and x11vnc sharing the local desktop
     #######################################
     _service_jriver-x11vnc() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         _installPackage x11vnc
@@ -1282,21 +1271,22 @@ EOF"
         fi
 
         _bash_cmd "cat <<-EOF > $_service_fname
-[Unit]
-Description=x11vnc
-After=multi.service
+			[Unit]
+			Description=x11vnc
+			After=multi.service
 
-[Service]
-$_user_specifier
-Type=forking
-Environment=DISPLAY=$_display
-ExecStart=$_exec_start_cmd
-Restart=always
-RestartSec=10
+			[Service]
+			$_user_specifier
+			Type=forking
+			Environment=DISPLAY=$_display
+			ExecStart=$_exec_start_cmd
+			Restart=always
+			RestartSec=10
 
-[Install]
-WantedBy=multi-user.target
-EOF"
+			[Install]
+			WantedBy=multi-user.target
+		EOF"
+
         _systemctl_reload && \
         _systemctl_start "$_service_name" && \
         _systemctl_enable "$_service_name" && \
@@ -1310,31 +1300,32 @@ EOF"
     # Center RPM from the source DEB and create/update an RPM repository
     #######################################
     _service_jriver-createrepo() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
-[Unit]
-Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
+			[Unit]
+			Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
 
-[Service]
-$_user_specifier
-ExecStart=$_basedir/installJRMC --outputdir $_outputdir --createrepo --createrepo-webroot $_createrepo_webroot --createrepo-user $_createrepo_user
+			[Service]
+			$_user_specifier
+			ExecStart=$_basedir/installJRMC --outputdir $_outputdir --createrepo --createrepo-webroot $_createrepo_webroot --createrepo-user $_createrepo_user
 
-[Install]
-WantedBy=default.target
-EOF"
+			[Install]
+			WantedBy=default.target
+		EOF"
+
         _bash_cmd "cat <<-EOF > $_timer_fname
-[Unit]
-Description=Run JRiver MC rpmbuild hourly
+			[Unit]
+			Description=Run JRiver MC rpmbuild hourly
 
-[Timer]
-OnCalendar=hourly
-Persistent=true
+			[Timer]
+			OnCalendar=hourly
+			Persistent=true
 
-[Install]
-WantedBy=timers.target
-EOF"
+			[Install]
+			WantedBy=timers.target
+		EOF"
+
         _systemctl_reload && \
         _systemctl_start "$_timer_name" && \
         _systemctl_enable "$_timer_name"
@@ -1363,7 +1354,6 @@ EOF"
     # Complete uninstall
     #######################################
     _uninstall() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         read -r -p "Do you really want to uninstall JRiver Media Center? [y/N] " _response
@@ -1410,7 +1400,7 @@ EOF"
     }
 
 
-    __main() {
+    _main() {
 
         # Parse input
         _parseInput "$@"
@@ -1426,7 +1416,7 @@ EOF"
 
         # Install MC using package manager
         if [[ -n $_repoinstall ]]; then
-            _installPackage rpmfusion-free-release epel-release
+            [[ "$ID" =~ ^(fedora|centos)$ ]] && _installPackage rpmfusion-free-release epel-release
             _installMCFromRepo
             _symlinkCerts
             _restoreLicense
@@ -1483,5 +1473,5 @@ EOF"
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _basedir=$(dirname "$(readlink -f "$0")")
     installJRMC
-    __main "$@"
+    _main "$@"
 fi
