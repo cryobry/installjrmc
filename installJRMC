@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.9.3"
+    _scriptversion="0.9.4"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,67.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -283,7 +283,7 @@ installJRMC() {
             _pkg_update(){ _ifSudo dnf makecache; }
             _pkg_query(){ _ifSudo rpm -q "$@"; }
             _firewall_cmd(){ _ifSudo firewall-cmd "$@"; }
-        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _pkg_install(){ _ifSudo apt-get install -y -q0 "$@"; }
             _pkg_reinstall(){ _ifSudo apt-get reinstall -y -q0 "$@"; }
             _pkg_install_nogpg(){ _ifSudo apt-get install -y -q0 "$@"; }
@@ -424,11 +424,11 @@ installJRMC() {
 
         unset _url_pkg
 
-        if [[ "$1" == "xorg-x11-utils" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        if [[ "$1" == "xorg-x11-utils" && "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _pkg="x11-utils"
-        elif [[ "$1" == "rpm-build" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        elif [[ "$1" == "rpm-build" && "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _pkg="rpm"
-        elif [[ "$1" == "createrepo_c" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        elif [[ "$1" == "createrepo_c" && "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _pkg="createrepo"
         elif [[ "$1" == "rpmfusion-free-release" ]]; then
             if [[ "$ID" == "fedora" ]]; then
@@ -444,7 +444,7 @@ installJRMC() {
             fi
         elif [[ "$1" == "epel-release" && "$ID" != "centos" ]]; then
             _pkg=""
-        elif [[ "$1" == "tigervnc-server" && "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        elif [[ "$1" == "tigervnc-server" && "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _pkg="tigervnc-standalone-server"
         else
             _pkg="$1"
@@ -601,7 +601,7 @@ installJRMC() {
 					baseurl=https://repos.bryanroessler.com/jriver
 					gpgcheck=0
 				EOF'
-            elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
                 _installPackage wget
                 wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
                 _bash_cmd 'cat <<- EOF > /etc/apt/sources.list.d/jriver.list
@@ -632,7 +632,7 @@ installJRMC() {
         fi
 
         # Ubuntu/Debian incorporate the mversion into the package name -- more fun!
-        if [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        if [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             if [[ -z $_mversion ]]; then
                 # Try parsing the latest mversion from the repo
                 if _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}'); then
@@ -660,7 +660,7 @@ installJRMC() {
                 else
                     _installPackage "$_mcpkg-$_mcversion" > /dev/null 2>&1
                 fi
-            elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+            elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
                 if [[ -n $_debug ]]; then
                     _installPackage "$_mcpkg=$_mcversion"
                 else
@@ -994,7 +994,7 @@ installJRMC() {
                 _firewall_cmd --add-service "$1" --permanent > /dev/null 2>&1
                 _firewall_cmd --reload > /dev/null 2>&1
             fi
-        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             # Debian ufw package state is broken on fresh installations
             [[ ! -x $(command -v ufw) ]] && _installPackage ufw
             if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
@@ -1390,7 +1390,7 @@ installJRMC() {
         echo "Uninstalling Media Center"
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             _pkg_remove MediaCenter
-        elif [[ "$ID" =~ ^(ubuntu|debian)$ ]]; then
+        elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _pkg_remove "mediacenter$_mversion"
         fi
 
