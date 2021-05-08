@@ -18,7 +18,7 @@ shopt -s extglob
 #######################################
 installJRMC() {
 
-    _scriptversion="0.9.4"
+    _scriptversion="0.9.5"
     _boardurl="https://yabb.jriver.com/interact/index.php/board,67.0.html"
     _outputdir="$_basedir/output"
     _createrepo_webroot="/srv/jriver"
@@ -97,7 +97,7 @@ installJRMC() {
 		EOF
 
         # Exit using passed exit code
-        [[ -z $1 ]] && exit 0 || exit "$1"
+        [[ ! -v 1 ]] && exit 0 || exit "$1"
     }
 
 
@@ -105,7 +105,7 @@ installJRMC() {
         debug "Running: ${FUNCNAME[0]}"
 
         # set default behavior
-        if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" == "--debug" ]]; then
+        if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
             _repoinstall="true"
         fi
 
@@ -189,7 +189,7 @@ installJRMC() {
 
     err() { echo "Error: $*" >&2; }
 
-    debug() { [[ -n $_debug ]] && echo "Debug: $*"; }
+    debug() { [[ -v _debug ]] && echo "Debug: $*"; }
 
     #######################################
     # Prepend this to any command that you wish to execute with sudo
@@ -220,7 +220,7 @@ installJRMC() {
             _printHelpAndExit 1
         fi
 
-        [[ -n $_debug ]] && echo "Platform: $ID $VERSION_ID"
+        debug "Platform: $ID $VERSION_ID"
     }
 
 
@@ -323,8 +323,8 @@ installJRMC() {
     #######################################
     _setUser() {
 
-        [[ -z $_service_user ]] && _service_user="$_exec_user"
-        [[ -z $_createrepo_user ]] && _createrepo_user="$_exec_user"
+        [[ ! -v _service_user ]] && _service_user="$_exec_user"
+        [[ ! -v _createrepo_user ]] && _createrepo_user="$_exec_user"
     }
 
 
@@ -370,8 +370,8 @@ installJRMC() {
             _packageQuirks "$_pkg"
             # Insert the package name to test if already installed
             if [[ "$_pkg" != "" ]]; then
-                if [[ -n $_noquery ]] || ! _pkg_query "$_pkg" > /dev/null 2>&1; then
-                    if [[ -n $_url_pkg ]]; then
+                if [[ -v _noquery ]] || ! _pkg_query "$_pkg" > /dev/null 2>&1; then
+                    if [[ -v _url_pkg ]]; then
                         _url_pkg_array+=("$_url_pkg")
                     else
                         _pkg_array+=("$_pkg")
@@ -383,7 +383,7 @@ installJRMC() {
         # Install from package name (with gpg check)
         if [[ ${#_pkg_array[@]} -ge 1 ]]; then
             echo "Installing:" "${_pkg_array[@]}"
-            if [[ -n $_debug ]]; then
+            if [[ -v _debug ]]; then
                 if ! _pkg_install "${_pkg_array[@]}"; then
                     err "Failed to install package. Attempting to continue..."
                     return 1
@@ -397,7 +397,7 @@ installJRMC() {
         # Install from package url (without gpg check)
         if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
             echo "Installing:" "${_url_pkg_array[@]}"
-            if [[ -n $_debug ]]; then
+            if [[ -v _debug ]]; then
                 if ! _pkg_install_nogpg "${_url_pkg_array[@]}"; then
                     err "Failed to install package. Attempting to continue..."
                     return 1
@@ -465,7 +465,7 @@ installJRMC() {
 
         debug "Running: ${FUNCNAME[0]}"
 
-        if [[ -z "$_mcversion" ]]; then
+        if [[ ! -v _mcversion ]]; then
 
             _installPackage wget
 
@@ -519,7 +519,6 @@ installJRMC() {
     #   _installJRMC should run sucessfully even without running _sanityChecks()
     #######################################
     _sanityChecks() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         # Check for bad service name
@@ -537,12 +536,11 @@ installJRMC() {
 
 
         _checkMCInstalled() {
-
             debug "Running: ${FUNCNAME[0]}"
 
             for _service in "${_services[@]}"; do
                 if [[ "$_service" =~ ^(jriver-mediacenter|jriver-mediaserver|jriver-xvnc-mediacenter|jriver-x11vnc)$ ]] \
-                && [[ -z $_repoinstall && -z $_rpminstall ]] \
+                && [[ ! -v _repoinstall && ! -v _rpminstall ]] \
                 && [[ ! -x $(command -v "mediacenter$_mversion") ]]; then
                     err "You are attempting to install a service that depends on JRiver Media Center"
                     err "without installing JRiver Media Center"
@@ -554,10 +552,9 @@ installJRMC() {
 
 
         _checkUser() {
-
             debug "Running: ${FUNCNAME[0]}"
 
-            if [[ "$_exec_user" == "root" && -z "$_service_user" && "${_services[*]}" ]]; then
+            if [[ "$_exec_user" == "root" && ! -v _service_user && "${_services[*]}" ]]; then
                 err "Attempting to install services as the root user"
                 err "This is not recommended and we are exiting now to prevent permission hell"
                 err "You can override this safety check by manually specifying --user root"
@@ -583,10 +580,12 @@ installJRMC() {
     #   0 if JRiver Media Center installed sucessfully
     #######################################
     _installMCFromRepo() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         echo "Installing JRiver Media Center from repo..."
+        [[ ! -v _debug ]] && \
+            echo "This may take a few minutes"; \
+            echo "Use --debug for verbose output"
 
         local _mcpkg
 
@@ -612,14 +611,14 @@ installJRMC() {
         _addRepo
 
         # Update package list
-        [[ -n $_debug ]] && echo "Updating package list"
+        debug "Updating package list"
         if ! _pkg_update > /dev/null 2>&1; then
             err "Package update failed!"
             exit 1
         fi
 
         # If user specifies a version, use that
-        if [[ -n $_mcversion ]]; then
+        if [[ -v _mcversion ]]; then
             _setVersion
             local _specific_version="true"
         fi
@@ -633,7 +632,7 @@ installJRMC() {
 
         # Ubuntu/Debian incorporate the mversion into the package name -- more fun!
         if [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-            if [[ -z $_mversion ]]; then
+            if [[ ! -v _mversion ]]; then
                 # Try parsing the latest mversion from the repo
                 if _mcpkg=$(apt-get install mediacenter?? -s -q0 | grep "selecting" | tail -1| awk '{print $3}'); then
                     _mcpkg="${_mcpkg%\'}"
@@ -653,22 +652,22 @@ installJRMC() {
             fi
         fi
 
-        if [[ -n $_specific_version ]]; then
+        if [[ -v _specific_version ]]; then
             if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                if [[ -n $_debug ]]; then
+                if [[ -v _debug ]]; then
                     _installPackage "$_mcpkg-$_mcversion"
                 else
                     _installPackage "$_mcpkg-$_mcversion" > /dev/null 2>&1
                 fi
             elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-                if [[ -n $_debug ]]; then
+                if [[ -v _debug ]]; then
                     _installPackage "$_mcpkg=$_mcversion"
                 else
                     _installPackage "$_mcpkg=$_mcversion" > /dev/null 2>&1
                 fi
             fi
         else
-            if [[ -n $_debug ]]; then
+            if [[ -v _debug ]]; then
                 _installPackage "$_mcpkg"
             else
                 _installPackage "$_mcpkg" > /dev/null 2>&1
@@ -693,7 +692,6 @@ installJRMC() {
     #   0 if DEB file downloaded successfully, 1 if failed
     #######################################
     _acquireDeb() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         local _debfilename="$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb"
@@ -705,7 +703,7 @@ installJRMC() {
         if [[ -f "$_debfilename" ]]; then
             echo "Using local DEB file: $_debfilename"
         # Else check beta repo
-        elif [[ -n $_betapass ]]; then
+        elif [[ -v _betapass ]]; then
             if wget -q -O "$_debfilename" \
             "https://files.jriver.com/mediacenter/channels/v${_mversion}/beta/${_betapass}/MediaCenter-${_mcversion}-amd64.deb"; then
                 true
@@ -744,7 +742,6 @@ installJRMC() {
     #   0 if rpmbuild is successful, 1 if not
     #######################################
     _buildRPM() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         # install build dependencies
@@ -761,7 +758,7 @@ installJRMC() {
             local _build_requires=''
         fi
 
-        if [[ "$ID" == "fedora" && -n $_rpminstall ]]; then
+        if [[ "$ID" == "fedora" && -v _rpminstall ]]; then
             # TODO: find out why this is required since it's not easily available on CentOS
             local _requires='Requires: pangox-compat >= 0.0.2'
         fi
@@ -841,7 +838,7 @@ installJRMC() {
         else
             # Run rpmbuild
             echo "Building version $_mcversion, please wait..."
-            if [[ -n $_debug ]]; then
+            if [[ -v _debug ]]; then
                 rpmbuild --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"
             else
                 rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec" > /dev/null 2>&1
@@ -869,7 +866,6 @@ installJRMC() {
     #   0 if createrepo is successful, 1 if not
     #######################################
     _runCreaterepo() {
-
         debug "Running: ${FUNCNAME[0]}"
 
         _installPackage createrepo_c
@@ -936,7 +932,7 @@ installJRMC() {
         local _mjr
 
         # Allow user to drop an mjr file next to installJRMC
-        if [[ -z $_restorefile ]]; then
+        if [[ ! -v _restorefile ]]; then
             for _mjr in "$_basedir"/*.mjr; do
               [[ $_mjr -nt $_restorefile ]] && _restorefile="$_mjr"
             done
@@ -1033,7 +1029,7 @@ installJRMC() {
         [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
 
         if [[ -f "$_vncpassfile" ]]; then
-            if [[ -z $_vncpass ]]; then
+            if [[ ! -v _vncpass ]]; then
                 err "Refusing to overwrite existing $_vncpassfile with an empty password"
                 err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
                 exit 1
@@ -1042,7 +1038,7 @@ installJRMC() {
             fi
         fi
 
-        if [[ -n $_vncpass ]]; then
+        if [[ -v _vncpass ]]; then
             if ! x11vnc -storepasswd "$_vncpass" "$_vncpassfile"; then
                 err "Could not create VNC password file"
                 return 1
@@ -1066,7 +1062,7 @@ installJRMC() {
         [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
 
         if [[ -f "$_vncpassfile" ]]; then
-            if [[ -z $_vncpass ]]; then
+            if [[ ! -v _vncpass ]]; then
                 err "Refusing to overwrite existing $_vncpassfile with an empty password"
                 err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
                 exit 1
@@ -1075,7 +1071,7 @@ installJRMC() {
             fi
         fi
 
-        if [[ -n $_vncpass ]]; then
+        if [[ -v _vncpass ]]; then
             if ! echo "$_vncpass" | vncpasswd -f > "$_vncpassfile"; then
                 err "Could not create VNC password file"
                 return 1
@@ -1098,9 +1094,9 @@ installJRMC() {
         debug "Running: ${FUNCNAME[0]}"
 
         # Check _display, else DISPLAY, else set to :0 by default
-        if [[ -n $_display ]]; then
+        if [[ -v _display ]]; then
             _next_display="$_display"
-        elif [[ -n $DISPLAY ]]; then
+        elif [[ -v DISPLAY ]]; then
             _display="${DISPLAY}"
             _displaynum="${_display#:}" # strip colon
             _displaynum="${_displaynum%.*}" # strip suffix
@@ -1209,7 +1205,7 @@ installJRMC() {
 
         local _port=$(( _next_displaynum + 5900 ))
 
-        if [[ -n $_novncauth ]]; then
+        if [[ -v _novncauth ]]; then
             _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$_mversion"
         else
             _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$_mversion"
@@ -1264,7 +1260,7 @@ installJRMC() {
         }
         _getResolution
 
-        if [[ -n $_novncauth ]]; then
+        if [[ -v _novncauth ]]; then
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -nopw"
         else
             _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
@@ -1415,7 +1411,7 @@ installJRMC() {
         _buildCommands
 
         # Install MC using package manager
-        if [[ -n $_repoinstall ]]; then
+        if [[ -v _repoinstall ]]; then
             [[ "$ID" =~ ^(fedora|centos)$ ]] && _installPackage rpmfusion-free-release epel-release
             _installMCFromRepo
             _symlinkCerts
@@ -1427,25 +1423,25 @@ installJRMC() {
         _setVersion
 
         # Uninstall and exit
-        if [[ -n $_uninstall ]]; then
+        if [[ -v _uninstall ]]; then
             _uninstall
             exit $?
         fi
 
         # Build RPM from source DEB
-        if [[ -n $_rpmbuild ]]; then
+        if [[ -v _rpmbuild ]]; then
             _installPackage epel-release
             _acquireDeb
             _buildRPM
         fi
 
         # Run createrepo
-        if [[ -n $_createrepo ]]; then
+        if [[ -v _createrepo ]]; then
             _runCreaterepo "$_mcrpm"
         fi
 
         # Install the rpm
-        if [[ -n $_rpminstall ]]; then
+        if [[ -v _rpminstall ]]; then
             if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
                 _installPackage rpmfusion-free-release epel-release
                 _installPackage --noquery "$_mcrpm"
