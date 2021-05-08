@@ -227,27 +227,6 @@ installJRMC() {
     #######################################
     # Creates some OS-specific functions to query, install, and remove packages and edit
     # firewalls, run bash, remove and copy files, etc.
-    # Requires:
-    #   ID
-    #   _createrepo_user
-    #   _createrepo_webroot
-    # Globals:
-    #   _bash_cmd
-    #   _rm_cmd
-    #   _cp_cmd
-    #   _mkdir_cmd
-    #   _ln_cmd
-    #   _createrepo_cmd
-    #   _pkg_install
-    #   _pkg_reinstall
-    #   _pkg_install_nogpg
-    #   _pkg_remove
-    #   _pkg_update
-    #   _pkg_query
-    #   _firewall_cmd
-    #   _systemctl_reload
-    #   _systemctl_enable
-    #   _systemctl_disable
     #######################################
     _buildCommands() {
 
@@ -315,11 +294,6 @@ installJRMC() {
 
     #######################################
     # Sets default user variables
-    # Requires:
-    #   _exec_user
-    # Globals
-    #   _service_user
-    #   _createrepo_user
     #######################################
     _setUser() {
 
@@ -458,8 +432,8 @@ installJRMC() {
     #   _boardurl
     #   _installPackage
     # Globals:
-    #   _mcversion (i.e. "26.0.12")
-    #   _mversion (i.e. "26")
+    #   _mcversion
+    #   _mversion
     #######################################
     _setVersion() {
 
@@ -758,6 +732,7 @@ installJRMC() {
             local _build_requires=''
         fi
 
+        
         if [[ "$ID" == "fedora" && -v _rpminstall ]]; then
             # TODO: find out why this is required since it's not easily available on CentOS
             local _requires='Requires: pangox-compat >= 0.0.2'
@@ -964,7 +939,7 @@ installJRMC() {
         debug "Running: ${FUNCNAME[0]}" "$@"
 
         # Create OS-specific port rules based on argument (service) name
-        local -a _f_ports # for firewall_cmd
+        local -a _f_ports # for firewall-cmd
         local _u_ports # for ufw
         if [[ "$1" == "jriver" ]]; then
             _f_ports=("52100-52200/tcp" "1900/udp")

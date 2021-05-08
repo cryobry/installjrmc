@@ -1,11 +1,11 @@
 # installJRMC
 
-This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on Fedora (>=29), CentOS (>=8), Ubuntu (>=16.04), and Debian (>=9).
+This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on Fedora, CentOS (>=8), Ubuntu, Debian, and Linux Mint.
 
 ## README
 
-1.  This script will not point major upgrades (i.e. from v25 to v26) to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
-2.  Typically `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services. Doing so may lead to permissions issues. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
+1. This script will not point major upgrades to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
+2. Typically `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-wide services. Doing so may lead to permissions issues. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
 
 ## Executing
 
@@ -57,10 +57,9 @@ Here is a list of possible options that can be passed to the script. You can alw
     Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 ```
 
-
 ### services
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root. If so, use `--service-user root` to override sanity checks.
 
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root. If so, use `--service-user root` to override sanity checks.
 
 ```text
 jriver-mediaserver
@@ -84,7 +83,8 @@ jriver-createrepo
 
 It is possible to install multiple services at one time using multiple `--service` blocks: `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter`
 
-##### `jriver-x11vnc` versus `jriver-xvnc-mediacenter`
+#### `jriver-x11vnc` versus `jriver-xvnc-mediacenter`
+
 [jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [jriver-xvnc-mediacenter](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display. The requisite firewall rules will also be added to the system firewall to enable remote access.
 
 **Note**: If `jriver-xvnc-mediacenter` finds an existing display it will attempt to increment the display number by 1. This should work fine in most cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
@@ -101,39 +101,40 @@ It is possible to install multiple services at one time using multiple `--servic
 
 ## Examples
 
-*   `installJRMC`
+* `installJRMC`
 
     Installs the latest version of JRiver Media Center from the repository.
 
-*   `installJRMC --install-repo --service jriver-mediaserver`
+* `installJRMC --install-repo --service jriver-mediaserver`
 
     Installs JRiver Media Center from the repository and starts/enables the /MediaServer service.
 
-*   `installJRMC --install-rpm --restorefile /path/to/license.mjr --mcversion 26.0.56`
+* `installJRMC --install-rpm --restorefile /path/to/license.mjr --mcversion 26.0.56`
 
     Builds JRiver Media Center version 26.0.56 RPM from the source DEB, installs it (RPM distros only), and activates it using the specified .mjr license file.
 
-*   `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
+* `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
      Builds the RPM, moves it to the webroot, and runs createrepo as `www-user`.
 
-*   `installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
+* `installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
     Installs the jriver-createrepo timer and service to build the RPM, move it to the webroot, and run createrepo as `www-user` hourly.
 
-*   `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
+* `installJRMC --install-repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
 
     Installs services to share the existing local desktop via VNC and automatically run Media Center on startup.
 
-*   `installJRMC --install-repo --service jriver-xvnc-mediacenter --display ":2"`
+* `installJRMC --install-repo --service jriver-xvnc-mediacenter --display ":2"`
 
     Installs an Xvnc server on display ':2' that starts Media Center.
 
-*   `installJRMC --uninstall`
+* `installJRMC --uninstall`
 
     Uninstalls JRiver Media Center and its associated services and firewall rules. This will **not** remove your media, media library/database, or automated library backup folder.
 
 ## Additional Info
+
 Did you find `installJRMC` useful? [Buy me a coffee!](https://paypal.me/bryanroessler?locale.x=en_US)
 
 Did you find a bug? Let me know on [Interact!](https://yabb.jriver.com/interact/index.php/topic,123648.0.html)
