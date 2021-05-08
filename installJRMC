@@ -728,8 +728,6 @@ installJRMC() {
         # this will fail on non-rpm distros
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
             local _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
-        else
-            local _build_requires=''
         fi
 
         # Create spec file
@@ -740,7 +738,7 @@ installJRMC() {
 			Summary: JRiver Media Center
 			Group:   Applications/Media
 			Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb
-			$_build_requires
+			${_build_requires:-}
 			BuildArch: x86_64
 			%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
