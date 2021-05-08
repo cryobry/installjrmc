@@ -150,6 +150,7 @@ installJRMC() {
                         ;;
                     --debug|-d)
                         echo "Debugging on"
+                        echo "installJRMC version: $_scriptversion"
                         _debug="true"
                         ;;
                     --help|-h)
