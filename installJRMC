@@ -732,12 +732,6 @@ installJRMC() {
             local _build_requires=''
         fi
 
-        
-        if [[ "$ID" == "fedora" && -v _rpminstall ]]; then
-            # TODO: find out why this is required since it's not easily available on CentOS
-            local _requires='Requires: pangox-compat >= 0.0.2'
-        fi
-
         # Create spec file
         cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
 			Name:    MediaCenter
@@ -764,7 +758,6 @@ installJRMC() {
 			Requires: mesa-libGL
 			Requires: libglvnd-glx
 			Requires: pango >= 1.36
-			$_requires
 			Requires: libXScrnSaver
 			Requires: xdg-utils
 			Requires: libgomp >= 4.9
