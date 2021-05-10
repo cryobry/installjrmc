@@ -492,9 +492,7 @@ _installMCFromRepo() {
         elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _installPackage wget
             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
-            _bash_cmd 'cat <<- EOF > /etc/apt/sources.list.d/jriver.list
-				deb [arch=amd64,i386,armhf] http://dist.jriver.com/latest/mediacenter/ buster main
-			EOF'
+            _ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$mversion.list" -O "/etc/apt/sources.list.d/mediacenter$mversion.list"
         fi
     }
     _addRepo
