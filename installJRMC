@@ -12,8 +12,8 @@ shopt -s extglob
 #
 #######################################
 
-_scriptversion="0.9.6"
-_boardurl="https://yabb.jriver.com/interact/index.php/board,67.0.html"
+_scriptversion="1.0.0a1"
+_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html"
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
 _exec_user="$(whoami)"
@@ -25,23 +25,20 @@ _printHelpAndExit() {
 		USAGE:
 			installJRMC [[OPTION] [VALUE]]...
 
-			If no options (besides -d) are provided, the script will default to --repo
+			If no options (besides -d) are provided, the script will default to '--install repo'
 
 		OPTIONS
-			--repo
-				Install JRiver Media Center from repository using package manager
-				DEB-based OSes: JRiver official package repository
-				RPM-based OSes: BryanC unofficial repository
-			--rpm
-				Build RPM from source DEB and install it
-			--rpmbuild
+			--install, -i repo|rpm
+				repo: Install JRiver Media Center from repository ('repo'), future updates will be handled by the system package manager
+                rpm: Build and install rpm file locally ('rpm')
+			--build
 				Build RPM from source DEB (no installation)
-			--outputdir PATH
-				Generate rpmbuild output in this directory (Default: $PWD/outputdir)
 			--mcversion VERSION
 				Build or install a specific version (Default: install the latest version)
+            --outputdir PATH
+				Generate rpmbuild output in this directory (Default: $PWD/output)
 			--restorefile RESTOREFILE
-				Restore file location for registration (Default: skip registration)
+				Restore file location for automatic license registration (Default: skip registration)
 			--betapass PASSWORD
 				Enter beta team password for access to beta builds
 			--service-user USER
@@ -133,8 +130,8 @@ _init() {
 
     # Set defaults
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
-        debug "No options passed, defaulting to --repo installation method"
-        _repoinstall="true"
+        debug "No options passed, defaulting to repo installation method"
+        _install="repo"
     fi
 
     _service_user="${_service_user:-$_exec_user}"
@@ -169,7 +166,7 @@ _main() {
     fi
 
     # Install MC using package manager
-    if [[ -v _repoinstall ]]; then
+    if [[ -v _install && "$_install" == "repo" ]]; then
         _installMCFromRepo
         _symlinkCerts
         _restoreLicense
@@ -177,7 +174,7 @@ _main() {
     fi
 
     # Build RPM from source deb package
-    if [[ -v _rpmbuild ]]; then
+    if [[ -v _build ]]; then
         _acquireDeb
         _buildRPM
     fi
@@ -188,7 +185,7 @@ _main() {
     fi
 
     # Install the rpm
-    if [[ -v _rpminstall ]]; then
+    if [[ -v _install && "$_install" == "rpm" ]]; then
         _installPackage --noquery "$_mcrpm"
         _symlinkCerts
         _restoreLicense
@@ -256,22 +253,23 @@ _ifSudo() {
 _parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if _input=$(getopt -o +vdhus:c: -l repo,rpm,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install,rpmbuild,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
-                --repo)
-                    _repoinstall="true"
+                --install|-i)
+                    shift 
+                    _install="$1"
+                    if [[ "$_install" == "rpm" ]]; then
+                        if [[ ! "$ID" =~ ^(fedora|centos)$ ]]; then
+                            err "RPM install method not available on $ID"
+                            _printHelpAndExit 1
+                        fi
+                        _build="true"
+                    fi
                     ;;
-                --rpm)
-                    [[ ! "$ID" =~ ^(fedora|centos)$ ]] && \
-                        err "RPM installation not available on $ID" && \
-                        _printHelpAndExit 1
-                    _rpmbuild="true"
-                    _rpminstall="true"
-                    ;;
-                --rpmbuild)
-                    _rpmbuild="true"
+                --build)
+                    _build="true"
                     ;;
                 --outputdir)
                     shift && _outputdir="$1"
@@ -292,7 +290,7 @@ _parseInput() {
                     shift && _services+=("$1")
                     ;;
                 --createrepo)
-                    _rpmbuild="true"
+                    _build="true"
                     _createrepo="true"
                     ;;
                 --createrepo-webroot)
@@ -492,7 +490,7 @@ _installMCFromRepo() {
         elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _installPackage wget
             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | _ifSudo apt-key add - > /dev/null 2>&1
-            _ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$mversion.list" -O "/etc/apt/sources.list.d/mediacenter$mversion.list"
+            _ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list"
         fi
     }
     _addRepo
@@ -1206,19 +1204,66 @@ _service_jriver-createrepo() {
 #######################################
 # CONTAINERS
 #######################################
-_containerCreaterepo() {
-    :
-}
+# _containerCreaterepo() {
+#     :
+# }
 
 
-_containerVNC() {
-    :
-}
+# _containerVNC() {
+#     :
+# }
 
 
-_containerMC() {
-    :
-}
+# _containerMC() {
+#     _installPackage buildah podman
+#     cnt=$(buildah from docker.io/jlesage/baseimage-gui:debian-10)
+#     podman_create_cmd=("podman" "create" "--name" "$CNAME")
+#     buildah_config_cmd=("buildah" "config" \
+#         "--author" "bryanroessler@gmail.com" \
+#         "--label" "maintainer=$MAINTAINER" \
+#         "--env" "TZ=$TZ" \
+#         "--workingdir" "/app" \
+#         "--cmd" "mediacenter$_mversion")
+
+#     mkcdirs() {
+#         local dir
+#         for dir in "$@"; do
+#             if [[ ! -d "$dir" ]]; then 
+#                 if ! mkdir -p "$dir"; then
+#                     err "Could not create directory $dir, check your permissions"
+#                 fi
+#             fi
+#             if ! chcon -t container_file_t -R "$dir"; then
+#                 err "Could not set container_file_t attribute for $dir, check your permissions"
+#             fi
+#         done
+#     }
+
+#     mkcdirs "$HOME/.jriver"
+
+#     podman_create_cmd+=("-v" "$HOME/.jriver:/root/.jriver")
+#     podman_create_cmd+=("-v" "$DOWNLOAD_ROOT:/downloads:z")
+#     podman_create_cmd+=("-v" "$MONITOR_ROOT/nzbs:/nzbs")
+#     podman_create_cmd+=("-p" "${CONTAINER[HOST_PORT]}:${CONTAINER[CONTAINER_PORT]}")
+
+#     brc() { buildah run "$1" "${@:2}" || return 1; }
+
+#     brc add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1
+
+#     brc add-pkg --virtual .build-deps wget
+
+#     brc sh -s <<- EOF
+# 		wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - > /dev/null 2>&1
+# 	EOF
+
+#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list"
+
+#     brc apt-get update -y -q0
+
+#     brc add-pkg "mediacenter$_mversion"
+
+#     brc del-pkg .build-deps
+# }
 
 
 #######################################
