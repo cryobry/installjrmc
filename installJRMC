@@ -253,7 +253,7 @@ _ifSudo() {
 _parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if _input=$(getopt -o +i:vdhus:c: -l install,build,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
