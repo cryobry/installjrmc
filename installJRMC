@@ -34,7 +34,7 @@ _printHelpAndExit() {
 			--build
 				Build RPM from source DEB (no installation)
 			--mcversion VERSION
-				Build or install a specific MC version, ex. "28.0.25"
+				Build or install a specific MC version, ex. "28.0.25" (Default: scrape latest version from Interact)
             --outputdir PATH
 				Generate rpmbuild output in this directory (Default: $PWD/output)
 			--restorefile RESTOREFILE
@@ -148,7 +148,7 @@ _init() {
 
     # Install script dependencies
     [[ "$ID" == "centos" ]] && _installPackage epel-release
-    [[ ! -v _mcversion ]] && _installPackage wget
+    [[ ! -v _mcversion ]] && [[ ! -x $(command -v wget) ]] && _installPackage wget
 
     # Set MC version
     _setVersion
