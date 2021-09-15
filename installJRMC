@@ -30,12 +30,12 @@ _printHelpAndExit() {
 		OPTIONS
 		    --install, -i repo|rpm
 		        repo: Install MC from repository, future updates will be handled by the system package manager
-                rpm: Build and install MC locally (RPM-based OSes only)
+		        rpm: Build and install MC locally (RPM-based OSes only)
 		    --build
 		        Build RPM from source DEB (no installation)
 		    --mcversion VERSION
 		        Build or install a specific MC version, ex. "28.0.25" (Default: scrape latest version from Interact)
-            --outputdir PATH
+		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: $PWD/output)
 		    --restorefile RESTOREFILE
 		        Restore file location for automatic license registration (Default: skip registration)
