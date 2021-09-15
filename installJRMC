@@ -12,7 +12,7 @@ shopt -s extglob
 #
 #######################################
 
-_scriptversion="1.0.0a1"
+_scriptversion="1.0.0a2"
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html"
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
@@ -23,68 +23,68 @@ _printHelpAndExit() {
 
     cat <<- 'EOF'
 		USAGE:
-			installJRMC [[OPTION] [VALUE]]...
+		    installJRMC [[OPTION] [VALUE]]...
 
-			If no options (besides -d) are provided, the script will default to '--install repo'
+		    If no options (besides -d) are provided, the script will default to '--install repo'
 
 		OPTIONS
-			--install, -i repo|rpm
-				repo: Install MC from repository, future updates will be handled by the system package manager
+		    --install, -i repo|rpm
+		        repo: Install MC from repository, future updates will be handled by the system package manager
                 rpm: Build and install MC locally (RPM-based OSes only)
-			--build
-				Build RPM from source DEB (no installation)
-			--mcversion VERSION
-				Build or install a specific MC version, ex. "28.0.25" (Default: scrape latest version from Interact)
+		    --build
+		        Build RPM from source DEB (no installation)
+		    --mcversion VERSION
+		        Build or install a specific MC version, ex. "28.0.25" (Default: scrape latest version from Interact)
             --outputdir PATH
-				Generate rpmbuild output in this directory (Default: $PWD/output)
-			--restorefile RESTOREFILE
-				Restore file location for automatic license registration (Default: skip registration)
-			--betapass PASSWORD
-				Enter beta team password for access to beta builds
-			--service-user USER
-				Install systemd services and containers for USER (Default: current user)
-			--service, -s SERVICE
-				See SERVICES section below for a list of possible services to install
-			--container, -c CONTAINER (TODO: Under construction)
-				See CONTAINERS section below for a list of possible services to install
-			--createrepo
-				Build rpm, copy to webroot, and run createrepo
-			--createrepo-webroot PATH
-				The webroot directory to install the repo (Default: /srv/jriver/)
-			--createrepo-user USER
-				The web server user (Default: current user)
-			--version, -v
-				Print this script version and exit
-			--debug, -d
-				Print debug output
-			--help, -h
-				Print help dialog and exit
-			--uninstall, -u
-				Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
+		        Generate rpmbuild output in this directory (Default: $PWD/output)
+		    --restorefile RESTOREFILE
+		        Restore file location for automatic license registration (Default: skip registration)
+		    --betapass PASSWORD
+		        Enter beta team password for access to beta builds
+		    --service-user USER
+		        Install systemd services and containers for USER (Default: current user)
+		    --service, -s SERVICE
+		        See SERVICES section below for a list of possible services to install
+		    --container, -c CONTAINER (TODO: Under construction)
+		        See CONTAINERS section below for a list of possible services to install
+		    --createrepo
+		        Build rpm, copy to webroot, and run createrepo
+		    --createrepo-webroot PATH
+		        The webroot directory to install the repo (Default: /srv/jriver/)
+		    --createrepo-user USER
+		        The web server user (Default: current user)
+		    --version, -v
+		        Print this script version and exit
+		    --debug, -d
+		        Print debug output
+		    --help, -h
+		        Print help dialog and exit
+		    --uninstall, -u
+		        Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
 
 		SERVICES
-			jriver-mediaserver
-				Enable and start a mediaserver systemd service (requires an existing X server)
-			jriver-mediacenter
-				Enable and start a mediacenter systemd service (requires an existing X server)
-			jriver-x11vnc
-				Enable and start x11vnc for the local desktop (requires an existing X server)
-				Usually combined with jriver-mediaserver or jriver-mediacenter services
-				--vncpass and --display are also valid options (see below)
-			jriver-xvnc-mediacenter
-				Enable and start a new Xvnc session running JRiver Media Center
-				--vncpass PASSWORD
-					Set vnc password for x11vnc/Xvnc access. If no password is set, the script
-					will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
-				--display DISPLAY
-					Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
-					current display incremented by 1 (Xvnc))
-			jriver-createrepo
-				Install hourly service to build latest MC RPM and run createrepo
+		    jriver-mediaserver
+		        Enable and start a mediaserver systemd service (requires an existing X server)
+		    jriver-mediacenter
+		        Enable and start a mediacenter systemd service (requires an existing X server)
+		    jriver-x11vnc
+		        Enable and start x11vnc for the local desktop (requires an existing X server)
+		        Usually combined with jriver-mediaserver or jriver-mediacenter services
+		        --vncpass and --display are also valid options (see below)
+		    jriver-xvnc-mediacenter
+		        Enable and start a new Xvnc session running JRiver Media Center
+		        --vncpass PASSWORD
+		            Set vnc password for x11vnc/Xvnc access. If no password is set, the script
+		            will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+		        --display DISPLAY
+		            Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
+		            current display incremented by 1 (Xvnc))
+		    jriver-createrepo
+		        Install hourly service to build latest MC RPM and run createrepo
 
 		CONTAINERS (TODO: Under construction)
-			mediacenter-xvnc
-			createrepo
+		    mediacenter-xvnc
+		    createrepo
 	EOF
 
         # Exit using passed exit code
