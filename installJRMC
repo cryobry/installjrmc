@@ -576,20 +576,19 @@ _acquireDeb() {
     # If deb file already exists, skip download
     if [[ -f "$_debfilename" ]]; then
         echo "Using local DEB file: $_debfilename"
-    # Else check beta repo
     elif [[ -v _betapass ]]; then
+        echo -n "Checking beta repo..."
         if wget -q -O "$_debfilename" \
         "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$_mcversion-amd64.deb"; then
-            true
+            echo "Found!"
         fi
-    # Else check test repo
-    elif wget -q -O "$_debfilename" \
+    elif echo -n "Checking test repo..." && wget -q -O "$_debfilename" \
     "https://files.jriver.com/mediacenter/test/MediaCenter-$_mcversion-amd64.deb"; then
-        true
+        echo "Found!"
     # Else check latest repo
-    elif wget -q -O "$_debfilename" \
+    elif echo -n "Checking latest repo..." && wget -q -O "$_debfilename" \
     "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb"; then
-        true
+        echo "Found!"
     else
         err "Cannot find DEB file. Exiting..."
         exit 1
