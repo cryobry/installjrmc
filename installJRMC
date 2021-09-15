@@ -12,7 +12,7 @@ shopt -s extglob
 #
 #######################################
 
-_scriptversion="1.0.0a2"
+_scriptversion="1.0.0a3"
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html"
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
@@ -562,31 +562,34 @@ _installMCFromRepo() {
 
 #######################################
 # Acquire the source DEB package from JRiver's servers
+# Globals:
+#   DEBFILENAME
 # Returns:
 #   0 if DEB file downloaded successfully, 1 if failed
 #######################################
 _acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local _debfilename="$_outputdir/SOURCES/MediaCenter-$_mcversion-amd64.deb"
+    declare -g DEBFILENAME
+    DEBFILENAME="$_outputdir/SOURCES/MediaCenter-$_mcversion-amd64.deb"
 
     # If necessary, create SOURCES dir
     [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
 
     # If deb file already exists, skip download
-    if [[ -f "$_debfilename" ]]; then
-        echo "Using local DEB file: $_debfilename"
+    if [[ -f "$DEBFILENAME" ]]; then
+        echo "Using local DEB file: $DEBFILENAME"
     elif [[ -v _betapass ]]; then
         echo -n "Checking beta repo..."
-        if wget -q -O "$_debfilename" \
+        if wget -q -O "$DEBFILENAME" \
         "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$_mcversion-amd64.deb"; then
             echo "Found!"
         fi
-    elif echo -n "Checking test repo..." && wget -q -O "$_debfilename" \
+    elif echo -n "Checking test repo..." && wget -q -O "$DEBFILENAME" \
     "https://files.jriver.com/mediacenter/test/MediaCenter-$_mcversion-amd64.deb"; then
         echo "Found!"
     # Else check latest repo
-    elif echo -n "Checking latest repo..." && wget -q -O "$_debfilename" \
+    elif echo -n "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
     "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb"; then
         echo "Found!"
     else
@@ -594,7 +597,7 @@ _acquireDeb() {
         exit 1
     fi
 
-    if [[ ! -f "$_debfilename" ]]; then
+    if [[ ! -f "$DEBFILENAME" ]]; then
         err "Downloaded DEB file missing or corrupted, exiting..."
         exit 1
     fi
@@ -714,6 +717,8 @@ _buildRPM() {
     # shellcheck disable=SC2181
     if [[ $? -ne 0 || ! -f "$_mcrpm" ]]; then
         err "Build failed. Exiting..."
+        echo "Removing source DEB"
+        [[ -f "$DEBFILENAME" ]] && rm -f "$DEBFILENAME"
         exit 1
     else
         echo "Build successful. The RPM file is located at: $_mcrpm"
