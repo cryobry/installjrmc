@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-shopt -s extglob
-#######################################
-# This script will download, build, and install JRiver Media Center with optional systemd services
+# This script will install JRiver Media Center and associated services
 # on Fedora, CentOS, Debian, and Ubuntu
+# Copyright (c) 2021 Bryan C. Roessler
+# This software is released under the Apache License.
+# https://www.apache.org/licenses/LICENSE-2.0
 #
-# Run installJRMC --help to see available options
+# Use installJRMC --help to see available options or
+# read printHelpAndExit() below.
 #
-# To-dos:
+# TODO:
 #   1. Raspberry Pi OS support
 #   2. Interactive installation (ncurses?)
+<<<<<<< Updated upstream
 #
 # installJRMC can be run directly or sourced as a function (by sourcing this file)
 # Arguments:
@@ -25,10 +28,90 @@ installJRMC() {
     _exec_user="$(whoami)"
     _available_services=("jriver-createrepo" "jriver-x11vnc" "jriver-mediaserver" "jriver-mediacenter" "jriver-xvnc-mediacenter")
     #_available_containers=("mediacenter-xvnc" "createrepo")
+=======
+
+shopt -s extglob
+
+_scriptversion="28.0a1"
+_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html"
+_outputdir="$PWD/output"
+_createrepo_webroot="/srv/jriver"
+_exec_user="$(whoami)"
+
+printHelpAndExit() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    cat <<- 'EOF'
+		USAGE:
+		    installJRMC [[OPTION] [VALUE]]...
+
+		    If no options (besides -d) are provided, the script will default to '--install repo'.
+
+		OPTIONS
+		    --install, -i repo|rpm
+		        repo: Install MC from repository, updates are handled by the system package manager
+		        rpm: Build and install RPM locally (RPM-based distros only)
+		    --build
+		        Build RPM from source DEB (but don't install it)
+		    --mcversion VERSION
+		        Specify the MC version, ex. "28.0.25" (Default: scrape latest version from Interact)
+		    --outputdir PATH
+		        Generate rpmbuild output in this directory (Default: $PWD/output)
+		    --restorefile RESTOREFILE
+		        Restore file location for automatic license registration (Default: skip registration)
+		    --betapass PASSWORD
+		        Enter beta team password for access to beta builds
+		    --service, -s SERVICE
+		        See SERVICES section below for a list of possible services to install
+		        --service-user USER
+		            Install systemd services and containers for user USER (Default: current user)
+		    --container, -c CONTAINER (TODO: Under construction)
+		        See CONTAINERS section below for a list of possible services to install
+		    --createrepo
+		        Build rpm, copy to webroot, and run createrepo
+		        --createrepo-webroot PATH
+		            The webroot directory to install the repo (Default: /srv/jriver/)
+		        --createrepo-user USER
+		            The web server user (Default: current user)
+		    --version, -v
+		        Print this script version and exit
+		    --debug, -d
+		        Print debug output
+		    --help, -h
+		        Print help dialog and exit
+		    --uninstall, -u
+		        Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
+
+		SERVICES
+		    jriver-mediaserver
+		        Enable and start a mediaserver systemd service (requires an existing X server)
+		    jriver-mediacenter
+		        Enable and start a mediacenter systemd service (requires an existing X server)
+		    jriver-x11vnc
+		        Enable and start x11vnc for the local desktop (requires an existing X server)
+		        Usually combined with jriver-mediaserver or jriver-mediacenter services
+		        --vncpass and --display are optional (see 'jriver-xvnc-mediacenter' below)
+		    jriver-xvnc-mediacenter
+		        Enable and start a new Xvnc session running JRiver Media Center
+		        --vncpass PASSWORD
+		            Set vnc password for x11vnc/Xvnc access. If no password is set, the script
+		            will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+		        --display DISPLAY
+		            Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
+		            current display incremented by 1 (Xvnc))
+		    jriver-createrepo
+		        Install hourly service to build latest MC RPM and run createrepo
+
+		CONTAINERS (TODO: Under construction)
+		    mediacenter-xvnc
+		    createrepo
+	EOF
+>>>>>>> Stashed changes
 
 
     _printHelpAndExit() {
 
+<<<<<<< Updated upstream
         debug "Running: ${FUNCNAME[0]}"
 
         cat <<-'EOF'
@@ -192,15 +275,201 @@ EOF
 
 
     err() { echo "Error: $*" >&2; }
+=======
+init() {
+
+    debug "Running: ${FUNCNAME[0]}"
+
+    getOS
+
+    # Agnostic commands
+    bash_cmd(){ ifSudo bash -c "$@"; }
+    rm_cmd(){ ifSudo rm -rf "$@"; }
+    #cp_cmd(){ ifSudo cp -n "$@"; }
+    mkdir_cmd(){ ifSudo mkdir -p "$@"; }
+    ln_cmd(){ ifSudo ln -s "$@"; }
+    systemctl_reload(){ ifSudo systemctl daemon-reload; }
+    systemctl_enable(){ ifSudo systemctl enable --now "$@"; }
+    systemctl_disable(){ ifSudo systemctl disable --now "$@"; }
+
+    # OS-specific commands
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        pkg_install(){ ifSudo dnf install -y "$@"; }
+        pkg_reinstall(){ ifSudo dnf reinstall -y "$@"; }
+        pkg_install_nogpg(){ ifSudo dnf install --nogpgcheck -y "$@"; }
+        pkg_remove(){ ifSudo dnf remove -y "$@"; }
+        pkg_update(){ ifSudo dnf makecache; }
+        pkg_query(){ ifSudo rpm -q "$@"; }
+        firewall_cmd(){ ifSudo firewall-cmd "$@"; }
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        pkg_install(){ ifSudo apt-get install -y -q0 "$@"; }
+        pkg_reinstall(){ ifSudo apt-get reinstall -y -q0 "$@"; }
+        pkg_install_nogpg(){ ifSudo apt-get install -y -q0 "$@"; }
+        pkg_remove(){ ifSudo apt-get remove -y -q0 "$@"; }
+        pkg_update(){ ifSudo apt-get update -y -q0; }
+        pkg_query(){ ifSudo dpkg -s "$@"; }
+        firewall_cmd(){ ifSudo ufw "$@"; }
+    fi
+
+    parseInput "$@"
+
+    _service_user="${_service_user:-$_exec_user}"
+    _createrepo_user="${_createrepo_user:-$_exec_user}"
+
+    # Set package aliases
+    if [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        declare -Ag PKG_ALIASES
+        PKG_ALIASES["xorg-x11-utils"]="xorg-x11"
+        PKG_ALIASES["rpm-build"]="rpm"
+        PKG_ALIASES["createrepo_c"]="createrepo"
+        PKG_ALIASES["tigervnc-server"]="tigervnc-standalone-server"
+    fi
+
+    # Install script dependencies
+    [[ "$ID" == "centos" ]] && installPackage epel-release
+
+    [[ ! -v _mcversion ]] && getLatestVersion
+
+    [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && echo "Invalid version number" && exit 1
+
+    # Extract major version number
+    _mversion="${_mcversion%%.*}"
+
+    # Saving this substituion in case it's needed in the future
+    #_variation="${_mcversion##*.}"
+}
+
+# HELPERS
+err() { echo "Error: $*" >&2; }
+debug() { 
+    if [[ -v _debug ]]; then
+        if [[ $# -gt 0 ]]; then
+            echo "Debug: $*"
+        fi
+    else
+        return 1
+    fi
+}
+ifSudo() {
+    if [[ "$_exec_user" != "root" ]]; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+askOk() {
+    local _response
+    read -r -p "$* [y/N]" _response
+    _response=${_response,,}
+    [[ ! "$_response" =~ ^(yes|y)$ ]] && return 1
+    return 0
+}
+>>>>>>> Stashed changes
 
     debug() { [[ -n $_debug ]] && echo "Debug: $*"; }
 
+<<<<<<< Updated upstream
     #######################################
     # Prepend this to any command that you wish to execute with sudo
     # Requires:
     #   _exec_user
     #######################################
     _ifSudo() {
+=======
+#######################################
+# Parse CLI input from the user w/ getopt
+#######################################
+parseInput() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
+        debug "No options passed, defaulting to repo installation method"
+        _install="repo"
+    fi
+
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
+        eval set -- "$_input"
+        while true; do
+            case "$1" in
+                --install|-i)
+                    shift 
+                    _install="$1"
+                    if [[ "$_install" == "rpm" ]]; then
+                        if [[ ! "$ID" =~ ^(fedora|centos)$ ]]; then
+                            err "RPM install method not available on $ID"
+                            printHelpAndExit 1
+                        fi
+                        _build=true
+                    fi
+                    ;;
+                --build)
+                    _build=true
+                    ;;
+                --outputdir)
+                    shift && _outputdir="$1"
+                    ;;
+                --mcversion)
+                    shift && _mcversion="$1"
+                    ;;
+                --restorefile)
+                    shift && _restorefile="$1"
+                    ;;
+                --betapass)
+                    shift && _betapass="$1"
+                    ;;
+                --service-user)
+                    shift && _service_user="$1"
+                    ;;
+                --service|-s)
+                    shift && _services+=("$1")
+                    ;;
+                --createrepo)
+                    _build=true
+                    _createrepo=true
+                    ;;
+                --createrepo-webroot)
+                    shift && _createrepo_webroot="$1"
+                    ;;
+                --createrepo-user)
+                    shift && _createrepo_user="$1"
+                    ;;
+                --vncpass)
+                    shift && _vncpass="$1"
+                    ;;
+                --display)
+                    shift && _display="$1"
+                    ;;
+                --container|-c)
+                    shift && _containers+=("$1")
+                    ;;
+                --version|-v)
+                    echo "Version: $_scriptversion"
+                    exit 0
+                    ;;
+                --debug|-d)
+                    echo "Debugging on"
+                    echo "installJRMC version: $_scriptversion"
+                    _debug="true"
+                    ;;
+                --help|-h)
+                    printHelpAndExit 0
+                    ;;
+                --uninstall|-u)
+                    _uninstall=true
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+            esac
+            shift
+        done
+    else
+        err "Incorrect options provided"
+        printHelpAndExit 1
+    fi
+}
+>>>>>>> Stashed changes
 
         if [[ "$_exec_user" != "root" ]]; then
             sudo "$@"
@@ -209,6 +478,22 @@ EOF
         fi
     }
 
+<<<<<<< Updated upstream
+=======
+getOS() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if [[ -e "/etc/os-release" ]]; then
+        source "/etc/os-release"
+    else
+        err "/etc/os-release not found"
+        err "Your OS is unsupported"
+        printHelpAndExit 1
+    fi
+
+    debug "Platform: $ID $VERSION_ID"
+}
+>>>>>>> Stashed changes
 
     #######################################
     # Sources /etc/os-release so we know which OS we're running on
@@ -216,6 +501,7 @@ EOF
     #######################################
     _getOS() {
 
+<<<<<<< Updated upstream
         debug "Running: ${FUNCNAME[0]}"
 
         if [[ -e "/etc/os-release" ]]; then
@@ -259,9 +545,43 @@ EOF
 
         # Detect OS
         _getOS
+=======
+#######################################
+# If no MC version is provided, find the latest
+# Requires:
+#   _boardurl
+#######################################
+getLatestVersion() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare -g _mcversion _source
+
+    # Use a containerized package manager
+    [[ ! -x $(command -v buildah) ]] && installPackage buildah
+    if CNT=$(buildah from ubuntu:18.04); then 
+        buildah run "$CNT" -- bash -c \
+            "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ buster main' > /etc/apt/sources.list 2>&1"
+        buildah run "$CNT" -- bash  -c \
+            "apt-get update --allow-insecure-repositories -y > /dev/null 2>&1"
+        if _mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1); then
+            _source="containerized package manager"
+        fi
+        buildah rm "$CNT" > /dev/null 2>&1
+    # Else scrape from Interact
+    elif _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+        _source="Interact scrape"
+    fi
+
+    if ! [[ -v _mcversion ]]; then
+        err "MC version could not be determined. Please check the boardurl: $_boardurl or specify a version manually using --mcversion"
+        exit 1
+    fi
+}
+>>>>>>> Stashed changes
 
         debug "Running: ${FUNCNAME[0]}"
 
+<<<<<<< Updated upstream
         # Agnostic commands
         _bash_cmd(){ _ifSudo bash -c "$@"; }
         _rm_cmd(){ _ifSudo rm -rf "$@"; }
@@ -304,6 +624,49 @@ EOF
         if [[ $_createrepo_user != "root" ]]; then
             if [[ -d "$_createrepo_webroot/repodata" ]]; then
                 _createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q --update "$@"; }
+=======
+#######################################
+# Installs a package using the system package manager
+# Arguments:
+#   One or more package names
+# Options:
+#   --noquery, -n: Do not query the package state (useful if installing a local RPM)
+# Returns:
+#   Will return 1 if failed
+#######################################
+installPackage() {
+    debug "Running: ${FUNCNAME[0]}" "$@"
+
+    if _input=$(getopt -o +n -l noquery -- "$@"); then
+        eval set -- "$_input"
+        while true; do
+            case "$1" in
+                --noquery|-n)
+                    local _noquery="true"
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+            esac
+            shift
+        done
+    else
+        err "Incorrect options provided"
+        exit 1
+    fi
+
+    local -a _pkg_array
+    local -a _url_pkg_array
+
+    # Parse packages
+    for _pkg in "$@"; do
+        [[ -v PKG_ALIASES && -v PKG_ALIASES["$_pkg"] ]] && _pkg=PKG_ALIASES["$_pkg"]
+        # Insert the package name to test if already installed
+        if [[ -v _noquery ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
+            if [[ -v _url_pkg ]]; then
+                _url_pkg_array+=("$_url_pkg")
+>>>>>>> Stashed changes
             else
                 _createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q "$@"; }
             fi
@@ -367,6 +730,7 @@ EOF
             _printHelpAndExit 1
         fi
 
+<<<<<<< Updated upstream
         # We will add packages to this array if their command is not available
         local -a _pkg_array
         local -a _url_pkg_array
@@ -399,8 +763,22 @@ EOF
                 err "Failed to install package. Attempting to continue..."
                 return 1
             fi
+=======
+    # Install from package name (with gpg check)
+    if [[ ${#_pkg_array[@]} -ge 1 ]]; then
+        echo "Installing:" "${_pkg_array[@]}"
+        if debug; then
+            if ! pkg_install "${_pkg_array[@]}"; then
+                err "Failed to install package. Attempting to continue..."
+                return 1
+            fi
+        elif ! pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
+            err "Failed to install package. Attempting to continue..."
+            return 1
+>>>>>>> Stashed changes
         fi
 
+<<<<<<< Updated upstream
         # Install from package url (without gpg check)
         if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
             echo "Installing:" "${_url_pkg_array[@]}"
@@ -413,10 +791,24 @@ EOF
                 err "Failed to install package. Attempting to continue..."
                 return 1
             fi
+=======
+    # Install from package url (without gpg check)
+    if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
+        echo "Installing: " "${_url_pkg_array[@]}"
+        if debug; then
+            if ! pkg_install_nogpg "${_url_pkg_array[@]}"; then
+                err "Failed to install package. Attempting to continue..."
+                return 1
+            fi
+        elif ! pkg_install_nogpg "${_url_pkg_array[@]}" > /dev/null 2>&1; then
+            err "Failed to install package. Attempting to continue..."
+            return 1
+>>>>>>> Stashed changes
         fi
     }
 
 
+<<<<<<< Updated upstream
     #######################################
     # Handles OS-specific package name tweaks and source urls
     # Arguments:
@@ -622,6 +1014,60 @@ EOF'
             err "Package update failed!"
             exit 1
         fi
+=======
+#######################################
+# Adds the appropriate repository files (by distro)
+#######################################
+addRepo() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        bash_cmd 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
+            [jriver]
+            name=JRiver Media Center repo by BryanC
+            baseurl=https://repos.bryanroessler.com/jriver
+            gpgcheck=0
+        EOF'
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        installPackage wget
+        wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
+        ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list"
+    fi
+}
+
+
+#######################################
+# Installs JRiver Media Center from a repository
+# Returns:
+#   0 if JRiver Media Center installed sucessfully
+#######################################
+installMCFromRepo() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    local _mcpkg
+
+    echo "Installing JRiver Media Center $_mcversion from repo..."
+
+    if ! debug; then
+        echo "This may take a few minutes to complete"
+        echo "Use --debug for verbose output"
+    fi
+
+    addRepo
+
+    # Update package list
+    debug "Updating package list"
+    if ! pkg_update > /dev/null 2>&1; then
+        err "Package update failed!"
+        exit 1
+    fi
+
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        _mcpkg="mediacenter"
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        _mcpkg="mediacenter$_mversion"
+    fi
+>>>>>>> Stashed changes
 
         # If user specifies a version, use that
         if [[ -n $_mcversion ]]; then
@@ -633,6 +1079,7 @@ EOF'
 
         # Fedora/CentOS use a universal package name -- easy
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+<<<<<<< Updated upstream
             _mcpkg="MediaCenter"
         fi
 
@@ -688,9 +1135,29 @@ EOF'
         else
             err "JRiver Media Center installation failed"
             exit 1
+=======
+            if debug; then
+                installPackage "$_mcpkg-$_mcversion"
+            else
+                installPackage "$_mcpkg-$_mcversion" > /dev/null 2>&1
+            fi
+        elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+            if debug; then
+                installPackage "$_mcpkg=$_mcversion"
+            else
+                installPackage "$_mcpkg=$_mcversion" > /dev/null 2>&1
+            fi
+        fi
+    else
+        if debug; then
+            installPackage "$_mcpkg"
+        else
+            installPackage "$_mcpkg" > /dev/null 2>&1
+>>>>>>> Stashed changes
         fi
     }
 
+<<<<<<< Updated upstream
 
     #######################################
     # Acquire the source DEB package from JRiver's servers
@@ -698,9 +1165,14 @@ EOF'
     #   0 if DEB file downloaded successfully, 1 if failed
     #######################################
     _acquireDeb() {
+=======
+    return $?
+}
+>>>>>>> Stashed changes
 
         debug "Running: ${FUNCNAME[0]}"
 
+<<<<<<< Updated upstream
         local _debfilename="$_outputdir/SOURCES/MediaCenter-${_mcversion}-amd64.deb"
 
         # If necessary, create SOURCES dir
@@ -726,6 +1198,32 @@ EOF'
         else
             err "Cannot find DEB file. Exiting..."
             exit 1
+=======
+#######################################
+# Acquire the source DEB package from JRiver's servers
+# Globals:
+#   DEBFILENAME
+# Returns:
+#   0 if DEB file downloaded successfully, 1 if failed
+#######################################
+acquireDeb() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare -g DEBFILENAME
+    DEBFILENAME="$_outputdir/SOURCES/MediaCenter-$_mcversion-amd64.deb"
+
+    # If necessary, create SOURCES dir
+    [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
+
+    # If deb file already exists, skip download
+    if [[ -f "$DEBFILENAME" ]]; then
+        echo "Using local DEB file: $DEBFILENAME"
+    elif [[ -v _betapass ]]; then
+        echo -n "Checking beta repo..."
+        if wget -q -O "$DEBFILENAME" \
+        "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$_mcversion-amd64.deb"; then
+            echo "Found!"
+>>>>>>> Stashed changes
         fi
 
         if [[ ! -f "$_debfilename" ]]; then
@@ -735,6 +1233,7 @@ EOF'
     }
 
 
+<<<<<<< Updated upstream
     #######################################
     # Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
     # Requires:
@@ -749,9 +1248,134 @@ EOF'
     #   0 if rpmbuild is successful, 1 if not
     #######################################
     _buildRPM() {
+=======
+#######################################
+# Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
+# Requires:
+#   _outputdir
+#   ID
+#   _mcversion
+#   _mversion
+#   installPackage
+# Globals:
+#   _mcrpm
+# Returns:
+#   0 if rpmbuild is successful, 1 if not
+#######################################
+buildRPM() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    # install build dependencies
+    installPackage wget dpkg rpm-build
+
+    # If necessary, make build directories
+    [[ ! -d "$_outputdir/SPECS" ]] && mkdir -p "$_outputdir/SPECS"
+
+    # rpmbuild uses rpm to check for build dependencies
+    # this will fail on non-rpm distros
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        local _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
+    fi
+
+    # Create spec file
+    cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
+		Name:    mediacenter
+		Version: $_mcversion
+		Release: 1
+		Summary: JRiver Media Center
+		Group:   Applications/Media
+		Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb
+		${_build_requires:-}
+		BuildArch: x86_64
+		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
+
+		AutoReq:  0
+		Requires: glibc >= 2.28
+		Requires: alsa-lib >= 1.1.8
+		Requires: libuuid >= 2.33
+		Requires: libX11 >= 1.6
+		Requires: libX11-common >= 1.6
+		Requires: libXext >= 1.3
+		Requires: libxcb >= 1.1
+		Requires: libXdmcp >= 1.1
+		Requires: libstdc++ >= 7.4
+		Requires: gtk3 >= 3.24
+		Requires: mesa-libGL
+		Requires: libglvnd-glx
+		Requires: pango >= 1.42
+		Requires: nss >= 3.42
+		Requires: nspr >= 4.20
+        Requires: python3
+        Requires: xdg-utils
+        Requires: libgomp >= 7.4
+        Requires: fribidi >= 1.0.5
+        Requires: fontconfig >= 2.13
+        Requires: freetype >= 2.9.1
+        Requires: harfbuzz >= 2.3.1
+        Requires: mesa-libgbm >= 18.3.6
+        Requires: libva >= 2.4.0
+        Requires: libepoxy >= 1.5.3
+        Requires: lcms2 >= 2.9
+        Requires: vulkan-headers >= 1.1
+        Requires: mesa-vulkan-drivers
+		Requires: ca-certificates
+        Requires: libXScrnSaver
+
+		Recommends: vorbis-tools >= 1.4.0
+		Recommends: lame >= 3.0
+
+		Provides: mediacenter$_mversion
+
+		License: Copyright 1998-2021, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
+		URL: http://www.jriver.com/
+
+		%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
+
+		%description
+		Media Center is more than a world class player.
+
+		%global __os_install_post %{nil}
+		%prep
+
+		%build
+
+		%install
+		dpkg -x %{S:0} %{buildroot}
+
+		%post -p /sbin/ldconfig
+		%postun -p /sbin/ldconfig
+
+		%files
+		%{_bindir}/mediacenter$_mversion
+		%{_libdir}/jriver
+		%{_datadir}
+		%exclude %{_datadir}/applications/media_center_packageinstaller_$_mversion.desktop
+		/etc/security/limits.d/*
+	EOF
+
+    declare -g _mcrpm="$_outputdir/RPMS/x86_64/mediacenter-$_mcversion.x86_64.rpm"
+
+    # skip rebuilding the rpm if it already exists
+    if [[ -f "$_mcrpm" ]]; then
+        echo "$_mcrpm already exists. Skipping build step..."
+        return 0
+    fi
+
+    # Run rpmbuild
+    echo "Building version $_mcversion, please wait..."
+    if debug; then
+        rpmbuild --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"
+    else
+        rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec" > /dev/null 2>&1
+    fi
+
+    return $?
+}
+>>>>>>> Stashed changes
 
         debug "Running: ${FUNCNAME[0]}"
 
+<<<<<<< Updated upstream
         # install build dependencies
         _installPackage wget dpkg rpm-build
 
@@ -858,9 +1482,41 @@ EOF"
             else
                 echo "Build successful. The RPM file is located at: $_mcrpm"
             fi
+=======
+#######################################
+# Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
+# Arguments:
+#   Requires one argument, the path to the RPM file (typically _mcrpm)
+# Requires:
+#   _createrepo_webroot
+# Returns:
+#   0 if createrepo is successful, 1 if not
+#######################################
+runCreaterepo() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    # Some additional commands specifically for createrepo (primarily to handle user rights)
+    if [[ $_createrepo_user != "root" ]]; then
+        if [[ -d "$_createrepo_webroot/repodata" ]]; then
+            createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q --update "$@"; }
+        else
+            createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q "$@"; }
+        fi
+        cr_mkdir_cmd(){ sudo -u "$_createrepo_user" mkdir -p "$@"; }
+        cr_cp_cmd(){ sudo -u "$_createrepo_user" cp -n "$@"; }
+    else
+        if [[ -d "$_createrepo_webroot/repodata" ]]; then
+            createrepo_cmd(){ createrepo -q --update "$@"; }
+        else
+            createrepo_cmd(){ createrepo -q "$@"; }
+>>>>>>> Stashed changes
         fi
     }
 
+<<<<<<< Updated upstream
+=======
+    installPackage createrepo_c
+>>>>>>> Stashed changes
 
     #######################################
     # Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
@@ -873,12 +1529,41 @@ EOF"
     #######################################
     _runCreaterepo() {
 
+<<<<<<< Updated upstream
         debug "Running: ${FUNCNAME[0]}"
 
         _installPackage createrepo_c
+=======
+    # If the webroot does not exist, create it
+    if [[ ! -d "$_createrepo_webroot" ]]; then
+        if ! cr_mkdir_cmd "$_createrepo_webroot"; then
+            err "Could not create the createrepo-webroot path!"
+            err "Make sure that the createrepo-webroot is writeable by createrepo-user: $_createrepo_user"
+            return 1
+        fi
+    fi
+
+    # Copy built rpms to webroot
+    if ! cr_cp_cmd -f "$_rpmfile" "$_createrepo_webroot"; then
+        err "Could not copy the RPM to the createrepo-webroot path"
+        err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $_createrepo_user"
+        return 1
+    fi
+
+    # Run createrepo
+    if createrepo_cmd "$_createrepo_webroot"; then
+        echo "Successfully updated repo"
+        return 0
+    else
+        err "Update repo failed"
+        return 1
+    fi
+}
+>>>>>>> Stashed changes
 
         local _rpmfile="$1"
 
+<<<<<<< Updated upstream
         # If the webroot does not exist, create it
         if [[ ! -d "$_createrepo_webroot" ]]; then
             if ! _cr_mkdir_cmd "$_createrepo_webroot"; then
@@ -892,6 +1577,20 @@ EOF"
         if ! _cr_cp_cmd "$_rpmfile" "$_createrepo_webroot"; then
             err "Could not copy the RPM to the createrepo-webroot path"
             err "Make sure that the createrepo-webroot path is writeable by createrepo-user"
+=======
+#######################################
+# Symlink certificates where JRiver Media Center expects them to be on Fedora/CentOS
+# Returns:
+#   0 if symlinking is unecessary or successful, 1 if not
+#######################################
+symlinkCerts() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
+    -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
+        if ! ln_cmd /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt; then
+            err "Symlinking certificates failed"
+>>>>>>> Stashed changes
             return 1
         fi
 
@@ -905,6 +1604,20 @@ EOF"
         fi
     }
 
+<<<<<<< Updated upstream
+=======
+#######################################
+# Automatically restore the mjr license file if it is found next to installJRMC or _restorefile
+# is set
+# Requires:
+#   _restorefile OR _basedir
+#   _mversion
+# Returns:
+#   0 if license restored successfully or skipped, 1 if unsuccessful
+#######################################
+restoreLicense() {
+    debug "Running: ${FUNCNAME[0]}"
+>>>>>>> Stashed changes
 
     #######################################
     # Symlink certificates where JRiver Media Center expects them to be on Fedora/CentOS
@@ -925,6 +1638,7 @@ EOF"
     }
 
 
+<<<<<<< Updated upstream
     #######################################
     # Automatically restore the mjr license file if it is found next to installJRMC or _restorefile
     # is set
@@ -935,10 +1649,84 @@ EOF"
     #   0 if license restored successfully or skipped, 1 if unsuccessful
     #######################################
     _restoreLicense() {
+=======
+#######################################
+# Opens ports using the system firewall tool
+# Arguments
+#   Service to enable (pre-defined)
+# Requires:
+#   ID
+#   bash_cmd
+#   firewall_cmd
+#   _port
+# Returns:
+#   0 if ports opened sucessfully, 1 if not
+#######################################
+openFirewall() {
+    debug "Running: ${FUNCNAME[0]}" "$@"
+
+    # Create OS-specific port rules based on argument (service) name
+    local -a _f_ports # for firewall-cmd
+    local _u_ports # for ufw
+    if [[ "$1" == "jriver" ]]; then
+        _f_ports=("52100-52200/tcp" "1900/udp")
+        _u_ports="52100:52200/tcp|1900/udp"
+    elif [[ "$1" =~ ^(jriver-x11vnc|jriver-xvnc)$ ]]; then
+        _f_ports=("$_port/tcp" "1900/udp")
+        _u_ports="$_port/tcp|1900/udp"
+    fi
+
+    # Open the ports
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        [[ ! -x $(command -v firewall-cmd) ]] && installPackage firewalld
+        if ! firewall_cmd --get-services | grep -q "$1"; then
+            firewall_cmd --permanent --new-service="$1" > /dev/null 2>&1
+            firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" > /dev/null 2>&1
+            firewall_cmd --permanent --service="$1" --set-short="$1" > /dev/null 2>&1
+            for _f_port in "${_f_ports[@]}"; do
+                firewall_cmd --permanent --service="$1" --add-port="$_f_port" > /dev/null 2>&1
+            done
+            firewall_cmd --add-service "$1" --permanent > /dev/null 2>&1
+            firewall_cmd --reload > /dev/null 2>&1
+        fi
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        # Debian ufw package state is broken on fresh installations
+        [[ ! -x $(command -v ufw) ]] && installPackage ufw
+        if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
+            bash_cmd "cat <<- EOF > /etc/ufw/applications.d/$1
+				[$1]
+				title=$1
+				description=$1 installed by installJRMC
+				ports=$_u_ports
+			EOF"
+        fi
+        firewall_cmd app update "$1"
+        firewall_cmd allow "$1" > /dev/null 2>&1
+    fi
+
+    # shellcheck disable=SC2181 # More concise
+    if [[ $? -ne 0 ]]; then
+        err "Firewall ports could not be opened"
+        return 1
+    fi
+}
+>>>>>>> Stashed changes
 
         debug "Running: ${FUNCNAME[0]}"
 
+<<<<<<< Updated upstream
         local _mjr
+=======
+#######################################
+# Create the x11vnc password file
+# Globals:
+#   _novncauth
+# Returns:
+#   0 if password created sucessfully, 1 if not
+#######################################
+setX11VNCPass() {
+    debug "Running: ${FUNCNAME[0]}"
+>>>>>>> Stashed changes
 
         # Allow user to drop an mjr file next to installJRMC
         if [[ -z $_restorefile ]]; then
@@ -1024,6 +1812,7 @@ EOF"
     }
 
 
+<<<<<<< Updated upstream
     #######################################
     # Create the x11vnc password file
     # Globals:
@@ -1034,6 +1823,15 @@ EOF"
     _setX11VNCPass() {
 
         debug "Running: ${FUNCNAME[0]}"
+=======
+#######################################
+# Create the Xvnc password file
+# Returns:
+#   0 if password created sucessfully, 1 if not
+#######################################
+setVNCPass() {
+    debug "Running: ${FUNCNAME[0]}"
+>>>>>>> Stashed changes
 
         _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
@@ -1118,12 +1916,32 @@ EOF"
             _next_display=":1"
         fi
 
+<<<<<<< Updated upstream
+=======
+#######################################
+# Set display and port variables
+# Globals:
+#   _display
+#   _displaynum
+#   _next_display
+#   _next_displaynum
+#######################################
+setDisplay() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    # Check _display, else DISPLAY, else set to :0 by default
+    if [[ -v _display ]]; then
+        _next_display="$_display"
+    elif [[ -v DISPLAY ]]; then
+        _display="${DISPLAY}"
+>>>>>>> Stashed changes
         _displaynum="${_display#:}" # strip colon
         _displaynum="${_displaynum%.*}" # strip suffix
         _next_displaynum=$(( _displaynum + 1 ))
     }
 
 
+<<<<<<< Updated upstream
     #######################################
     # Create associated service variables based on service name
     # Requires:
@@ -1156,6 +1974,72 @@ EOF"
     #######################################
     # SERVICES
     #######################################
+=======
+#######################################
+# Create associated service variables based on service name
+# Requires:
+#   _service_user
+# Globals:
+#   _service_fname
+#   _timer_fname
+#   _service_name
+#   _timer_name
+#   _user_specifier
+#######################################
+servicePrep() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if [[ "$_service_user" == "root" ]]; then
+        _service_fname="/usr/lib/systemd/system/${1}.service"
+        _timer_fname="/usr/lib/systemd/system/${1}.timer"
+        _service_name="jriver-${1}.service"
+        _timer_name="jriver-${1}}.timer"
+        _user_specifier=""
+    else
+        _service_fname="/usr/lib/systemd/system/${1}@.service"
+        _timer_fname="/usr/lib/systemd/system/${1}@.timer"
+        _service_name="${1}@$_service_user.service"
+        _timer_name="${1}@$_service_user.timer"
+        _user_specifier="User=%I"
+    fi
+}
+
+
+#######################################
+# Starts and enables (at startup) a JRiver Media Center service
+# Arguments:
+#   Passes arguments as startup options to /usr/bin/mediacenter26
+# Requires:
+#   XAUTHORITY
+#######################################
+service_jriver-mediacenter() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    bash_cmd "cat <<- EOF > $_service_fname
+		[Unit]
+		Description=JRiver Media Center $_mversion
+		After=graphical.target
+
+		[Service]
+		$_user_specifier
+		Type=simple
+		Environment=DISPLAY=$_display
+		Environment=XAUTHORITY=$XAUTHORITY
+		ExecStart=/usr/bin/mediacenter$_mversion $*
+		Restart=always
+		RestartSec=10
+		KillSignal=SIGHUP
+		TimeoutStopSec=30
+
+		[Install]
+		WantedBy=graphical.target
+	EOF"
+
+    systemctl_reload && \
+    systemctl_enable "$_service_name" && \
+    openFirewall "jriver"
+}
+>>>>>>> Stashed changes
 
     #######################################
     # Starts and enables (at startup) a JRiver Media Center service
@@ -1166,6 +2050,7 @@ EOF"
     #######################################
     _service_jriver-mediacenter() {
 
+<<<<<<< Updated upstream
         debug "Running: ${FUNCNAME[0]}"
 
         _bash_cmd "cat <<-EOF > $_service_fname
@@ -1200,10 +2085,64 @@ EOF"
     _service_jriver-mediaserver() {
 
         debug "Running: ${FUNCNAME[0]}"
+=======
+#######################################
+# Starts and enables (at startup) a JRiver Media Server service
+#######################################
+service_jriver-mediaserver() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    service_jriver-mediacenter "/MediaServer"
+}
+
+
+#######################################
+# Starts and enables (at startup) JRiver Media Center in a new Xvnc session
+#######################################
+service_jriver-xvnc-mediacenter() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    installPackage tigervnc-server
+
+    setVNCPass
+
+    local _port=$(( _next_displaynum + 5900 ))
+
+    if [[ -v _novncauth ]]; then
+        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$_mversion"
+    else
+        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$_mversion"
+    fi
+
+    bash_cmd "cat <<- EOF > $_service_fname
+		[Unit]
+		Description=Remote desktop service (VNC)
+		After=syslog.target network.target
+
+		[Service]
+		Type=simple
+		$_user_specifier
+		ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $_next_display > /dev/null 2>&1 || :'
+		ExecStart=$_exec_start_cmd
+		ExecStop=/usr/bin/vncserver -kill $_next_display
+		Restart=always
+
+		[Install]
+		WantedBy=multi-user.target
+	EOF"
+
+    systemctl_reload && \
+    systemctl_enable "$_service_name" && \
+    echo "Xvnc running on localhost:$_port" && \
+    openFirewall "jriver-xvnc" && \
+    openFirewall "jriver"
+}
+>>>>>>> Stashed changes
 
         _service_jriver-mediacenter "/MediaServer"
     }
 
+<<<<<<< Updated upstream
 
     #######################################
     # Starts and enables (at startup) JRiver Media Center in a new Xvnc session
@@ -1247,6 +2186,17 @@ EOF"
         _openFirewall "jriver-xvnc" && \
         _openFirewall "jriver"
     }
+=======
+#######################################
+# Starts and enables (at startup) JRiver Media Server and x11vnc sharing the local desktop
+#######################################
+service_jriver-x11vnc() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    installPackage x11vnc
+
+    setX11VNCPass
+>>>>>>> Stashed changes
 
 
     #######################################
@@ -1256,6 +2206,7 @@ EOF"
 
         debug "Running: ${FUNCNAME[0]}"
 
+<<<<<<< Updated upstream
         _installPackage x11vnc
 
         _setX11VNCPass
@@ -1310,6 +2261,53 @@ EOF"
     _service_jriver-createrepo() {
 
         debug "Running: ${FUNCNAME[0]}"
+=======
+        installPackage xorg-x11-utils
+        _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
+    }
+    _getResolution
+
+    if [[ -v _novncauth ]]; then
+        _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -nopw"
+    else
+        _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
+    fi
+
+    bash_cmd "cat <<-EOF > $_service_fname
+		[Unit]
+		Description=x11vnc
+		After=multi.service
+
+		[Service]
+		$_user_specifier
+		Type=forking
+		Environment=DISPLAY=$_display
+		ExecStart=$_exec_start_cmd
+		Restart=always
+		RestartSec=10
+
+		[Install]
+		WantedBy=multi-user.target
+	EOF"
+
+    systemctl_reload && \
+    systemctl_enable "$_service_name" && \
+    echo "x11vnc running on localhost:$_port" && \
+    openFirewall "jriver-x11vnc"
+}
+
+
+#######################################
+# Starts and enables (at startup) an hourly service to build the latest version of JRiver Media
+# Center RPM from the source DEB and create/update an RPM repository
+#######################################
+service_jriver-createrepo() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    bash_cmd "cat <<-EOF > $_service_fname
+		[Unit]
+		Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
+>>>>>>> Stashed changes
 
         _bash_cmd "cat <<-EOF > $_service_fname
 [Unit]
@@ -1339,30 +2337,57 @@ EOF"
     }
 
 
+<<<<<<< Updated upstream
     #######################################
     # CONTAINERS
     #######################################
     _containerCreaterepo() {
         :
     }
+=======
+    bash_cmd "cat <<-EOF > $_timer_fname
+		[Unit]
+		Description=Run JRiver MC rpmbuild hourly
+>>>>>>> Stashed changes
 
 
     _containerVNC() {
         :
     }
 
+<<<<<<< Updated upstream
+=======
+    systemctl_reload && \
+    systemctl_enable "$_timer_name"
+}
+>>>>>>> Stashed changes
 
     _containerMC() {
         :
     }
 
+<<<<<<< Updated upstream
+=======
+#######################################
+# CONTAINERS
+#######################################
+# containerCreaterepo() {
+#     :
+# }
+>>>>>>> Stashed changes
 
     #######################################
     # Complete uninstall
     #######################################
     _uninstall() {
 
+<<<<<<< Updated upstream
         debug "Running: ${FUNCNAME[0]}"
+=======
+# containerVNC() {
+#     :
+# }
+>>>>>>> Stashed changes
 
         read -r -p "Do you really want to uninstall JRiver Media Center? [y/N] " _response
         _response=${_response,,}    # tolower
@@ -1378,6 +2403,7 @@ EOF"
             [[ -f "$_timer_fname" ]] && _rm_cmd "$_timer_fname"
         done
 
+<<<<<<< Updated upstream
         echo "Removing repo files"
         [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
             && _rm_cmd "/etc/yum.repos.d/jriver.repo"
@@ -1394,6 +2420,18 @@ EOF"
             [[ -f "/etc/ufw/applications.d/jriver" ]] \
                 && _rm_cmd /etc/ufw/applications.d/jriver
         fi
+=======
+# containerMC() {
+#     installPackage buildah podman
+#     cnt=$(buildah from docker.io/jlesage/baseimage-gui:debian-10)
+#     podman_create_cmd=("podman" "create" "--name" "$CNAME")
+#     buildah_config_cmd=("buildah" "config" \
+#         "--author" "bryanroessler@gmail.com" \
+#         "--label" "maintainer=$MAINTAINER" \
+#         "--env" "TZ=$TZ" \
+#         "--workingdir" "/app" \
+#         "--cmd" "mediacenter$_mversion")
+>>>>>>> Stashed changes
 
         echo "Uninstalling Media Center"
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -1447,6 +2485,7 @@ EOF"
             _buildRPM
         fi
 
+<<<<<<< Updated upstream
         # Run createrepo
         if [[ -n $_createrepo ]]; then
             _runCreaterepo "$_mcrpm"
@@ -1462,6 +2501,57 @@ EOF"
                 _openFirewall "jriver"
             fi
         fi
+=======
+#######################################
+# Complete uninstall
+#######################################
+uninstall() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if ! askOk "Do you really want to uninstall JRiver Media Center?"; then
+        echo "Cancelling uninstall..."
+        exit 0
+    fi
+
+    # Uninstall services
+    echo "Stopping and removing all associated Media Center services"
+    for _service in $(compgen -A "function" "service"); do 
+        servicePrep "$_service"
+        systemctl_disable "$_service_name"
+        systemctl_disable "$_timer_name"
+        [[ -f "$_service_fname" ]] && rm_cmd "$_service_fname"
+        [[ -f "$_timer_fname" ]] && rm_cmd "$_timer_fname"
+    done
+
+    echo "Removing repo files"
+    [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
+        && rm_cmd "/etc/yum.repos.d/jriver.repo"
+    [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
+        && rm_cmd "/etc/apt/sources.list.d/jriver.list"
+
+    echo "Removing firewall rules"
+    if [[ -x $(command -v firewall-cmd) ]]; then
+        firewall_cmd --permanent --remove-service=jriver
+        firewall_cmd --permanent --delete-service=jriver
+        firewall_cmd --reload
+    elif [[ -x $(command -v ufw) ]]; then
+        firewall_cmd delete allow jriver
+        [[ -f "/etc/ufw/applications.d/jriver" ]] \
+            && rm_cmd /etc/ufw/applications.d/jriver
+    fi
+
+    echo "Uninstalling Media Center"
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        pkg_remove mediacenter
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        pkg_remove "mediacenter$_mversion"
+    fi
+
+    echo "JRiver Media Center has been completely uninstalled"
+    echo "If you wish to remove your library files: rm -rf $HOME/.jriver"
+    echo "If you wish to remove your rpmbuild output files: rm -rf $_outputdir"
+}
+>>>>>>> Stashed changes
 
         # Install services
         _setDisplay
@@ -1477,9 +2567,89 @@ EOF"
     }
 }
 
+<<<<<<< Updated upstream
 # Allow this file to be executed directly if not being sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _basedir=$(dirname "$(readlink -f "$0")")
     installJRMC
     __main "$@"
 fi
+=======
+main() {
+
+    debug "Running: ${FUNCNAME[0]}"
+
+    init "$@"
+
+    # Uninstall and exit
+    if [[ -v _uninstall ]]; then
+        uninstall
+        exit $?
+    fi
+
+    # Install MC using package manager
+    if [[ -v _install && "$_install" == "repo" ]]; then
+        if ! installMCFromRepo; then
+            err "JRiver Media Center installation failed"
+            exit 1
+        else
+            echo "JRiver Media Center installed successfully"
+        fi
+        symlinkCerts
+        restoreLicense
+        openFirewall "jriver"
+    fi
+
+    # Build RPM from source deb package
+    if [[ -v _build ]]; then
+        acquireDeb
+        if ! buildRPM || [[ ! -f "$_mcrpm" ]] ; then
+            err "Build failed. Exiting..."
+            [[ -f "$DEBFILENAME" ]] && echo "Removing source DEB" && rm -f "$DEBFILENAME"
+            exit 1
+        else
+            echo "Build successful. The RPM file is located at: $_mcrpm"
+        fi
+    fi
+
+    # Run createrepo
+    if [[ -v _createrepo ]]; then
+        runCreaterepo "$_mcrpm"
+    fi
+
+    # Install the rpm
+    if [[ -v _install && "$_install" == "rpm" ]]; then
+        installPackage --noquery "$_mcrpm"
+        symlinkCerts
+        restoreLicense
+        openFirewall "jriver"
+    fi
+
+    # Install services
+    setDisplay
+    for _service in "${_services[@]}"; do
+        servicePrep "$_service"
+        if ! "service_$_service"; then
+            if [[ $? -eq 127 ]]; then
+                err "Service $_service does not exist, check your service name"
+            else
+                err "Failed to create service: $_service"
+            fi
+        fi
+    done
+
+    # Install containers
+    # for _container in "${_containers[@]}"; do
+    #     if ! "_container_$_container"; then
+    #         if [[ $? -eq 127 ]]; then
+    #             err "Container $_container does not exist, check your container name"
+    #         else
+    #             err "Failed to create container: $_container"
+    #         fi
+    #     fi
+    # done
+}
+
+
+main "$@"
+>>>>>>> Stashed changes
