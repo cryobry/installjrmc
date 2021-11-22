@@ -412,11 +412,11 @@ addRepo() {
 
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         bash_cmd 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
-            [jriver]
-            name=JRiver Media Center repo by BryanC
-            baseurl=https://repos.bryanroessler.com/jriver
-            gpgcheck=0
-        EOF'
+			[jriver]
+			name=JRiver Media Center repo by BryanC
+			baseurl=https://repos.bryanroessler.com/jriver
+			gpgcheck=0
+		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
@@ -583,21 +583,21 @@ buildRPM() {
 		Requires: pango >= 1.42
 		Requires: nss >= 3.42
 		Requires: nspr >= 4.20
-        Requires: python3
-        Requires: xdg-utils
-        Requires: libgomp >= 7.4
-        Requires: fribidi >= 1.0.5
-        Requires: fontconfig >= 2.13
-        Requires: freetype >= 2.9.1
-        Requires: harfbuzz >= 2.3.1
-        Requires: mesa-libgbm >= 18.3.6
-        Requires: libva >= 2.4.0
-        Requires: libepoxy >= 1.5.3
-        Requires: lcms2 >= 2.9
-        Requires: vulkan-headers >= 1.1
-        Requires: mesa-vulkan-drivers
+		Requires: python3
+		Requires: xdg-utils
+		Requires: libgomp >= 7.4
+		Requires: fribidi >= 1.0.5
+		Requires: fontconfig >= 2.13
+		Requires: freetype >= 2.9.1
+		Requires: harfbuzz >= 2.3.1
+		Requires: mesa-libgbm >= 18.3.6
+		Requires: libva >= 2.4.0
+		Requires: libepoxy >= 1.5.3
+		Requires: lcms2 >= 2.9
+		Requires: vulkan-headers >= 1.1
+		Requires: mesa-vulkan-drivers
 		Requires: ca-certificates
-        Requires: libXScrnSaver
+		Requires: libXScrnSaver
 
 		Recommends: vorbis-tools >= 1.4.0
 		Recommends: lame >= 3.0
