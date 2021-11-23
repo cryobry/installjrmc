@@ -15,7 +15,7 @@
 shopt -s extglob
 
 _scriptversion="28.0a1"
-_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html"
+_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
 _exec_user="$(whoami)"
@@ -89,9 +89,9 @@ printHelpAndExit() {
 		    createrepo
 	EOF
 
-        # Exit using passed exit code
-        [[ ! -v 1 ]] && exit 0 || exit "$1"
-    }
+    # Exit using passed exit code
+    [[ ! -v 1 ]] && exit 0 || exit "$1"
+}
 
 
 init() {
@@ -452,7 +452,7 @@ installMCFromRepo() {
     fi
 
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        _mcpkg="mediacenter"
+        _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         _mcpkg="mediacenter$_mversion"
     fi
@@ -557,7 +557,7 @@ buildRPM() {
 
     # Create spec file
     cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
-		Name:    mediacenter
+		Name:    MediaCenter
 		Version: $_mcversion
 		Release: 1
 		Summary: JRiver Media Center
@@ -631,7 +631,7 @@ buildRPM() {
 		/etc/security/limits.d/*
 	EOF
 
-    declare -g _mcrpm="$_outputdir/RPMS/x86_64/mediacenter-$_mcversion.x86_64.rpm"
+    declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
     # skip rebuilding the rpm if it already exists
     if [[ -f "$_mcrpm" ]]; then
@@ -954,7 +954,7 @@ servicePrep() {
 #######################################
 # Starts and enables (at startup) a JRiver Media Center service
 # Arguments:
-#   Passes arguments as startup options to /usr/bin/mediacenter26
+#   Passes arguments as startup options to /usr/bin/mediacenter??
 # Requires:
 #   XAUTHORITY
 #######################################
@@ -1234,7 +1234,7 @@ uninstall() {
 
     echo "Uninstalling Media Center"
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_remove mediacenter
+        pkg_remove "MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         pkg_remove "mediacenter$_mversion"
     fi
