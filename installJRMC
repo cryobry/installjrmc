@@ -379,21 +379,21 @@ installPackage() {
 
     # Install from package name (with gpg check)
     if [[ ${#_pkg_array[@]} -ge 1 ]]; then
-        echo "Installing:" "${_pkg_array[@]}"
+        [[ ! -v _silent ]] && echo "Installing:" "${_pkg_array[@]}"
         if debug; then
             if ! pkg_install "${_pkg_array[@]}"; then
                 [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
                 return 1
             fi
         elif ! pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
-            [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
+            [[ ! -v _silent ]] && err "Failed to install ${_pkg_array[*]}. Attempting to continue..."
             return 1
         fi
     fi
 
     # Install from package url (without gpg check)
     if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
-        echo "Installing: " "${_url_pkg_array[@]}"
+        [[ ! -v _silent ]] && echo "Installing: " "${_url_pkg_array[@]}"
         if debug; then
             if ! pkg_install_nogpg "${_url_pkg_array[@]}"; then
                 [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
@@ -440,8 +440,8 @@ installMCFromRepo() {
     echo "Future updates will be handled by your package manager."
 
     if ! debug; then
-        echo "This may take a few minutes to complete"
-        echo "Use --debug for verbose output"
+        echo "This may take a few minutes to complete."
+        echo "Use --debug for more verbose output."
     fi
 
     addRepo
