@@ -298,7 +298,7 @@ getLatestVersion() {
 
     # Use a containerized package manager
     debug "Getting latest version using containerized apt"
-    [[ ! -x $(command -v buildah) ]] && installPackage buildah
+    [[ ! -x $(command -v buildah) ]] && installPackage --silent buildah
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from ubuntu:18.04); then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ buster main' > /etc/apt/sources.list 2>&1"
@@ -326,16 +326,20 @@ getLatestVersion() {
 #   One or more package names
 # Options:
 #   --noquery, -n: Do not query the package state (useful if installing a local RPM)
+#   --silent, -s: Do not report errors (useful if package is not strictly required)
 #######################################
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    if _input=$(getopt -o +n -l noquery -- "$@"); then
+    if _input=$(getopt -o +ns -l noquery,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
                 --noquery|-n)
                     local _noquery="true"
+                    ;;
+                --silent|-s)
+                    local _silent=true
                     ;;
                 --)
                     shift
@@ -370,11 +374,11 @@ installPackage() {
         echo "Installing:" "${_pkg_array[@]}"
         if debug; then
             if ! pkg_install "${_pkg_array[@]}"; then
-                err "Failed to install package. Attempting to continue..."
+                [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
                 return 1
             fi
         elif ! pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
-            err "Failed to install package. Attempting to continue..."
+            [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
             return 1
         fi
     fi
@@ -384,11 +388,11 @@ installPackage() {
         echo "Installing: " "${_url_pkg_array[@]}"
         if debug; then
             if ! pkg_install_nogpg "${_url_pkg_array[@]}"; then
-                err "Failed to install package. Attempting to continue..."
+                [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
                 return 1
             fi
         elif ! pkg_install_nogpg "${_url_pkg_array[@]}" > /dev/null 2>&1; then
-            err "Failed to install package. Attempting to continue..."
+            [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
             return 1
         fi
     fi
@@ -424,7 +428,8 @@ installMCFromRepo() {
 
     local _mcpkg
 
-    echo "Installing JRiver Media Center $_mcversion from repo..."
+    echo "Installing JRiver Media Center $_mcversion from repository."
+    echo "Future updates will be handled by your package manager."
 
     if ! debug; then
         echo "This may take a few minutes to complete"
