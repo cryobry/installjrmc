@@ -1154,10 +1154,10 @@ uninstall() {
     echo "Stopping and removing all associated Media Center services"
     for _service in $(compgen -A "function" "service"); do 
         setServiceVars "$_service"
-        if systemctl is-active "$_timer_name" || systemctl is-enabled "$_timer_name"; then 
+        if systemctl is-active -q "$_timer_name" || systemctl is-enabled -q "$_timer_name"; then 
             systemctl_disable "$_timer_name"
         fi
-        if systemctl is-active "$_service_name" || systemctl is-enabled "$_service_name"; then 
+        if systemctl is-active -q "$_service_name" || systemctl is-enabled -q "$_service_name"; then 
             systemctl_disable "$_service_name"
         fi
         [[ -f "$_service_fname" ]] && rm_cmd "$_service_fname"
