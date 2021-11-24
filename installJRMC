@@ -1150,18 +1150,21 @@ uninstall() {
         exit 0
     fi
 
-    # Uninstall services
     echo "Stopping and removing all associated Media Center services"
-    for _service in $(compgen -A "function" "service"); do 
+    for _service in $(compgen -A "function" "service"); do
+        _service="${_service##service_}"
+        echo "$_service"
         setServiceVars "$_service"
-        if systemctl is-active -q "$_timer_name" || systemctl is-enabled -q "$_timer_name"; then 
-            systemctl_disable "$_timer_name"
-        fi
-        if systemctl is-active -q "$_service_name" || systemctl is-enabled -q "$_service_name"; then 
-            systemctl_disable "$_service_name"
-        fi
-        [[ -f "$_service_fname" ]] && rm_cmd "$_service_fname"
-        [[ -f "$_timer_fname" ]] && rm_cmd "$_timer_fname"
+        for unit in "$_service."{service,timer}; do
+            if systemctl is-active -q "$unit" || systemctl is-enabled -q "$unit"; then
+                debug "Disabling $unit"
+                systemctl_disable "$unit"
+            fi
+        done
+        for f in "$_service_fname" "$_timer_fname"; do
+            debug "Removing $f"
+            rm_cmd "$f"
+        done
         systemctl_reload
     done
 
@@ -1182,7 +1185,7 @@ uninstall() {
             && rm_cmd /etc/ufw/applications.d/jriver
     fi
 
-    echo "Uninstalling Media Center"
+    echo "Uninstalling Media Center packages"
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         pkg_remove "MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
