@@ -298,7 +298,7 @@ parseInput() {
 
 
 #######################################
-# Uses several methods to determine the latest JRiver MC version
+# Use several methods to determine the latest JRiver MC version
 #######################################
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1139,9 +1139,6 @@ service_jriver-createrepo() {
 # }
 
 
-#######################################
-# Complete uninstall
-#######################################
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1175,11 +1172,11 @@ uninstall() {
 
     echo "Removing firewall rules"
     if [[ -x $(command -v firewall-cmd) ]]; then
-        firewall_cmd --permanent --remove-service=jriver
-        firewall_cmd --permanent --delete-service=jriver
+        firewall_cmd --permanent --remove-service=jriver > /dev/null 2>&1
+        firewall_cmd --permanent --delete-service=jriver > /dev/null 2>&1
         firewall_cmd --reload
     elif [[ -x $(command -v ufw) ]]; then
-        firewall_cmd delete allow jriver
+        firewall_cmd delete allow jriver > /dev/null 2>&1
         [[ -f "/etc/ufw/applications.d/jriver" ]] \
             && rm_cmd /etc/ufw/applications.d/jriver
     fi
