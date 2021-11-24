@@ -16,10 +16,13 @@
 shopt -s extglob
 
 _scriptversion="1.1.0"
-_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
 _exec_user="$(whoami)"
+
+# Version control
+_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
+# _mcversion="28.0.84" # set manually
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -37,7 +40,7 @@ printHelp() {
 		    --build
 		        Build RPM from source DEB (but don't install it)
 		    --mcversion VERSION
-		        Specify the MC version, ex. "28.0.25" (Default: scrape latest version from Interact)
+		        Specify the MC version, ex. "28.0.25" (Default: latest version)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: $PWD/output)
 		    --restorefile RESTOREFILE
@@ -191,6 +194,7 @@ ifSudo() {
     fi
 }
 
+
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -199,7 +203,7 @@ parseInput() {
         _install="repo"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container: -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -269,6 +273,10 @@ parseInput() {
                 --uninstall|-u)
                     _uninstall=true
                     ;;
+                --tests)
+                    echo "Running tests, all other options are skipped"
+                    tests
+                    ;;
                 --)
                     shift
                     break
@@ -318,8 +326,6 @@ getLatestVersion() {
 #   One or more package names
 # Options:
 #   --noquery, -n: Do not query the package state (useful if installing a local RPM)
-# Returns:
-#   Returns 1 if failed
 #######################################
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
@@ -390,7 +396,7 @@ installPackage() {
 
 
 #######################################
-# Adds the JRiver repos per distro
+# Adds the JRiver repos
 #######################################
 addRepo() {
     debug "Running: ${FUNCNAME[0]}"
@@ -468,8 +474,6 @@ installMCFromRepo() {
 
 #######################################
 # Acquire the source DEB package from JRiver's servers
-# Returns:
-#   0 if DEB file downloaded successfully, 1 if failed
 #######################################
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
@@ -510,8 +514,6 @@ acquireDeb() {
 
 #######################################
 # Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
-# Returns:
-#   0 if rpmbuild is successful, 1 if not
 #######################################
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
@@ -626,8 +628,6 @@ buildRPM() {
 
 #######################################
 # Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
-# Returns:
-#   0 if createrepo is successful, 1 if not
 #######################################
 runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
@@ -680,8 +680,6 @@ runCreaterepo() {
 
 #######################################
 # Symlink certificates where JRiver Media Center expects them to be on Fedora/CentOS
-# Returns:
-#   0 if symlinking is unecessary or successful, 1 if not
 #######################################
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
@@ -699,8 +697,6 @@ symlinkCerts() {
 #######################################
 # Automatically restore the mjr license file if it is found next to 
 # installJRMC or _restorefile is set
-# Returns:
-#   0 if license restored successfully or skipped, 1 if unsuccessful
 #######################################
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
@@ -728,8 +724,6 @@ restoreLicense() {
 # Opens ports using the system firewall tool
 # Arguments
 #   Pre-defined service to enable
-# Returns:
-#   0 if ports opened sucessfully, 1 if not
 #######################################
 openFirewall() {
     debug "Running: ${FUNCNAME[0]}" "$@"
@@ -783,8 +777,6 @@ openFirewall() {
 
 #######################################
 # Create the x11vnc password file
-# Returns:
-#   0 if password created sucessfully, 1 if not
 #######################################
 setX11VNCPass() {
     debug "Running: ${FUNCNAME[0]}"
@@ -816,8 +808,6 @@ setX11VNCPass() {
 
 #######################################
 # Create the Xvnc password file
-# Returns:
-#   0 if password created sucessfully, 1 if not
 #######################################
 setVNCPass() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1188,10 +1178,8 @@ uninstall() {
 
 
 tests() {
-
     # To test on Mint: sudo apt-get install -y spice-vdagent ca-certificates git
-    :
-
+    exit $?
 }
 
 
@@ -1236,7 +1224,7 @@ main() {
         runCreaterepo
     fi
 
-    # Install the rpm
+    # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
         installPackage --noquery "$_mcrpm"
         symlinkCerts
