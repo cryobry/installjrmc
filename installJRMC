@@ -16,7 +16,7 @@
 shopt -s extglob
 
 _scriptversion="1.1.0"
-_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28
+_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
 _exec_user="$(whoami)"
@@ -151,10 +151,10 @@ init() {
     _mversion="${_mcversion%%.*}"
 
     # Saving this substituion in case it's needed in the future
-    #_variation="${_mcversion##*.}"
+    # _variation="${_mcversion##*.}"
 }
 
-# HELPERS
+
 askOk() {
     local _response
     read -r -p "$* [y/N]" _response
@@ -174,7 +174,6 @@ debug() {
 err() { echo "Error: $*" >&2; }
 getOS() {
     debug "Running: ${FUNCNAME[0]}"
-
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
     else
@@ -182,7 +181,6 @@ getOS() {
         err "Your OS is unsupported"
         printHelp && exit 1
     fi
-
     debug "Platform: $ID $VERSION_ID"
 }
 ifSudo() {
@@ -193,10 +191,6 @@ ifSudo() {
     fi
 }
 
-
-#######################################
-# Parse CLI input from the user w/ getopt
-#######################################
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -289,19 +283,15 @@ parseInput() {
 }
 
 
-#######################################
-# If no MC version is provided, find the latest
-# Optional (only required if container method fails):
-#   _boardurl
-#######################################
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g _mcversion _source
 
     # Use a containerized package manager
+    debug "Getting latest version using containerized apt"
     [[ ! -x $(command -v buildah) ]] && installPackage buildah
-    if CNT=$(buildah from ubuntu:18.04); then 
+    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from ubuntu:18.04); then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ buster main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
@@ -329,7 +319,7 @@ getLatestVersion() {
 # Options:
 #   --noquery, -n: Do not query the package state (useful if installing a local RPM)
 # Returns:
-#   Will return 1 if failed
+#   Returns 1 if failed
 #######################################
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
@@ -353,8 +343,8 @@ installPackage() {
         exit 1
     fi
 
-    local -a _pkg_array
-    local -a _url_pkg_array
+    local -a _pkg_array _url_pkg_array
+    local -a _pkg
 
     # Parse packages
     for _pkg in "$@"; do
@@ -400,7 +390,7 @@ installPackage() {
 
 
 #######################################
-# Adds the appropriate repository files (by distro)
+# Adds the JRiver repos per distro
 #######################################
 addRepo() {
     debug "Running: ${FUNCNAME[0]}"
@@ -422,8 +412,6 @@ addRepo() {
 
 #######################################
 # Installs JRiver Media Center from a repository
-# Returns:
-#   0 if JRiver Media Center installed sucessfully
 #######################################
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
@@ -480,8 +468,6 @@ installMCFromRepo() {
 
 #######################################
 # Acquire the source DEB package from JRiver's servers
-# Globals:
-#   DEBFILENAME
 # Returns:
 #   0 if DEB file downloaded successfully, 1 if failed
 #######################################
@@ -524,14 +510,6 @@ acquireDeb() {
 
 #######################################
 # Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
-# Requires:
-#   _outputdir
-#   ID
-#   _mcversion
-#   _mversion
-#   installPackage
-# Globals:
-#   _mcrpm
 # Returns:
 #   0 if rpmbuild is successful, 1 if not
 #######################################
@@ -648,10 +626,6 @@ buildRPM() {
 
 #######################################
 # Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
-# Arguments:
-#   Requires one argument, the path to the RPM file (typically _mcrpm)
-# Requires:
-#   _createrepo_webroot
 # Returns:
 #   0 if createrepo is successful, 1 if not
 #######################################
@@ -677,8 +651,6 @@ runCreaterepo() {
 
     installPackage createrepo_c
 
-    local _rpmfile="$1"
-
     # If the webroot does not exist, create it
     if [[ ! -d "$_createrepo_webroot" ]]; then
         if ! cr_mkdir_cmd "$_createrepo_webroot"; then
@@ -689,7 +661,7 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    if ! cr_cp_cmd -f "$_rpmfile" "$_createrepo_webroot"; then
+    if ! cr_cp_cmd -f "$_mcrpm" "$_createrepo_webroot"; then
         err "Could not copy the RPM to the createrepo-webroot path"
         err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $_createrepo_user"
         return 1
@@ -725,11 +697,8 @@ symlinkCerts() {
 
 
 #######################################
-# Automatically restore the mjr license file if it is found next to installJRMC or _restorefile
-# is set
-# Requires:
-#   _restorefile OR _basedir
-#   _mversion
+# Automatically restore the mjr license file if it is found next to 
+# installJRMC or _restorefile is set
 # Returns:
 #   0 if license restored successfully or skipped, 1 if unsuccessful
 #######################################
@@ -758,12 +727,7 @@ restoreLicense() {
 #######################################
 # Opens ports using the system firewall tool
 # Arguments
-#   Service to enable (pre-defined)
-# Requires:
-#   ID
-#   bash_cmd
-#   firewall_cmd
-#   _port
+#   Pre-defined service to enable
 # Returns:
 #   0 if ports opened sucessfully, 1 if not
 #######################################
@@ -819,8 +783,6 @@ openFirewall() {
 
 #######################################
 # Create the x11vnc password file
-# Globals:
-#   _novncauth
 # Returns:
 #   0 if password created sucessfully, 1 if not
 #######################################
@@ -887,11 +849,6 @@ setVNCPass() {
 
 #######################################
 # Set display and port variables
-# Globals:
-#   _display
-#   _displaynum
-#   _next_display
-#   _next_displaynum
 #######################################
 setDisplay() {
     debug "Running: ${FUNCNAME[0]}"
@@ -918,14 +875,6 @@ setDisplay() {
 
 #######################################
 # Create associated service variables based on service name
-# Requires:
-#   _service_user
-# Globals:
-#   _service_fname
-#   _timer_fname
-#   _service_name
-#   _timer_name
-#   _user_specifier
 #######################################
 servicePrep() {
     debug "Running: ${FUNCNAME[0]}"
@@ -950,8 +899,6 @@ servicePrep() {
 # Starts and enables (at startup) a JRiver Media Center service
 # Arguments:
 #   Passes arguments as startup options to /usr/bin/mediacenter??
-# Requires:
-#   XAUTHORITY
 #######################################
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1286,7 +1233,7 @@ main() {
 
     # Run createrepo
     if [[ -v _createrepo ]]; then
-        runCreaterepo "$_mcrpm"
+        runCreaterepo
     fi
 
     # Install the rpm
