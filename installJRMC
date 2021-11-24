@@ -15,7 +15,7 @@
 
 shopt -s extglob
 
-_scriptversion="1.1.0"
+_scriptversion="1.0b1"
 _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
 _exec_user="$(whoami)"
@@ -146,9 +146,15 @@ init() {
     # Install script dependencies
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
-    [[ ! -v _mcversion ]] && getLatestVersion
+    if [[ -v _mcversion ]]; then
+        _version_source="user input"
+    else
+        getLatestVersion
+    fi
 
-    [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && echo "Invalid version number" && exit 1
+    [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
+
+    debug "Using MC version $_mcversion determined by $_version_source"
 
     # Extract major version number
     _mversion="${_mcversion%%.*}"
@@ -157,7 +163,7 @@ init() {
     # _variation="${_mcversion##*.}"
 }
 
-
+# Some helper functions
 askOk() {
     local _response
     read -r -p "$* [y/N]" _response
@@ -291,13 +297,15 @@ parseInput() {
 }
 
 
+#######################################
+# Uses several methods to determine the latest JRiver MC version
+#######################################
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g _mcversion _source
+    declare -g _mcversion
 
     # Use a containerized package manager
-    debug "Getting latest version using containerized apt"
     [[ ! -x $(command -v buildah) ]] && installPackage --silent buildah
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from ubuntu:18.04); then 
         buildah run "$CNT" -- bash -c \
@@ -305,12 +313,12 @@ getLatestVersion() {
         buildah run "$CNT" -- bash  -c \
             "apt-get update --allow-insecure-repositories -y > /dev/null 2>&1"
         if _mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1); then
-            _source="containerized package manager"
+            _version_source="containerized package manager"
         fi
         buildah rm "$CNT" > /dev/null 2>&1
     # Else scrape from Interact
     elif _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
-        _source="Interact scrape"
+        _version_source="webscrape"
     fi
 
     if ! [[ -v _mcversion ]]; then
@@ -871,7 +879,7 @@ setDisplay() {
 #######################################
 # Create associated service variables based on service name
 #######################################
-servicePrep() {
+setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
     if [[ "$_service_user" == "root" ]]; then
@@ -1145,11 +1153,16 @@ uninstall() {
     # Uninstall services
     echo "Stopping and removing all associated Media Center services"
     for _service in $(compgen -A "function" "service"); do 
-        servicePrep "$_service"
-        systemctl_disable "$_service_name"
-        systemctl_disable "$_timer_name"
+        setServiceVars "$_service"
+        if systemctl is-active "$_timer_name" || systemctl is-enabled "$_timer_name"; then 
+            systemctl_disable "$_timer_name"
+        fi
+        if systemctl is-active "$_service_name" || systemctl is-enabled "$_service_name"; then 
+            systemctl_disable "$_service_name"
+        fi
         [[ -f "$_service_fname" ]] && rm_cmd "$_service_fname"
         [[ -f "$_timer_fname" ]] && rm_cmd "$_timer_fname"
+        systemctl_reload
     done
 
     echo "Removing repo files"
@@ -1240,7 +1253,7 @@ main() {
     # Install services
     setDisplay
     for _service in "${_services[@]}"; do
-        servicePrep "$_service"
+        setServiceVars "$_service"
         if ! "service_$_service"; then
             if [[ $? -eq 127 ]]; then
                 err "Service $_service does not exist, check your service name"
