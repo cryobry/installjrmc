@@ -120,7 +120,7 @@ init() {
         pkg_install(){ ifSudo apt-get install -y -q0 "$@"; }
         pkg_reinstall(){ ifSudo apt-get reinstall -y -q0 "$@"; }
         pkg_install_nogpg(){ ifSudo apt-get install -y -q0 "$@"; }
-        pkg_remove(){ ifSudo apt-get remove -y -q0 "$@"; }
+        pkg_remove(){ ifSudo apt-get remove --auto-remove -y -q0 "$@"; }
         pkg_update(){ ifSudo apt-get update -y -q0; }
         pkg_query(){ ifSudo dpkg -s "$@"; }
         firewall_cmd(){ ifSudo ufw "$@"; }
