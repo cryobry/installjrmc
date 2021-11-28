@@ -22,7 +22,7 @@ _exec_user="$(whoami)"
 
 # Version control
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
-# _mcversion="28.0.84" # set manually
+# _mcversion="28.0.84" # to set manually
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -114,7 +114,6 @@ init() {
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         pkg_install(){ ifSudo dnf install -y "$@"; }
         pkg_reinstall(){ ifSudo dnf reinstall -y "$@"; }
-        pkg_install_nogpg(){ ifSudo dnf install --nogpgcheck -y "$@"; }
         pkg_remove(){ ifSudo dnf remove -y "$@"; }
         pkg_update(){ ifSudo dnf makecache; }
         pkg_query(){ ifSudo rpm -q "$@"; }
@@ -122,7 +121,6 @@ init() {
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         pkg_install(){ ifSudo apt-get install -y -q0 "$@"; }
         pkg_reinstall(){ ifSudo apt-get reinstall -y -q0 "$@"; }
-        pkg_install_nogpg(){ ifSudo apt-get install -y -q0 "$@"; }
         pkg_remove(){ ifSudo apt-get remove --auto-remove -y -q0 "$@"; }
         pkg_update(){ ifSudo apt-get update -y -q0; }
         pkg_query(){ ifSudo dpkg -s "$@"; }
@@ -306,6 +304,7 @@ getLatestVersion() {
     declare -g _mcversion
 
     # Use a containerized package manager
+    # TODO but how to determine build distro ('buster')?
     [[ ! -x $(command -v buildah) ]] && installPackage --silent buildah
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from ubuntu:18.04); then 
         buildah run "$CNT" -- bash -c \
@@ -333,18 +332,28 @@ getLatestVersion() {
 # Arguments:
 #   One or more package names
 # Options:
-#   --noquery, -n: Do not query the package state (useful if installing a local RPM)
-#   --silent, -s: Do not report errors (useful if package is not strictly required)
+#   --no-check: Do not check if package is already installed
+#   --no-gpg: Disable GPG checks for RPM based distros
+#   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    if _input=$(getopt -o +ns -l noquery,silent -- "$@"); then
+    local -a _pkg_array
+    local -a _pkg
+    local _gpg=""
+
+    if _input=$(getopt -o +s -l no-check,no-gpg,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
-                --noquery|-n)
-                    local _noquery="true"
+                --no-check)
+                    local _no_check=true
+                    ;;
+                --no-gpg)
+                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                        _gpg="--nogpgcheck"
+                    fi
                     ;;
                 --silent|-s)
                     local _silent=true
@@ -361,54 +370,33 @@ installPackage() {
         exit 1
     fi
 
-    local -a _pkg_array _url_pkg_array
-    local -a _pkg
-
-    # Parse packages
     for _pkg in "$@"; do
+        # Check for alias
         [[ -v PKG_ALIASES && -v PKG_ALIASES["$_pkg"] ]] && _pkg=PKG_ALIASES["$_pkg"]
-        # Insert the package name to test if already installed
-        if [[ -v _noquery ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
-            if [[ -v _url_pkg ]]; then
-                _url_pkg_array+=("$_url_pkg")
-            else
-                _pkg_array+=("$_pkg")
-            fi
+        # Check if already installed
+        if [[ -v _no_check ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
+            _pkg_array+=("$_pkg")
         fi
     done
 
-    # Install from package name (with gpg check)
+    # Install from package name
     if [[ ${#_pkg_array[@]} -ge 1 ]]; then
-        [[ ! -v _silent ]] && echo "Installing:" "${_pkg_array[@]}"
+        debug "Installing: ${_pkg_array[*]}"
         if debug; then
-            if ! pkg_install "${_pkg_array[@]}"; then
-                [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
-                return 1
-            fi
-        elif ! pkg_install "${_pkg_array[@]}" > /dev/null 2>&1; then
-            [[ ! -v _silent ]] && err "Failed to install ${_pkg_array[*]}. Attempting to continue..."
-            return 1
+            debug "pkg_install $_gpg ${_pkg_array[*]}"
+            pkg_install "$_gpg" "${_pkg_array[@]}"
+        else
+            pkg_install "$_gpg" "${_pkg_array[@]}" > /dev/null 2>&1
         fi
-    fi
-
-    # Install from package url (without gpg check)
-    if [[ ${#_url_pkg_array[@]} -ge 1 ]]; then
-        [[ ! -v _silent ]] && echo "Installing: " "${_url_pkg_array[@]}"
-        if debug; then
-            if ! pkg_install_nogpg "${_url_pkg_array[@]}"; then
-                [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
-                return 1
-            fi
-        elif ! pkg_install_nogpg "${_url_pkg_array[@]}" > /dev/null 2>&1; then
-            [[ ! -v _silent ]] && err "Failed to install package. Attempting to continue..."
-            return 1
-        fi
+        local _return=$?       
+        [[ $_return -ne 0 && ! -v _silent ]] && err "Failed to install ${_pkg_array[*]}. Attempting to continue..."
+        return $_return
     fi
 }
 
 
 #######################################
-# Adds the JRiver repos
+# Add the JRiver repository files
 #######################################
 addRepo() {
     debug "Running: ${FUNCNAME[0]}"
@@ -441,7 +429,7 @@ installMCFromRepo() {
 
     if ! debug; then
         echo "This may take a few minutes to complete."
-        echo "Use --debug for more verbose output."
+        echo "Use --debug for verbose output."
     fi
 
     addRepo
@@ -461,24 +449,17 @@ installMCFromRepo() {
 
     if [[ -v _specific_version ]]; then
         if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-            if debug; then
-                installPackage "$_mcpkg-$_mcversion"
-            else
-                installPackage "$_mcpkg-$_mcversion" > /dev/null 2>&1
-            fi
+            _mcpkg="$_mcpkg-$_mcversion"
         elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-            if debug; then
-                installPackage "$_mcpkg=$_mcversion"
-            else
-                installPackage "$_mcpkg=$_mcversion" > /dev/null 2>&1
-            fi
+            _mcpkg="$_mcpkg=$_mcversion"
         fi
+    fi
+
+    if debug; then
+        debug "installPackage $_mcpkg"
+        installPackage "$_mcpkg"
     else
-        if debug; then
-            installPackage "$_mcpkg"
-        else
-            installPackage "$_mcpkg" > /dev/null 2>&1
-        fi
+        installPackage "$_mcpkg" > /dev/null 2>&1
     fi
 
     return $?
@@ -514,12 +495,12 @@ acquireDeb() {
     "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb"; then
         echo "Found!"
     else
-        err "Cannot find DEB file. Exiting..."
+        err "Cannot find DEB file."
         exit 1
     fi
 
     if [[ ! -f "$DEBFILENAME" ]]; then
-        err "Downloaded DEB file missing or corrupted, exiting..."
+        err "Downloaded DEB file missing or corrupted."
         exit 1
     fi
 }
@@ -1183,9 +1164,9 @@ uninstall() {
 
     echo "Uninstalling Media Center packages"
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_remove "MediaCenter"
+        pkg_remove "-q" "MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        pkg_remove "mediacenter$_mversion"
+        pkg_remove "-q" "mediacenter$_mversion"
     fi
 
     echo "JRiver Media Center has been completely uninstalled"
@@ -1195,7 +1176,7 @@ uninstall() {
 
 
 tests() {
-    # To test on Mint: sudo apt-get install -y spice-vdagent ca-certificates git
+    # To test on Mint: sudo apt-get install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
     exit $?
 }
 
@@ -1228,7 +1209,7 @@ main() {
     if [[ -v _build ]]; then
         acquireDeb
         if ! buildRPM || [[ ! -f "$_mcrpm" ]] ; then
-            err "Build failed. Exiting..."
+            err "Build failed."
             [[ -f "$DEBFILENAME" ]] && echo "Removing source DEB" && rm -f "$DEBFILENAME"
             exit 1
         else
@@ -1243,7 +1224,7 @@ main() {
 
     # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
-        installPackage --noquery "$_mcrpm"
+        installPackage --no-check "$_mcrpm"
         symlinkCerts
         restoreLicense
         openFirewall "jriver"
