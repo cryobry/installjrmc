@@ -1242,7 +1242,7 @@ main() {
 
     # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
-        installPackage --nocheck "$_mcrpm"
+        installPackage --no-check --nogpgcheck "$_mcrpm"
         symlinkCerts
         restoreLicense
         openFirewall "jriver"
