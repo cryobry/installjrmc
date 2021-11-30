@@ -125,6 +125,14 @@ init() {
         pkg_update(){ ifSudo apt-get update -y -q0; }
         pkg_query(){ ifSudo dpkg -s "$@"; }
         firewall_cmd(){ ifSudo ufw "$@"; }
+    elif [[ "$ID" =~ ^opensuse.* ]]; then
+        echo "Experimental SUSE support"
+        pkg_install(){ ifSudo zypper install -y -q "$@"; }
+        pkg_reinstall(){ ifSudo zypper install -y -q -f "$@"; }
+        pkg_remove(){ ifSudo zypper remove --clean-deps -y -q "$@"; }
+        pkg_update(){ ifSudo zypper update -y -q; }
+        pkg_query(){ ifSudo rpm -q "$@"; }
+        firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     fi
 
     parseInput "$@"
@@ -215,7 +223,7 @@ parseInput() {
                     shift 
                     _install="$1"
                     if [[ "$_install" == "rpm" ]]; then
-                        if [[ ! "$ID" =~ ^(fedora|centos)$ ]]; then
+                        if [[ ! "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
                             err "RPM install method not available on $ID"
                             printHelp && exit 1
                         fi
@@ -333,26 +341,27 @@ getLatestVersion() {
 #   One or more package names
 # Options:
 #   --no-check: Do not check if package is already installed
-#   --no-gpg: Disable GPG checks for RPM based distros
+#   --nogpgcheck: Disable GPG checks for RPM based distros
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    local -a _pkg_array
-    local -a _pkg
-    local _gpg=""
+    local -a _pkg_array _install_flags
+    local _pkg
 
-    if _input=$(getopt -o +s -l no-check,no-gpg,silent -- "$@"); then
+    if _input=$(getopt -o +s -l no-check,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
                 --no-check)
                     local _no_check=true
                     ;;
-                --no-gpg)
+                --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        _gpg="--nogpgcheck"
+                        _install_flags+=("--nogpgcheck")
+                    elif [[ "$ID" =~ ^opensuse.* ]]; then
+                        _install_flags+=("--allow-unsigned-rpm")
                     fi
                     ;;
                 --silent|-s)
@@ -379,14 +388,14 @@ installPackage() {
         fi
     done
 
-    # Install from package name
+    # Install packages from package array
     if [[ ${#_pkg_array[@]} -ge 1 ]]; then
         debug "Installing: ${_pkg_array[*]}"
         if debug; then
-            debug "pkg_install $_gpg ${_pkg_array[*]}"
-            pkg_install "$_gpg" "${_pkg_array[@]}"
+            debug "pkg_install ${_installflags[*]} ${_pkg_array[*]}"
+            pkg_install "${_install_flags[@]}" "${_pkg_array[@]}"
         else
-            pkg_install "$_gpg" "${_pkg_array[@]}" > /dev/null 2>&1
+            pkg_install "${_install_flags[@]}" "${_pkg_array[@]}" > /dev/null 2>&1
         fi
         local _return=$?       
         [[ $_return -ne 0 && ! -v _silent ]] && err "Failed to install ${_pkg_array[*]}. Attempting to continue..."
@@ -412,6 +421,8 @@ addRepo() {
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
         ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list" > /dev/null 2>&1
+    elif [[ "$ID" =~ ^opensuse.* ]]; then
+        ifSudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver
     fi
 }
 
@@ -441,14 +452,14 @@ installMCFromRepo() {
         exit 1
     fi
 
-    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         _mcpkg="mediacenter$_mversion"
     fi
 
     if [[ -v _specific_version ]]; then
-        if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
             _mcpkg="$_mcpkg-$_mcversion"
         elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
             _mcpkg="$_mcpkg=$_mcversion"
@@ -456,10 +467,10 @@ installMCFromRepo() {
     fi
 
     if debug; then
-        debug "installPackage $_mcpkg"
-        installPackage "$_mcpkg"
+        debug "installPackage --no-check $_mcpkg"
+        installPackage --no-check --nogpgcheck "$_mcpkg"
     else
-        installPackage "$_mcpkg" > /dev/null 2>&1
+        installPackage --no-check --nogpgcheck "$_mcpkg" > /dev/null 2>&1
     fi
 
     return $?
@@ -520,7 +531,7 @@ buildRPM() {
 
     # rpmbuild uses rpm to check for build dependencies
     # this will fail on non-rpm distros
-    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         local _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
     fi
 
@@ -734,7 +745,7 @@ openFirewall() {
     fi
 
     # Open the ports
-    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         [[ ! -x $(command -v firewall-cmd) ]] && installPackage firewalld
         if ! firewall_cmd --get-services | grep -q "$1"; then
             firewall_cmd --permanent --new-service="$1" > /dev/null 2>&1
@@ -981,9 +992,7 @@ service_jriver-x11vnc() {
     # Get current desktop resolution
     # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
     _getResolution() {
-
         debug "Running: ${FUNCNAME[0]}"
-
         installPackage xorg-x11-utils
         _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
     }
@@ -1163,15 +1172,24 @@ uninstall() {
     fi
 
     echo "Uninstalling Media Center packages"
-    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_remove "-q" "MediaCenter"
+    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
+        _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        pkg_remove "-q" "mediacenter$_mversion"
+        _mcpkg="mediacenter$_mversion"
+    fi
+
+    if debug; then
+        debug "pkg_remove -q $_mcpkg"
+        pkg_remove "-q" "MediaCenter"
+    else
+        pkg_remove "-q" "MediaCenter" > /dev/null 2>&1
     fi
 
     echo "JRiver Media Center has been completely uninstalled"
     echo "If you wish to remove your library files: rm -rf $HOME/.jriver"
     echo "If you wish to remove your rpmbuild output files: rm -rf $_outputdir"
+
+    exit 0
 }
 
 
@@ -1224,7 +1242,7 @@ main() {
 
     # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
-        installPackage --no-check "$_mcrpm"
+        installPackage --nocheck "$_mcrpm"
         symlinkCerts
         restoreLicense
         openFirewall "jriver"
