@@ -392,7 +392,7 @@ installPackage() {
     for _pkg in "$@"; do
         # Check for alias
         if [[ -v PKG_ALIASES["$_pkg"] ]]; then
-            _pkg=PKG_ALIASES["$_pkg"]
+            _pkg=${PKG_ALIASES[$_pkg]}
         fi
         # Check if already installed
         if [[ -v _no_check ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
