@@ -537,7 +537,7 @@ buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
     # install build dependencies
-    installPackage wget dpkg rpm-build
+    installPackage "wget" "dpkg" "rpm-build"
 
     # If necessary, make build directories
     [[ ! -d "$_outputdir/SPECS" ]] && mkdir -p "$_outputdir/SPECS"
