@@ -3,3 +3,6 @@
 testing.sh
 .lock
 tests
+mwe*
+test*
+container*
