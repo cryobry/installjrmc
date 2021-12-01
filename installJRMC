@@ -389,6 +389,8 @@ installPackage() {
         exit 1
     fi
 
+    debug "${PKG_ALIASES[@]}"
+
     for _pkg in "$@"; do
         # Check for alias
         if [[ -v PKG_ALIASES && -v PKG_ALIASES["$_pkg"] ]]; then
