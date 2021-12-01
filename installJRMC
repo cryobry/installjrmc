@@ -22,6 +22,7 @@ _exec_user="$(whoami)"
 
 # MC version
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
+_base="buster" # TODO maybe support for older versions and legacy distros? A lot of work...
 # _mcversion="28.0.87" # to set manually
 
 printHelp() {
@@ -215,8 +216,6 @@ ifSudo() {
         sudo -u "$_user" "$@"
     fi
 }
-
-
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -322,11 +321,11 @@ getLatestVersion() {
     declare -g _mcversion
 
     # Use a containerized package manager
-    # TODO but how to determine build distro ('buster')?
+    # TODO but how to determine build distro ($_base=buster)?
     [[ ! -x $(command -v buildah) ]] && installPackage --silent buildah
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from ubuntu:18.04); then 
         buildah run "$CNT" -- bash -c \
-            "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ buster main' > /etc/apt/sources.list 2>&1"
+            "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $_base main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
             "apt-get update --allow-insecure-repositories -y > /dev/null 2>&1"
         if _mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1); then
