@@ -890,7 +890,7 @@ setServiceVars() {
         _service_fname="/usr/lib/systemd/system/${1}.service"
         _timer_fname="/usr/lib/systemd/system/${1}.timer"
         _service_name="jriver-${1}.service"
-        _timer_name="jriver-${1}}.timer"
+        _timer_name="jriver-${1}.timer"
         _user_specifier=""
     else
         _service_fname="/usr/lib/systemd/system/${1}@.service"
@@ -1153,13 +1153,14 @@ uninstall() {
     for _service in $(compgen -A "function" "service"); do
         _service="${_service##service_}"
         setServiceVars "$_service"
-        for unit in "$_service."{service,timer}; do
+        for unit in "$_service_name."{service,timer} "$_service_name@$_service_user."{service,timer}; do
             if systemctl is-active -q "$unit" > /dev/null 2>&1 || systemctl is-enabled -q "$unit" > /dev/null 2>&1; then
                 debug "Disabling $unit"
                 systemctl_disable "$unit"
             fi
         done
-        for f in "$_service_fname" "$_timer_fname"; do
+        for f in "/usr/lib/systemd/system/${_service_name}."{service,timer} \
+                 "/usr/lib/systemd/system/${_service_name}@${_service_user}."{service,timer}; do
             debug "Removing $f"
             rm_cmd "$f"
         done
