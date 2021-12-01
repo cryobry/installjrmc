@@ -389,12 +389,9 @@ installPackage() {
         exit 1
     fi
 
-    debug "${PKG_ALIASES[@]}"
-
     for _pkg in "$@"; do
         # Check for alias
-        if [[ -v PKG_ALIASES && -v PKG_ALIASES["$_pkg"] ]]; then
-            debug "Aliasing $_pkg to ${PKG_ALIASES[$_pkg]}"
+        if [[ -v PKG_ALIASES["$_pkg"] ]]; then
             _pkg=PKG_ALIASES["$_pkg"]
         fi
         # Check if already installed
