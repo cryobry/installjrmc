@@ -17,7 +17,7 @@ shopt -s extglob
 
 _scriptversion="1.0b1"
 _outputdir="$PWD/output"
-_createrepo_webroot="/srv/jriver"
+_createrepo_webroot="/var/wwww/jriver"
 _exec_user="$(whoami)"
 
 # MC version
@@ -56,7 +56,7 @@ printHelp() {
 		    --createrepo
 		        Build rpm, copy to webroot, and run createrepo
 		        --createrepo-webroot PATH
-		            The webroot directory to install the repo (Default: /srv/jriver/)
+		            The webroot directory to install the repo (Default: /var/www/jriver)
 		        --createrepo-user USER
 		            The web server user (Default: current user)
 		    --version, -v
@@ -503,16 +503,16 @@ acquireDeb() {
     if [[ -f "$DEBFILENAME" ]]; then
         echo "Using local DEB file: $DEBFILENAME"
     elif [[ -v _betapass ]]; then
-        echo -n "Checking beta repo..."
+        echo "Checking beta repo..."
         if wget -q -O "$DEBFILENAME" \
         "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$_mcversion-amd64.deb"; then
             echo "Found!"
         fi
-    elif echo -n "Checking test repo..." && wget -q -O "$DEBFILENAME" \
+    elif echo "Checking test repo..." && wget -q -O "$DEBFILENAME" \
     "https://files.jriver.com/mediacenter/test/MediaCenter-$_mcversion-amd64.deb"; then
         echo "Found!"
     # Else check latest repo
-    elif echo -n "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
+    elif echo "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
     "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb"; then
         echo "Found!"
     else
@@ -654,22 +654,35 @@ runCreaterepo() {
     # If the webroot does not exist, create it
     if [[ ! -d "$_createrepo_webroot" ]]; then
         if ! ifSudo -u "$_createrepo_user" mkdir -p "$_createrepo_webroot"; then
-            err "Could not create the createrepo-webroot path!"
-            err "Make sure that the createrepo-webroot is writeable by createrepo-user: $_createrepo_user"
-            return 1
+            if ifSudo mkdir -p "$_createrepo_webroot" && \
+                ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
+                :
+            else
+                err "Could not create the createrepo-webroot path!"
+                err "Make sure that the createrepo-webroot is writeable by createrepo-user: $_createrepo_user"
+                return 1
+            fi
         fi
     fi
 
     # Copy built rpms to webroot
+    debug "ifSudo -u $_createrepo_user cp -n -f $_mcrpm $_createrepo_webroot"
     if ! ifSudo -u "$_createrepo_user" cp -n -f "$_mcrpm" "$_createrepo_webroot"; then
-        err "Could not copy the RPM to the createrepo-webroot path"
-        err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $_createrepo_user"
-        return 1
+        debug "ifSudo cp -n -f $_mcrpm $_createrepo_webroot"
+        if ifSudo cp -n -f "$_mcrpm" "$_createrepo_webroot" && \
+            ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
+            :
+        else
+            err "Could not copy $_mcrpm to $_createrepo_webroot"
+            err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $_createrepo_user"
+            return 1
+        fi
     fi
 
     # Run createrepo
     createrepo_cmd=("sudo" "-u" "$_createrepo_user" "createrepo" "-q")
     [[ -d "$_createrepo_webroot" ]] && createrepo_cmd+=("--update")
+    debug "${createrepo_cmd[*]} $_createrepo_webroot"
     if "${createrepo_cmd[@]}" "$_createrepo_webroot"; then
         echo "Successfully updated repo"
         return 0
