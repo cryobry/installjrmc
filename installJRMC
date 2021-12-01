@@ -12,6 +12,7 @@
 #   1. Raspberry Pi OS support
 #   2. Interactive installation (ncurses?)
 #   3. Additional containerization
+#   4. Tests
 
 shopt -s extglob
 
@@ -77,8 +78,8 @@ printHelp() {
 		    jriver-x11vnc
 		        Enable and start x11vnc for the local desktop (requires an existing X server)
 		        Usually combined with jriver-mediaserver or jriver-mediacenter services
-		        --vncpass and --display are optional (see 'jriver-xvnc-mediacenter' below)
-		    jriver-xvnc-mediacenter
+		        --vncpass and --display are optional (see below)
+		    jriver-xvnc
 		        Enable and start a new Xvnc session running JRiver Media Center
 		        --vncpass PASSWORD
 		            Set vnc password for x11vnc/Xvnc access. If no password is set, the script
@@ -390,7 +391,10 @@ installPackage() {
 
     for _pkg in "$@"; do
         # Check for alias
-        [[ -v PKG_ALIASES && -v PKG_ALIASES["$_pkg"] ]] && _pkg=PKG_ALIASES["$_pkg"]
+        if [[ -v PKG_ALIASES && -v PKG_ALIASES["$_pkg"] ]]; then
+            debug "Aliasing $_pkg to ${PKG_ALIASES[$_pkg]}"
+            _pkg=PKG_ALIASES["$_pkg"]
+        fi
         # Check if already installed
         if [[ -v _no_check ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
             _pkg_array+=("$_pkg")
@@ -948,7 +952,7 @@ service_jriver-mediaserver() {
 #######################################
 # Starts and enables (at startup) JRiver Media Center in a new Xvnc session
 #######################################
-service_jriver-xvnc-mediacenter() {
+service_jriver-xvnc() {
     debug "Running: ${FUNCNAME[0]}"
 
     installPackage tigervnc-server
@@ -1143,7 +1147,7 @@ service_jriver-createrepo() {
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if ! askOk "Do you really want to uninstall JRiver Media Center?"; then
+    if ! askOk "Do you really want to uninstall JRiver Media Center"; then
         echo "Cancelling uninstall..."
         exit 0
     fi
