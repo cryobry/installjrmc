@@ -20,9 +20,9 @@ _outputdir="$PWD/output"
 _createrepo_webroot="/srv/jriver"
 _exec_user="$(whoami)"
 
-# Version control
+# MC version
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
-# _mcversion="28.0.84" # to set manually
+# _mcversion="28.0.87" # to set manually
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -126,7 +126,7 @@ init() {
         pkg_query(){ ifSudo dpkg -s "$@"; }
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
-        echo "Experimental SUSE support"
+        echo "SUSE support is experimental!"
         pkg_install(){ ifSudo zypper install -y -q "$@"; }
         pkg_reinstall(){ ifSudo zypper install -y -q -f "$@"; }
         pkg_remove(){ ifSudo zypper remove --clean-deps -y -q "$@"; }
@@ -152,12 +152,12 @@ init() {
     # Install script dependencies
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
+    # Select MC version to work with
     if [[ -v _mcversion ]]; then
         _version_source="user input"
     else
         getLatestVersion
     fi
-
     [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
 
     debug "Using MC version $_mcversion determined by $_version_source"
@@ -1137,7 +1137,7 @@ uninstall() {
         exit 0
     fi
 
-    echo "Stopping and removing all associated Media Center services"
+    debug "Stopping and removing all associated Media Center services"
     for _service in $(compgen -A "function" "service"); do
         _service="${_service##service_}"
         setServiceVars "$_service"
@@ -1154,24 +1154,37 @@ uninstall() {
         systemctl_reload
     done
 
-    echo "Removing repo files"
+    debug "Removing repo files"
     [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
         && rm_cmd "/etc/yum.repos.d/jriver.repo"
     [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
         && rm_cmd "/etc/apt/sources.list.d/jriver.list"
 
-    echo "Removing firewall rules"
+    debug "Removing firewall rules"
     if [[ -x $(command -v firewall-cmd) ]]; then
-        firewall_cmd --permanent --remove-service=jriver > /dev/null 2>&1
-        firewall_cmd --permanent --delete-service=jriver > /dev/null 2>&1
-        firewall_cmd --reload
+        if [[ -v debug ]]; then
+            debug "firewall_cmd --permanent --remove-service=jriver"
+            firewall_cmd --permanent --remove-service=jriver
+            debug "firewall_cmd --permanent --delete-service=jriver"
+            firewall_cmd --permanent --delete-service=jriver
+            debug "firewall_cmd --reload"
+            firewall_cmd --reload
+        else
+            firewall_cmd --permanent --remove-service=jriver > /dev/null 2>&1
+            firewall_cmd --permanent --delete-service=jriver > /dev/null 2>&1
+            firewall_cmd --reload > /dev/null 2>&1
+        fi
     elif [[ -x $(command -v ufw) ]]; then
-        firewall_cmd delete allow jriver > /dev/null 2>&1
+        if [[ -v debug ]]; then
+            firewall_cmd delete allow jriver
+        else
+            firewall_cmd delete allow jriver > /dev/null 2>&1
+        fi
         [[ -f "/etc/ufw/applications.d/jriver" ]] \
             && rm_cmd /etc/ufw/applications.d/jriver
     fi
 
-    echo "Uninstalling Media Center packages"
+    debug "Uninstalling Media Center packages"
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
@@ -1180,14 +1193,14 @@ uninstall() {
 
     if debug; then
         debug "pkg_remove -q $_mcpkg"
-        pkg_remove "-q" "MediaCenter"
+        pkg_remove "-q" "$_mcpkg"
     else
-        pkg_remove "-q" "MediaCenter" > /dev/null 2>&1
+        pkg_remove "-q" "$_mcpkg" > /dev/null 2>&1
     fi
 
-    echo "JRiver Media Center has been completely uninstalled"
-    echo "If you wish to remove your library files: rm -rf $HOME/.jriver"
-    echo "If you wish to remove your rpmbuild output files: rm -rf $_outputdir"
+    echo "JRiver Media Center has been completely uninstalled."
+    echo "To remove your library files, run: rm -rf $HOME/.jriver"
+    echo "To remove your rpmbuild output files, run: rm -rf $_outputdir"
 
     exit 0
 }
