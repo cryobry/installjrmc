@@ -402,7 +402,7 @@ installPackage() {
     if [[ ${#_pkg_array[@]} -ge 1 ]]; then
         debug "Installing: ${_pkg_array[*]}"
         if debug; then
-            debug "pkg_install ${_installflags[*]} ${_pkg_array[*]}"
+            debug "pkg_install ${_install_flags[*]} ${_pkg_array[*]}"
             pkg_install "${_install_flags[@]}" "${_pkg_array[@]}"
         else
             pkg_install "${_install_flags[@]}" "${_pkg_array[@]}" > /dev/null 2>&1
