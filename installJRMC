@@ -199,10 +199,20 @@ getOS() {
     debug "Platform: $ID $VERSION_ID"
 }
 ifSudo() {
-    if [[ "$_exec_user" != "root" ]]; then
-        sudo "$@"
-    else
+    declare -l _user="root"
+    if [[ $# == 0 ]]; then
+        [[ "$_exec_user" == "root" ]]; return $?
+    elif [[ $# -eq 2 && "$1" == "-u" ]]; then
+        _user="$2"
+        [[ "$_exec_user" == "$_user" ]]; return $?
+    elif [[ $# -gt 2 && "$1" == "-u" ]]; then
+        _user="$2"
+        shift 2
+    fi
+    if [[ "$_user" == "$_exec_user" ]]; then
         "$@"
+    else
+        sudo -u "$_user" "$@"
     fi
 }
 
@@ -637,28 +647,13 @@ buildRPM() {
 runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    # Some additional commands specifically for createrepo (primarily to handle user rights)
-    if [[ $_createrepo_user != "root" ]]; then
-        if [[ -d "$_createrepo_webroot/repodata" ]]; then
-            createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q --update "$@"; }
-        else
-            createrepo_cmd(){ sudo -u "$_createrepo_user" createrepo -q "$@"; }
-        fi
-        cr_mkdir_cmd(){ sudo -u "$_createrepo_user" mkdir -p "$@"; }
-        cr_cp_cmd(){ sudo -u "$_createrepo_user" cp -n "$@"; }
-    else
-        if [[ -d "$_createrepo_webroot/repodata" ]]; then
-            createrepo_cmd(){ createrepo -q --update "$@"; }
-        else
-            createrepo_cmd(){ createrepo -q "$@"; }
-        fi
-    fi
+    declare -a createrepo_cmd
 
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
     if [[ ! -d "$_createrepo_webroot" ]]; then
-        if ! cr_mkdir_cmd "$_createrepo_webroot"; then
+        if ! ifSudo -u "$_createrepo_user" mkdir -p "$_createrepo_webroot"; then
             err "Could not create the createrepo-webroot path!"
             err "Make sure that the createrepo-webroot is writeable by createrepo-user: $_createrepo_user"
             return 1
@@ -666,14 +661,16 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    if ! cr_cp_cmd -f "$_mcrpm" "$_createrepo_webroot"; then
+    if ! ifSudo -u "$_createrepo_user" cp -n -f "$_mcrpm" "$_createrepo_webroot"; then
         err "Could not copy the RPM to the createrepo-webroot path"
         err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $_createrepo_user"
         return 1
     fi
 
     # Run createrepo
-    if createrepo_cmd "$_createrepo_webroot"; then
+    createrepo_cmd=("sudo" "-u" "$_createrepo_user" "createrepo" "-q")
+    [[ -d "$_createrepo_webroot" ]] && createrepo_cmd+=("--update")
+    if "${createrepo_cmd[@]}" "$_createrepo_webroot"; then
         echo "Successfully updated repo"
         return 0
     else
