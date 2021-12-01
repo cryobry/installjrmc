@@ -653,7 +653,9 @@ runCreaterepo() {
 
     # If the webroot does not exist, create it
     if [[ ! -d "$_createrepo_webroot" ]]; then
+        debug "ifSudo -u $_createrepo_user mkdir -p $_createrepo_webroot"
         if ! ifSudo -u "$_createrepo_user" mkdir -p "$_createrepo_webroot"; then
+            debug "ifSudo mkdir -p $_createrepo_webroot"
             if ifSudo mkdir -p "$_createrepo_webroot" && \
                 ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
                 :
