@@ -27,8 +27,7 @@ _exec_user="$(whoami)"
 _systemddir="/usr/lib/systemd/system"
 
 # MC version
-_boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
-# _mcversion="28.0.87" # to set manually
+# _mcversion="28.0.87" # to set manually, if unset use automatic latest check
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -106,22 +105,7 @@ init() {
 
     getOS
 
-    _base="buster" # default
-    #_base_next="bullseye" # TODO use for fallback to smooth upgrades
 
-    # Peg older versions to prevent ABI mismatches
-    # This can be overriden w/ --mcversion
-    if [[ "$ID" == "ubuntu" ]]; then
-        [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && _base="buster"
-        # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && _base="bullseye"
-        [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && _base="stretch"
-        [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && _base="jessie"
-    elif [[ "$ID" == "debian" ]]; then
-        _base="$VERSION_CODENAME"
-    elif [[ "$ID" == "centos" ]]; then
-        [[ "$VERSION_ID" == "7" ]] && _base="stretch"
-        [[ "$VERSION_ID" == "8" ]] && _base="buster"
-    fi
 
     # Make sure universe repo is installed on Ubuntu
     if [[ "$ID" == "ubuntu" ]]; then
@@ -348,6 +332,44 @@ getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g _mcversion
+
+    # Latest defaults
+    _base="buster" # For container method
+    _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # buster, for fallback webscrape
+    #_base_next="bullseye" # TODO use for fallback to smooth upgrades
+
+    # Legacy
+    _boardurl26="https://yabb.jriver.com/interact/index.php/board,64.0.html" # jessie/stretch
+
+    # Peg older versions to prevent ABI and dependency mismatches in automatic mode
+    # This can be overriden w/ --mcversion
+    # TODO need user input here
+    if [[ "$ID" == "ubuntu" ]]; then
+        # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
+        #     _base="bullseye"
+        [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
+            _base="buster"
+        [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
+            _mcversion="26.0.107"
+        [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
+            _mcversion="26.0.107" 
+    elif [[ "$ID" == "debian" ]]; then
+        _base="$VERSION_CODENAME"
+        [[ $VERSION_ID -eq 10 ]] && \
+            _base="buster"
+        [[ $VERSION_ID -le 9 ]] && \
+            _mcversion="26.0.107"
+    elif [[ "$ID" == "centos" ]]; then
+        [[ "$VERSION_ID" -eq "8" ]] && \
+            _base="buster"
+        [[ "$VERSION_ID" -lt "8" ]] && \
+            _mcversion="26.0.107" # Doubtful
+    fi
+
+    [[ -v _mcversion ]] && \
+        _version_source="compatibility lookup" && \
+        echo "To override, use --mcversion" && \
+        return 0
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($_base=buster)?
