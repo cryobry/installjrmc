@@ -656,7 +656,7 @@ buildRPM() {
 
     # skip rebuilding the rpm if it already exists
     if [[ -f "$_mcrpm" ]]; then
-        echo "$_mcrpm already exists. Skipping build step..."
+        echo "$_mcrpm already exists. Skipping build step."
         return 0
     fi
 
