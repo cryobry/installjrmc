@@ -174,7 +174,8 @@ init() {
     fi
     [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
 
-    debug "Using MC version $_mcversion determined by $_version_source"
+    echo "Using MC version $_mcversion determined by $_version_source"
+    echo "To override, use --mcversion"
 
     # Extract major version number
     _mversion="${_mcversion%%.*}"
@@ -368,7 +369,7 @@ getLatestVersion() {
 
     [[ -v _mcversion ]] && \
         _version_source="compatibility lookup" && \
-        echo "To override, use --mcversion" && \
+        debug "To override, use --mcversion" && \
         return 0
 
     # Use a containerized package manager
@@ -1327,7 +1328,7 @@ main() {
 
     # Install services
     setDisplay
-    [[ "${#_services[@]}" -gt 0 && ! -d "$_systemddir" ]] && mkdir "$_systemddir"
+    [[ "${#_services[@]}" -gt 0 && ! -d "$_systemddir" ]] && ifSudo mkdir -p "$_systemddir"
     for _service in "${_services[@]}"; do
         setServiceVars "$_service"
         if ! "service_$_service"; then
