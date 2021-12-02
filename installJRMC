@@ -358,7 +358,7 @@ getLatestVersion() {
         [[ $VERSION_ID -eq 10 ]] && \
             _base="buster"
         [[ $VERSION_ID -le 9 ]] && \
-            _mcversion="26.0.107"
+            _mcversion="26.0.107" # For 9 and 8
     elif [[ "$ID" == "centos" ]]; then
         [[ "$VERSION_ID" -eq "8" ]] && \
             _base="buster"
