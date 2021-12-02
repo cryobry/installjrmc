@@ -691,6 +691,9 @@ buildRPM() {
     else
         rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec" > /dev/null 2>&1
     fi
+    declare -l _ec=$?
+    [[ "$_ec" == 0 ]] && echo "Build successful. The RPM file is located at: $_mcrpm"
+    return $_ec
 }
 
 
@@ -1303,10 +1306,7 @@ main() {
     # Build RPM from source deb package
     if [[ -v _build ]]; then
         acquireDeb
-        if buildRPM; then
-            echo "Build Successful."
-            echo "The RPM file is located at: $_mcrpm"
-        else
+        if ! buildRPM; then
             err "Build failed."
             # In case this is automated, let's remove the source DEB and reaquire 
             # it on next run in case it is corrupted or buggy
