@@ -24,6 +24,7 @@ _scriptversion="1.0b1"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
 _exec_user="$(whoami)"
+_systemddir="/usr/lib/systemd/system"
 
 # MC version
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
@@ -910,14 +911,14 @@ setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
     if [[ "$_service_user" == "root" ]]; then
-        _service_fname="/usr/lib/systemd/system/${1}.service"
-        _timer_fname="/usr/lib/systemd/system/${1}.timer"
+        _service_fname="$_systemddir/${1}.service"
+        _timer_fname="$_systemddir/${1}.timer"
         _service_name="${1}.service"
         _timer_name="${1}.timer"
         _user_specifier=""
     else
-        _service_fname="/usr/lib/systemd/system/${1}@.service"
-        _timer_fname="/usr/lib/systemd/system/${1}@.timer"
+        _service_fname="$_systemddir/${1}@.service"
+        _timer_fname="$_systemddir/${1}@.timer"
         _service_name="${1}@$_service_user.service"
         _timer_name="${1}@$_service_user.timer"
         _user_specifier="User=%I"
@@ -1298,6 +1299,7 @@ main() {
 
     # Install services
     setDisplay
+    [[ "${#_services[@]}" -gt 0 && ! -d "$_systemddir" ]] && mkdir "$_systemddir"
     for _service in "${_services[@]}"; do
         setServiceVars "$_service"
         if ! "service_$_service"; then
