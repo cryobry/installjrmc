@@ -117,7 +117,7 @@ init() {
     # Agnostic commands
     bash_cmd(){ ifSudo bash -c "$@"; }
     rm_cmd(){ ifSudo rm -rf "$@"; }
-    #cp_cmd(){ ifSudo cp -n "$@"; }
+    cp_cmd(){ ifSudo cp -n -f "$@"; }
     mkdir_cmd(){ ifSudo mkdir -p "$@"; }
     ln_cmd(){ ifSudo ln -s "$@"; }
     systemctl_reload(){ ifSudo systemctl daemon-reload; }
@@ -710,7 +710,7 @@ runCreaterepo() {
     # If the webroot does not exist, create it
     if [[ ! -d "$_createrepo_webroot" ]]; then
         debug "ifSudo -u $_createrepo_user mkdir -p $_createrepo_webroot"
-        if ! ifSudo -u "$_createrepo_user" mkdir -p "$_createrepo_webroot"; then
+        if ! ifSudo -u "$_createrepo_user" mkdir -p "$_createrepo_webroot" > /dev/null 2>&1; then
             debug "ifSudo mkdir -p $_createrepo_webroot"
             if ifSudo mkdir -p "$_createrepo_webroot" && \
                 ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
@@ -725,9 +725,9 @@ runCreaterepo() {
 
     # Copy built rpms to webroot
     debug "ifSudo -u $_createrepo_user cp -n -f $_mcrpm $_createrepo_webroot"
-    if ! ifSudo -u "$_createrepo_user" cp -n -f "$_mcrpm" "$_createrepo_webroot"; then
-        debug "ifSudo cp -n -f $_mcrpm $_createrepo_webroot"
-        if ifSudo cp -n -f "$_mcrpm" "$_createrepo_webroot" && \
+    if ! ifSudo -u "$_createrepo_user" cp -n -f "$_mcrpm" "$_createrepo_webroot" > /dev/null 2>&1; then
+        debug "cp_cmd $_mcrpm $_createrepo_webroot"
+        if cp_cmd "$_mcrpm" "$_createrepo_webroot" && \
             ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
             :
         else
