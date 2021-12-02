@@ -112,9 +112,9 @@ init() {
     # Peg older versions to prevent ABI mismatches
     # This can be overriden w/ --mcversion
     if [[ "$ID" == "ubuntu" ]]; then
-        [[ "$VERSION_CODENAME" =~ ^(bionic|cosmic|disco|eoan)$ ]] && _base="buster"
+        [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && _base="buster"
         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && _base="bullseye"
-        [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful)$ ]] && _base="stretch"
+        [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && _base="stretch"
         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && _base="jessie"
     elif [[ "$ID" == "debian" ]]; then
         _base="$VERSION_CODENAME"
