@@ -8,11 +8,15 @@
 # Use installJRMC --help to see available options or
 # read printHelp() below.
 #
-# TODO:
+# TODO
 #   1. Raspberry Pi OS support
 #   2. Interactive installation (ncurses?)
-#   3. Additional containerization
+#   3. Additional containerization (createrepo and rpmbuild)
 #   4. Tests
+#
+# BUGS
+#   1. SUSE probably broken
+#   2. No createrepo on Mint
 
 shopt -s extglob
 
@@ -23,7 +27,6 @@ _exec_user="$(whoami)"
 
 # MC version
 _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # Media Center 28, only required if buildah is unavailable
-_base="buster" # TODO maybe support for older versions and legacy distros? A lot of work...
 # _mcversion="28.0.87" # to set manually
 
 printHelp() {
@@ -102,6 +105,23 @@ init() {
 
     getOS
 
+    _base="buster" # default
+    #_base_next="bullseye" # TODO use for fallback to smooth upgrades
+
+    # Peg older versions to prevent ABI mismatches
+    # This can be overriden w/ --mcversion
+    if [[ "$ID" == "ubuntu" ]]; then
+        [[ "$VERSION_CODENAME" =~ ^(bionic|cosmic|disco|eoan)$ ]] && _base="buster"
+        # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && _base="bullseye"
+        [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful)$ ]] && _base="stretch"
+        [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && _base="jessie"
+    elif [[ "$ID" == "debian" ]]; then
+        _base="$VERSION_CODENAME"
+    elif [[ "$ID" == "centos" ]]; then
+        [[ "$VERSION_ID" == "7" ]] && _base="stretch"
+        [[ "$VERSION_ID" == "8" ]] && _base="buster"
+    fi
+   
     # Agnostic commands
     bash_cmd(){ ifSudo bash -c "$@"; }
     rm_cmd(){ ifSudo rm -rf "$@"; }
@@ -324,7 +344,7 @@ getLatestVersion() {
     # Use a containerized package manager
     # TODO but how to determine build distro ($_base=buster)?
     [[ ! -x $(command -v buildah) ]] && installPackage --silent buildah
-    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from ubuntu:18.04); then 
+    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian$_base); then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $_base main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
@@ -430,6 +450,7 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        # _mversion will depend on _base unless --mcversion is passed
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
         ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list" > /dev/null 2>&1
@@ -891,8 +912,8 @@ setServiceVars() {
     if [[ "$_service_user" == "root" ]]; then
         _service_fname="/usr/lib/systemd/system/${1}.service"
         _timer_fname="/usr/lib/systemd/system/${1}.timer"
-        _service_name="jriver-${1}.service"
-        _timer_name="jriver-${1}.timer"
+        _service_name="${1}.service"
+        _timer_name="${1}.timer"
         _user_specifier=""
     else
         _service_fname="/usr/lib/systemd/system/${1}@.service"
@@ -1155,14 +1176,13 @@ uninstall() {
     for _service in $(compgen -A "function" "service"); do
         _service="${_service##service_}"
         setServiceVars "$_service"
-        for unit in "$_service_name."{service,timer} "$_service_name@$_service_user."{service,timer}; do
+        for unit in "$_service_name" "$_timer_name"; do
             if systemctl is-active -q "$unit" > /dev/null 2>&1 || systemctl is-enabled -q "$unit" > /dev/null 2>&1; then
                 debug "Disabling $unit"
                 systemctl_disable "$unit"
             fi
         done
-        for f in "/usr/lib/systemd/system/${_service_name}."{service,timer} \
-                 "/usr/lib/systemd/system/${_service_name}@${_service_user}."{service,timer}; do
+        for f in "$_service_fname" "$_timer_fname"; do
             debug "Removing $f"
             rm_cmd "$f"
         done
