@@ -714,7 +714,7 @@ runCreaterepo() {
 
     # Run createrepo
     createrepo_cmd=("sudo" "-u" "$_createrepo_user" "createrepo" "-q")
-    [[ -d "$_createrepo_webroot" ]] && createrepo_cmd+=("--update")
+    [[ -d "$_createrepo_webroot/repodata" ]] && createrepo_cmd+=("--update")
     debug "${createrepo_cmd[*]} $_createrepo_webroot"
     if "${createrepo_cmd[@]}" "$_createrepo_webroot"; then
         echo "Successfully updated repo"
