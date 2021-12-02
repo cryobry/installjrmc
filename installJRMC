@@ -345,32 +345,34 @@ getLatestVersion() {
     # Peg older versions to prevent ABI and dependency mismatches in automatic mode
     # This can be overriden w/ --mcversion
     # TODO need user input here
-    if [[ "$ID" == "ubuntu" ]]; then
-        # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
-        #     _base="bullseye"
-        [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
-            _base="buster"
-        [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
-            _mcversion="26.0.107"
-        [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
-            _mcversion="26.0.107" 
-    elif [[ "$ID" == "debian" ]]; then
-        _base="$VERSION_CODENAME"
-        [[ $VERSION_ID -eq 10 ]] && \
-            _base="buster"
-        [[ $VERSION_ID -le 9 ]] && \
-            _mcversion="26.0.107" # For 9 and 8
-    elif [[ "$ID" == "centos" ]]; then
-        [[ "$VERSION_ID" -eq "8" ]] && \
-            _base="buster"
-        [[ "$VERSION_ID" -lt "8" ]] && \
-            _mcversion="26.0.107" # Doubtful
-    fi
+    if ! [[ -v _createrepo ]]; then # disable version checks for createrepo servers
+        if [[ "$ID" == "ubuntu" ]]; then
+            # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
+            #     _base="bullseye"
+            [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
+                _base="buster"
+            [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
+                _mcversion="26.0.107"
+            [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
+                _mcversion="26.0.107" 
+        elif [[ "$ID" == "debian" ]]; then
+            _base="$VERSION_CODENAME"
+            [[ $VERSION_ID -eq 10 ]] && \
+                _base="buster"
+            [[ $VERSION_ID -le 9 ]] && \
+                _mcversion="26.0.107" # For 9 and 8
+        elif [[ "$ID" == "centos" ]]; then
+            [[ "$VERSION_ID" -eq "8" ]] && \
+                _base="buster"
+            [[ "$VERSION_ID" -lt "8" ]] && \
+                _mcversion="26.0.107" # Doubtful
+        fi
 
-    [[ -v _mcversion ]] && \
-        _version_source="compatibility lookup" && \
-        debug "To override, use --mcversion" && \
-        return 0
+        [[ -v _mcversion ]] && \
+            _version_source="compatibility lookup" && \
+            debug "To override, use --mcversion" && \
+            return 0
+    fi
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($_base=buster)?
