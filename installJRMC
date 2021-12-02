@@ -1171,7 +1171,6 @@ service_jriver-createrepo() {
 #     brc del-pkg .build-deps
 # }
 
-
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
