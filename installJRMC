@@ -122,6 +122,13 @@ init() {
         [[ "$VERSION_ID" == "7" ]] && _base="stretch"
         [[ "$VERSION_ID" == "8" ]] && _base="buster"
     fi
+
+    # Make sure universe repo is installed on Ubuntu
+    if [[ "$ID" == "ubuntu" ]]; then
+        if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
+            ifSudo add-apt-repository universe
+        fi
+    fi
    
     # Agnostic commands
     bash_cmd(){ ifSudo bash -c "$@"; }
