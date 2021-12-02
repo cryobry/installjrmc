@@ -1318,6 +1318,7 @@ main() {
     # Run createrepo
     if [[ -v _createrepo ]]; then
         runCreaterepo
+        exit $?
     fi
 
     # Install RPM
@@ -1329,18 +1330,21 @@ main() {
     fi
 
     # Install services
-    setDisplay
-    [[ "${#_services[@]}" -gt 0 && ! -d "$_systemddir" ]] && ifSudo mkdir -p "$_systemddir"
-    for _service in "${_services[@]}"; do
-        setServiceVars "$_service"
-        if ! "service_$_service"; then
-            if [[ $? -eq 127 ]]; then
-                err "Service $_service does not exist, check your service name"
-            else
-                err "Failed to create service: $_service"
+    
+    if [[ "${#_services[@]}" -gt 0 ]]; then
+        setDisplay
+        ! [[ -d "$_systemddir" ]] && ifSudo mkdir -p "$_systemddir"
+        for _service in "${_services[@]}"; do
+            setServiceVars "$_service"
+            if ! "service_$_service"; then
+                if [[ $? -eq 127 ]]; then
+                    err "Service $_service does not exist, check your service name"
+                else
+                    err "Failed to create service: $_service"
+                fi
             fi
-        fi
-    done
+        done
+    fi
 
     # Install containers
     # for _container in "${_containers[@]}"; do
