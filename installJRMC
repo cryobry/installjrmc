@@ -609,9 +609,9 @@ buildRPM() {
     # If you are building on SUSE, I assume you want SUSE RPMs
     # i.e. cross-building not an option but could be added
     if [[ "$ID" =~ ^opensuse.*$ ]]; then
-        _requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6\nRequires: libXdmcp6 >= 1.1\nRequires: libXext6 >= 1.3\nRequires: libepoxy0 >= 1.5.3\nRequires: libgomp1 >= 7.4\nRequires: libstdc++6 >= 7.4\nRequires: libuuid1 >= 2.33\nRequires: libva2 >= 2.4.0\nRequires: libxcb1 >= 1.1\nRequires: libgbm1 >= 18.3.6'
+        _requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6\nRequires: libXdmcp6 >= 1.1\nRequires: libXext6 >= 1.3\nRequires: libepoxy0 >= 1.5.3\nRequires: libgomp1 >= 7.4\nRequires: libstdc++6 >= 7.4\nRequires: libuuid1 >= 2.33\nRequires: libva2 >= 2.4.0\nRequires: libxcb1 >= 1.1\nRequires: libgbm1 >= 18.3.6\nRequires: mozilla-nspr >= 4.20'
     else
-        _requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6\nRequires: libXdmcp >= 1.1\nRequires: libXext >= 1.3\nRequires: libepoxy >= 1.5.3\nRequires: libgomp >= 7.4\nRequires: libstdc++ >= 7.4\nRequires: libuuid >= 2.33\nRequires: libva >= 2.4.0\nRequires: libxcb >= 1.1\nRequires: mesa-libgbm >= 18.3.6'
+        _requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6\nRequires: libXdmcp >= 1.1\nRequires: libXext >= 1.3\nRequires: libepoxy >= 1.5.3\nRequires: libgomp >= 7.4\nRequires: libstdc++ >= 7.4\nRequires: libuuid >= 2.33\nRequires: libva >= 2.4.0\nRequires: libxcb >= 1.1\nRequires: mesa-libgbm >= 18.3.6\nRequires: nspr >= 4.20'
     fi
 
     debug "Requires: $_requires"
@@ -634,7 +634,6 @@ buildRPM() {
 		Requires: gtk3 >= 3.24
 		Requires: pango >= 1.42
 		Requires: nss >= 3.42
-		Requires: nspr >= 4.20
 		Requires: python3
 		Requires: xdg-utils
 		Requires: fribidi >= 1.0.5
