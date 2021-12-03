@@ -20,7 +20,7 @@
 
 shopt -s extglob
 
-_scriptversion="1.1b1"
+_scriptversion="1.0b2"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
 _exec_user="$(whoami)"
