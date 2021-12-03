@@ -343,7 +343,8 @@ getLatestVersion() {
     # Peg older versions to prevent ABI and dependency mismatches in automatic mode
     # This can be overriden w/ --mcversion
     # TODO need user input here
-    if ! [[ -v _createrepo ]] || [[ -v _build && ! -v _install ]]; then # disable version checks for createrepo or rpmbuild (servers)
+    # disable version checks for createrepo or rpmbuild (servers)
+    if [[ ! -v _createrepo ]] || ! [[ -v _build && ! -v _install ]]; then
         if [[ "$ID" == "ubuntu" ]]; then
             # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
             #     _base="bullseye"
