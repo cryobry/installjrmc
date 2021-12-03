@@ -609,9 +609,9 @@ buildRPM() {
     # If you are building on SUSE, I assume you want SUSE RPMs
     # i.e. cross-building not an option but could be added
     if [[ "$ID" =~ ^opensuse.*$ ]]; then
-        _requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6'
+        _requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6\nRequires: libXdmcp6 >= 1.1'
     else
-        _requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6'
+        _requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6\nRequires: libXdmcp >= 1.1'
     fi
 
     debug "Requires: $_requires"
@@ -634,7 +634,6 @@ buildRPM() {
 		Requires: libuuid >= 2.33
 		Requires: libXext >= 1.3
 		Requires: libxcb >= 1.1
-		Requires: libXdmcp >= 1.1
 		Requires: libstdc++ >= 7.4
 		Requires: gtk3 >= 3.24
 		Requires: pango >= 1.42
