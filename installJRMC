@@ -139,10 +139,10 @@ init() {
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         echo "SUSE support is experimental!"
-        pkg_install(){ ifSudo zypper install -y -q "$@"; }
-        pkg_reinstall(){ ifSudo zypper install -y -q -f "$@"; }
-        pkg_remove(){ ifSudo zypper remove --clean-deps -y -q "$@"; }
-        pkg_update(){ ifSudo zypper update -y -q; }
+        pkg_install(){ ifSudo zypper install -y "$@"; }
+        pkg_reinstall(){ ifSudo zypper install -y -f "$@"; }
+        pkg_remove(){ ifSudo zypper remove --clean-deps -y "$@"; }
+        pkg_update(){ ifSudo zypper refresh; }
         pkg_query(){ ifSudo rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     fi
@@ -1329,7 +1329,6 @@ main() {
     fi
 
     # Install services
-    
     if [[ "${#_services[@]}" -gt 0 ]]; then
         setDisplay
         ! [[ -d "$_systemddir" ]] && ifSudo mkdir -p "$_systemddir"
