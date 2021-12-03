@@ -125,22 +125,19 @@ init() {
     # OS-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         pkg_install(){ ifSudo dnf install -y "$@"; }
-        pkg_reinstall(){ ifSudo dnf reinstall -y "$@"; }
         pkg_remove(){ ifSudo dnf remove -y "$@"; }
         pkg_update(){ ifSudo dnf makecache; }
         pkg_query(){ ifSudo rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         pkg_install(){ ifSudo apt-get install -y -q0 "$@"; }
-        pkg_reinstall(){ ifSudo apt-get reinstall -y -q0 "$@"; }
         pkg_remove(){ ifSudo apt-get remove --auto-remove -y -q0 "$@"; }
         pkg_update(){ ifSudo apt-get update -y -q0; }
         pkg_query(){ ifSudo dpkg -s "$@"; }
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         echo "SUSE support is experimental!"
-        pkg_install(){ ifSudo zypper --non-interactive -q install "$@"; }
-        pkg_reinstall(){ ifSudo zypper --non-interactive -q install -f "$@"; }
+        pkg_install(){ ifSudo zypper --non-interactive -q install --force "$@"; }
         pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ ifSudo zypper --non-interactive -q refresh; }
         pkg_query(){ ifSudo rpm -q "$@"; }
