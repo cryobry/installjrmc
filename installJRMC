@@ -412,7 +412,7 @@ installPackage() {
     local -a _pkg_array _install_flags
     local _pkg _nocheck _silent _return
 
-    if _input=$(getopt -o +s -l no-check,nogpgcheck,silent -- "$@"); then
+    if _input=$(getopt -o +s -l nocheck,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
