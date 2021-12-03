@@ -1,6 +1,6 @@
 # installJRMC
 
-This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on Fedora, CentOS (>=8), Ubuntu, Debian, and Linux Mint.
+This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on Fedora, CentOS (>=8), Ubuntu, Debian, Linux Mint, and SUSE.
 
 ## README
 
