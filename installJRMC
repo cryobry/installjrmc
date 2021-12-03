@@ -645,7 +645,6 @@ buildRPM() {
 		Requires: libXdmcp >= 1.1
 		Requires: libstdc++ >= 7.4
 		Requires: gtk3 >= 3.24
-		Requires: mesa-libGL
 		Requires: pango >= 1.42
 		Requires: nss >= 3.42
 		Requires: nspr >= 4.20
