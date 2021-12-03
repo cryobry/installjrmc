@@ -487,7 +487,7 @@ addRepo() {
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
         ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list" > /dev/null 2>&1
     elif [[ "$ID" =~ ^opensuse.* ]]; then
-        ifSudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver
+        ifSudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver > /dev/null 2>&1
     fi
 }
 
