@@ -139,7 +139,7 @@ init() {
         echo "SUSE support is experimental!"
         pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
         pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
-        pkg_update(){ ifSudo zypper --non-interactive -q refresh; }
+        pkg_update(){ ifSudo zypper --non-interactive -q refresh jriver; }
         pkg_query(){ ifSudo rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     fi
@@ -1234,6 +1234,9 @@ uninstall() {
         && rm_cmd "/etc/yum.repos.d/jriver.repo"
     [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
         && rm_cmd "/etc/apt/sources.list.d/jriver.list"
+    if [[ "$ID" =~ ^opensuse.* ]]; then
+        ifSudo zypper rr jriver > /dev/null 2>&1
+    fi
 
     debug "Removing firewall rules"
     if [[ -x $(command -v firewall-cmd) ]]; then
