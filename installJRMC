@@ -20,7 +20,7 @@
 
 shopt -s extglob
 
-_scriptversion="1.0b2"
+_scriptversion="1.0b3"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
 _exec_user="$(whoami)"
@@ -1306,11 +1306,11 @@ main() {
 
     # Install MC using package manager
     if [[ -v _install && "$_install" == "repo" ]]; then
-        if ! installMCFromRepo; then
+        if installMCFromRepo; then
+            echo "JRiver Media Center installed successfully"
+        else
             err "JRiver Media Center installation failed"
             exit 1
-        else
-            echo "JRiver Media Center installed successfully"
         fi
         symlinkCerts
         restoreLicense
@@ -1337,7 +1337,12 @@ main() {
 
     # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
-        installPackage --nocheck --nogpgcheck "$_mcrpm"
+        if installPackage --nocheck --nogpgcheck "$_mcrpm"; then
+            echo "JRiver Media Center installed successfully"
+        else
+            err "JRiver Media Center installation failed"
+            exit 1
+        fi
         symlinkCerts
         restoreLicense
         openFirewall "jriver"
