@@ -139,10 +139,10 @@ init() {
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         echo "SUSE support is experimental!"
-        pkg_install(){ ifSudo zypper install -y "$@"; }
-        pkg_reinstall(){ ifSudo zypper install -y -f "$@"; }
-        pkg_remove(){ ifSudo zypper remove --clean-deps -y "$@"; }
-        pkg_update(){ ifSudo zypper refresh; }
+        pkg_install(){ ifSudo zypper --non-interactive -q install "$@"; }
+        pkg_reinstall(){ ifSudo zypper --non-interactive -q install -f "$@"; }
+        pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
+        pkg_update(){ ifSudo zypper --non-interactive -q refresh; }
         pkg_query(){ ifSudo rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     fi
@@ -334,7 +334,7 @@ getLatestVersion() {
 
     # Latest defaults
     _base="buster" # For container method
-    _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # buster, for fallback webscrape
+    _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
     #_base_next="bullseye" # TODO use for fallback to smooth upgrades
 
     # Legacy
@@ -685,6 +685,7 @@ buildRPM() {
 
     # Run rpmbuild
     echo "Building version $_mcversion, please wait..."
+
     if debug; then
         rpmbuild --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"
     else
