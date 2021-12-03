@@ -603,7 +603,7 @@ buildRPM() {
     # rpmbuild uses rpm to check for build dependencies
     # this will fail on non-rpm distros
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        _build_requires='BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
+        _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
     fi
 
     # ALIASES (for SUSE)
@@ -613,9 +613,9 @@ buildRPM() {
     # If you are building on SUSE, I assume you want SUSE RPMs
     # i.e. cross-building not an option but could be added
     if [[ "$ID" =~ ^opensuse.*$ ]]; then
-        _requires='Requires: Mesa-libVulkan-devel\n'
+        _requires=$'Requires: Mesa-libVulkan-devel\n'
     else
-        _requires='Requires: mesa-vulkan-drivers\n'
+        _requires=$'Requires: mesa-vulkan-drivers\n'
     fi
 
 
