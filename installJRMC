@@ -588,6 +588,8 @@ acquireDeb() {
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
+    declare -l _build_requires _requires
+
     declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
     # skip rebuilding the rpm if it already exists
@@ -604,8 +606,21 @@ buildRPM() {
     # rpmbuild uses rpm to check for build dependencies
     # this will fail on non-rpm distros
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        local _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
+        _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
     fi
+
+    # ALIASES (for SUSE)
+
+
+
+    # If you are building on SUSE, I assume you want SUSE RPMs
+    # i.e. cross-building not an option but could be added
+    if [[ "$ID" =~ ^opensuse.*$ ]]; then
+        _requires=$'Requires: libglvnd \nBuildRequires: dpkg'
+    else
+        _requires=$'Requires: libglvnd \nBuildRequires: dpkg'
+    fi
+
 
     # Create spec file
     cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
@@ -631,7 +646,6 @@ buildRPM() {
 		Requires: libstdc++ >= 7.4
 		Requires: gtk3 >= 3.24
 		Requires: mesa-libGL
-		Requires: libglvnd-glx
 		Requires: pango >= 1.42
 		Requires: nss >= 3.42
 		Requires: nspr >= 4.20
