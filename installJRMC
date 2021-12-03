@@ -209,7 +209,7 @@ getOS() {
     debug "Platform: $ID $VERSION_ID"
 }
 ifSudo() {
-    declare -l _user="root"
+    local _user="root"
     if [[ $# == 0 ]]; then
         [[ "$_exec_user" == "root" ]]; return $?
     elif [[ $# -eq 2 && "$1" == "-u" ]]; then
@@ -585,7 +585,7 @@ acquireDeb() {
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -l _build_requires _requires
+    local _build_requires _requires _ec
 
     declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
@@ -699,7 +699,7 @@ buildRPM() {
     else
         rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec" > /dev/null 2>&1
     fi
-    declare -l _ec=$?
+    _ec=$?
     [[ "$_ec" == 0 ]] && echo "Build successful. The RPM file is located at: $_mcrpm"
     return $_ec
 }
