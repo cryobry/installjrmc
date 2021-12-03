@@ -606,10 +606,6 @@ buildRPM() {
         _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
     fi
 
-    # ALIASES (for SUSE)
-
-
-
     # If you are building on SUSE, I assume you want SUSE RPMs
     # i.e. cross-building not an option but could be added
     if [[ "$ID" =~ ^opensuse.*$ ]]; then
@@ -618,6 +614,7 @@ buildRPM() {
         _requires=$'Requires: mesa-vulkan-drivers\n'
     fi
 
+    debug "Requires: $_requires"
 
     # Create spec file
     cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
