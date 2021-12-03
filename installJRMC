@@ -20,7 +20,7 @@
 
 shopt -s extglob
 
-_scriptversion="1.0b1"
+_scriptversion="1.1b1"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
 _exec_user="$(whoami)"
@@ -104,8 +104,6 @@ init() {
     debug "Running: ${FUNCNAME[0]}"
 
     getOS
-
-
 
     # Make sure universe repo is installed on Ubuntu
     if [[ "$ID" == "ubuntu" ]]; then
@@ -345,7 +343,7 @@ getLatestVersion() {
     # Peg older versions to prevent ABI and dependency mismatches in automatic mode
     # This can be overriden w/ --mcversion
     # TODO need user input here
-    if ! [[ -v _createrepo ]]; then # disable version checks for createrepo servers
+    if ! [[ -v _createrepo ]] || [[ -v _build && ! -v _install ]]; then # disable version checks for createrepo or rpmbuild (servers)
         if [[ "$ID" == "ubuntu" ]]; then
             # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
             #     _base="bullseye"
