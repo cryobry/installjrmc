@@ -137,7 +137,7 @@ init() {
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         echo "SUSE support is experimental!"
-        pkg_install(){ ifSudo zypper --non-interactive -q install --force "$@"; }
+        pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
         pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ ifSudo zypper --non-interactive -q refresh; }
         pkg_query(){ ifSudo rpm -q "$@"; }
@@ -613,9 +613,9 @@ buildRPM() {
     # If you are building on SUSE, I assume you want SUSE RPMs
     # i.e. cross-building not an option but could be added
     if [[ "$ID" =~ ^opensuse.*$ ]]; then
-        _requires=$'Requires: libglvnd \nBuildRequires: dpkg'
+        _requires=$'Requires: Mesa-libVulkan-devel\n'
     else
-        _requires=$'Requires: libglvnd \nBuildRequires: dpkg'
+        _requires=$'Requires: mesa-vulkan-drivers\n'
     fi
 
 
@@ -660,6 +660,7 @@ buildRPM() {
 		Requires: mesa-vulkan-drivers
 		Requires: ca-certificates
 		Requires: libXScrnSaver
+        ${_requires:-}
 
 		Recommends: vorbis-tools >= 1.4.0
 		Recommends: lame >= 3.0
