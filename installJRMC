@@ -660,7 +660,7 @@ buildRPM() {
 		Requires: mesa-vulkan-drivers
 		Requires: ca-certificates
 		Requires: libXScrnSaver
-        ${_requires:-}
+		${_requires:-}
 
 		Recommends: vorbis-tools >= 1.4.0
 		Recommends: lame >= 3.0
