@@ -402,7 +402,7 @@ getLatestVersion() {
 # Arguments:
 #   One or more package names
 # Options:
-#   --no-check: Do not check if package is already installed
+#   --nocheck: Do not check if package is already installed
 #   --nogpgcheck: Disable GPG checks for RPM based distros
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
@@ -410,14 +410,14 @@ installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     local -a _pkg_array _install_flags
-    local _pkg
+    local _pkg _nocheck _silent _return
 
     if _input=$(getopt -o +s -l no-check,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
-                --no-check)
-                    local _no_check=true
+                --nocheck)
+                    _nocheck=true
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -427,7 +427,7 @@ installPackage() {
                     fi
                     ;;
                 --silent|-s)
-                    local _silent=true
+                    _silent=true
                     ;;
                 --)
                     shift
@@ -443,7 +443,7 @@ installPackage() {
 
     for _pkg in "$@"; do
         # Check for alias
-        if [[ -v PKG_ALIASES["$_pkg"] ]]; then
+        if [[ ! -v _nocheck && -v PKG_ALIASES[$_pkg] ]]; then
             _pkg=${PKG_ALIASES[$_pkg]}
         fi
         # Check if already installed
@@ -461,7 +461,7 @@ installPackage() {
         else
             pkg_install "${_install_flags[@]}" "${_pkg_array[@]}" > /dev/null 2>&1
         fi
-        local _return=$?       
+        _return=$?       
         [[ $_return -ne 0 && ! -v _silent ]] && err "Failed to install ${_pkg_array[*]}. Attempting to continue..."
         return $_return
     fi
@@ -532,10 +532,10 @@ installMCFromRepo() {
     fi
 
     if debug; then
-        debug "installPackage --no-check $_mcpkg"
-        installPackage --no-check --nogpgcheck "$_mcpkg"
+        debug "installPackage --nocheck $_mcpkg"
+        installPackage --nocheck --nogpgcheck "$_mcpkg"
     else
-        installPackage --no-check --nogpgcheck "$_mcpkg" > /dev/null 2>&1
+        installPackage --nocheck --nogpgcheck "$_mcpkg" > /dev/null 2>&1
     fi
 
     return $?
@@ -1337,7 +1337,7 @@ main() {
 
     # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
-        installPackage --no-check --nogpgcheck "$_mcrpm"
+        installPackage --nocheck --nogpgcheck "$_mcrpm"
         symlinkCerts
         restoreLicense
         openFirewall "jriver"
