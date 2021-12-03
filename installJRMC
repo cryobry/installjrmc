@@ -447,7 +447,7 @@ installPackage() {
             _pkg=${PKG_ALIASES[$_pkg]}
         fi
         # Check if already installed
-        if [[ -v _no_check ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
+        if [[ -v _nocheck ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
             _pkg_array+=("$_pkg")
         fi
     done
