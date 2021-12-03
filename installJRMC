@@ -654,7 +654,6 @@ buildRPM() {
 		Requires: libepoxy >= 1.5.3
 		Requires: lcms2 >= 2.9
 		Requires: vulkan-headers >= 1.1
-		Requires: mesa-vulkan-drivers
 		Requires: ca-certificates
 		Requires: libXScrnSaver
 		${_requires:-}
