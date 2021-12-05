@@ -137,6 +137,7 @@ init() {
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         echo "SUSE support is experimental!"
+        echo "Use --install rpm to build and install MC for SUSE."
         pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
         pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ ifSudo zypper --non-interactive -q refresh jriver; }
@@ -609,12 +610,48 @@ buildRPM() {
     # If you are building on SUSE, I assume you want SUSE RPMs
     # i.e. cross-building not an option but could be added
     if [[ "$ID" =~ ^opensuse.*$ ]]; then
-        _requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6\nRequires: libXdmcp6 >= 1.1\nRequires: libXext6 >= 1.3\nRequires: libepoxy0 >= 1.5.3\nRequires: libgomp1 >= 7.4\nRequires: libstdc++6 >= 7.4\nRequires: libuuid1 >= 2.33\nRequires: libva2 >= 2.4.0\nRequires: libxcb1 >= 1.1\nRequires: libgbm1 >= 18.3.6\nRequires: mozilla-nspr >= 4.20\nRequires: mozilla-nss >= 3.42'
+        read -r -d '' _requires <<- 'EOF'
+			Requires: Mesa-libVulkan-devel
+			Requires: freetype >= 1.3.1
+			Requires: libharfbuzz0 >= 2.3.1
+			Requires: libX11-6 >= 1.6
+			Requires: libX11-data >= 1.6
+			Requires: libXdmcp6 >= 1.1
+			Requires: libXext6 >= 1.3
+			Requires: libepoxy0 >= 1.5.3
+			Requires: libgomp1 >= 7.4
+			Requires: libstdc++6 >= 7.4
+			Requires: libuuid1 >= 2.33
+			Requires: libva2 >= 2.4.0
+			Requires: libxcb1 >= 1.1
+			Requires: libgbm1 >= 18.3.6
+			Requires: mozilla-nspr >= 4.20
+			Requires: mozilla-nss >= 3.42
+		EOF
+        #_requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6\nRequires: libXdmcp6 >= 1.1\nRequires: libXext6 >= 1.3\nRequires: libepoxy0 >= 1.5.3\nRequires: libgomp1 >= 7.4\nRequires: libstdc++6 >= 7.4\nRequires: libuuid1 >= 2.33\nRequires: libva2 >= 2.4.0\nRequires: libxcb1 >= 1.1\nRequires: libgbm1 >= 18.3.6\nRequires: mozilla-nspr >= 4.20\nRequires: mozilla-nss >= 3.42'
     else
-        _requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6\nRequires: libXdmcp >= 1.1\nRequires: libXext >= 1.3\nRequires: libepoxy >= 1.5.3\nRequires: libgomp >= 7.4\nRequires: libstdc++ >= 7.4\nRequires: libuuid >= 2.33\nRequires: libva >= 2.4.0\nRequires: libxcb >= 1.1\nRequires: mesa-libgbm >= 18.3.6\nRequires: nspr >= 4.20\nRequires: nss >= 3.42'
+        read -r -d '' _requires <<- 'EOF'
+			Requires: mesa-vulkan-drivers
+			Requires: freetype >= 2.9.1
+			Requires: harfbuzz >= 2.3.1
+			Requires: libX11 >= 1.6
+			Requires: libX11-common >= 1.6
+			Requires: libXdmcp >= 1.1
+			Requires: libXext >= 1.3
+			Requires: libepoxy >= 1.5.3
+			Requires: libgomp >= 7.4
+			Requires: libstdc++ >= 7.4
+			Requires: libuuid >= 2.33
+			Requires: libva >= 2.4.0
+			Requires: libxcb >= 1.1
+			Requires: mesa-libgbm >= 18.3.6
+			Requires: nspr >= 4.20
+			Requires: nss >= 3.42
+		EOF
+        #_requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6\nRequires: libXdmcp >= 1.1\nRequires: libXext >= 1.3\nRequires: libepoxy >= 1.5.3\nRequires: libgomp >= 7.4\nRequires: libstdc++ >= 7.4\nRequires: libuuid >= 2.33\nRequires: libva >= 2.4.0\nRequires: libxcb >= 1.1\nRequires: mesa-libgbm >= 18.3.6\nRequires: nspr >= 4.20\nRequires: nss >= 3.42'
     fi
 
-    debug "Requires: $_requires"
+    #debug "Requires: $_requires"
 
     # Create spec file
     cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
@@ -1303,8 +1340,7 @@ main() {
         acquireDeb
         if ! buildRPM; then
             err "Build failed."
-            # In case this is automated, let's remove the source DEB and reaquire 
-            # it on next run in case it is corrupted or buggy
+            # For automation, let's remove the source DEB and reaquire it on next run in case it is corrupted or buggy
             [[ -f "$DEBFILENAME" ]] && echo "Removing source DEB" && rm -f "$DEBFILENAME"
             exit 1
         fi
