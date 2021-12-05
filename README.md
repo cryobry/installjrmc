@@ -86,9 +86,9 @@ It is possible to install multiple services at one time using multiple `--servic
 
 ### Firewall Rules
 
-`installJRMC` will automatically install and enable port forwarding firewall rules to enable remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on Fedora/CentOS/SUSE and `ufw` on Ubuntu/Debian.
+`installJRMC` will automatically add port forwarding firewall rules enabling remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on Fedora/CentOS/SUSE and `ufw` on Ubuntu/Debian.
 
-**Note:** `ufw` is not installed by default on Debian but will be installed by `installJRMC`. To prevent user lock-out (i.e. SSH), Debian users that have not already enabled `ufw` will need to do so (`sudo ufw enable`) after running `installJRMC` and inspecting their rules.
+**Note:** `ufw` is not installed by default on Debian but will be installed by `installJRMC`. To prevent user lock-out (i.e. SSH), Debian users that have not already enabled `ufw` will need to `sudo ufw enable` after running `installJRMC` and inspecting their configuration.
 
 ### containers
 
