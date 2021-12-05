@@ -140,8 +140,6 @@ init() {
         pkg_query(){ ifSudo dpkg -s "$@"; }
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
-        echo "SUSE support is experimental!"
-        echo "Use --install rpm to build and install MC for SUSE."
         pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
         pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ ifSudo zypper --non-interactive -q refresh jriver; }
@@ -1339,6 +1337,11 @@ main() {
 
     # Install MC using package manager
     if [[ -v _install && "$_install" == "repo" ]]; then
+        if [[ "$ID" =~ ^opensuse.*$ ]]; then
+            echo "A SUSE repository is not yet available."
+            echo "Use --install rpm to build and install a SUSE RPM instead."
+            exit 1
+        fi
         if installMCFromRepo; then
             echo "JRiver Media Center installed successfully"
         else
