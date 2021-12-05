@@ -20,7 +20,7 @@
 
 shopt -s extglob
 
-_scriptversion="1.0b3"
+_scriptversion="1.0b4"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
 _exec_user="$(whoami)"
@@ -353,7 +353,7 @@ getLatestVersion() {
     # This can be overriden w/ --mcversion
     # TODO need user input here
     # disable version checks for createrepo or rpmbuild (servers)
-    if [[ ! -v _createrepo ]] || ! [[ -v _build && ! -v _install ]]; then
+    if [[ -v _build && ! -v _install ]]; then
         if [[ "$ID" == "ubuntu" ]]; then
             # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
             #     _base="bullseye"
