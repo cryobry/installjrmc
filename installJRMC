@@ -44,6 +44,8 @@ printHelp() {
 		        rpm: Build and install RPM locally (RPM-based distros only)
 		    --build
 		        Build RPM from source DEB (but don't install it)
+            --build-suse
+                Override OS detection and build SUSE RPM
 		    --mcversion VERSION
 		        Specify the MC version, ex. "28.0.25" (Default: latest version)
 		    --outputdir PATH
@@ -64,6 +66,8 @@ printHelp() {
 		            The webroot directory to install the repo (Default: /var/www/jriver)
 		        --createrepo-user USER
 		            The web server user (Default: current user)
+            --createrepo-suse
+                Override OS detection and run --createrepo with SUSE RPM
 		    --version, -v
 		        Print this script version and exit
 		    --debug, -d
@@ -234,7 +238,7 @@ parseInput() {
         _install="repo"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -251,6 +255,10 @@ parseInput() {
                     ;;
                 --build)
                     _build=true
+                    ;;
+                --build-suse)
+                    _build=true
+                    _build_suse=true
                     ;;
                 --outputdir)
                     shift && _outputdir="$1"
@@ -272,6 +280,11 @@ parseInput() {
                     ;;
                 --createrepo)
                     _build=true
+                    _createrepo=true
+                    ;;
+                --createrepo-suse)
+                    _build=true
+                    _build_suse=true
                     _createrepo=true
                     ;;
                 --createrepo-webroot)
@@ -586,7 +599,7 @@ acquireDeb() {
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local _build_requires _requires _ec
+    local _build_requires _global_requires _custom_requires _ec
 
     declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
@@ -607,10 +620,24 @@ buildRPM() {
         _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
     fi
 
-    # If you are building on SUSE, I assume you want SUSE RPMs
-    # i.e. cross-building not an option but could be added
-    if [[ "$ID" =~ ^opensuse.*$ ]]; then
-        read -r -d '' _requires <<- 'EOF'
+    read -r -d '' _global_requires <<- 'EOF'
+		Requires: glibc >= 2.28
+		Requires: alsa-lib >= 1.1.8
+		Requires: gtk3 >= 3.24
+		Requires: pango >= 1.42
+		Requires: python3
+		Requires: xdg-utils
+		Requires: fribidi >= 1.0.5
+		Requires: fontconfig >= 2.13
+		Requires: lcms2 >= 2.9
+		Requires: vulkan-headers >= 1.1
+		Requires: ca-certificates
+		Requires: libXScrnSaver
+	EOF
+
+    # SUSE dependency name variations
+    if [[ "$ID" =~ ^opensuse.*$ || -v _build_suse ]]; then
+        read -r -d '' _custom_requires <<- 'EOF'
 			Requires: Mesa-libVulkan-devel
 			Requires: freetype >= 1.3.1
 			Requires: libharfbuzz0 >= 2.3.1
@@ -628,9 +655,8 @@ buildRPM() {
 			Requires: mozilla-nspr >= 4.20
 			Requires: mozilla-nss >= 3.42
 		EOF
-        #_requires=$'Requires: Mesa-libVulkan-devel\nRequires: freetype >= 1.3.1\nRequires: libharfbuzz0 >= 2.3.1\nRequires: libX11-6 >= 1.6\nRequires: libX11-data >= 1.6\nRequires: libXdmcp6 >= 1.1\nRequires: libXext6 >= 1.3\nRequires: libepoxy0 >= 1.5.3\nRequires: libgomp1 >= 7.4\nRequires: libstdc++6 >= 7.4\nRequires: libuuid1 >= 2.33\nRequires: libva2 >= 2.4.0\nRequires: libxcb1 >= 1.1\nRequires: libgbm1 >= 18.3.6\nRequires: mozilla-nspr >= 4.20\nRequires: mozilla-nss >= 3.42'
     else
-        read -r -d '' _requires <<- 'EOF'
+        read -r -d '' _custom_requires <<- 'EOF'
 			Requires: mesa-vulkan-drivers
 			Requires: freetype >= 2.9.1
 			Requires: harfbuzz >= 2.3.1
@@ -648,7 +674,6 @@ buildRPM() {
 			Requires: nspr >= 4.20
 			Requires: nss >= 3.42
 		EOF
-        #_requires=$'Requires: mesa-vulkan-drivers\nRequires: freetype >= 2.9.1\nRequires: harfbuzz >= 2.3.1\nRequires: libX11 >= 1.6\nRequires: libX11-common >= 1.6\nRequires: libXdmcp >= 1.1\nRequires: libXext >= 1.3\nRequires: libepoxy >= 1.5.3\nRequires: libgomp >= 7.4\nRequires: libstdc++ >= 7.4\nRequires: libuuid >= 2.33\nRequires: libva >= 2.4.0\nRequires: libxcb >= 1.1\nRequires: mesa-libgbm >= 18.3.6\nRequires: nspr >= 4.20\nRequires: nss >= 3.42'
     fi
 
     #debug "Requires: $_requires"
@@ -666,26 +691,16 @@ buildRPM() {
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
 		AutoReq:  0
-		Requires: glibc >= 2.28
-		Requires: alsa-lib >= 1.1.8
-		Requires: gtk3 >= 3.24
-		Requires: pango >= 1.42
-		Requires: python3
-		Requires: xdg-utils
-		Requires: fribidi >= 1.0.5
-		Requires: fontconfig >= 2.13
-		Requires: lcms2 >= 2.9
-		Requires: vulkan-headers >= 1.1
-		Requires: ca-certificates
-		Requires: libXScrnSaver
-		${_requires:-}
+
+		${_global_requires:-}
+        ${_custom_requires:-}
 
 		Recommends: vorbis-tools >= 1.4.0
 		Recommends: lame >= 3.0
 
 		Provides: mediacenter$_mversion
 
-		License: Copyright 1998-2021, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
+		License: Copyright 1998-2022, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
 
 		%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$

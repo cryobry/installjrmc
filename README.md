@@ -23,6 +23,8 @@ You can always find the latest supported options by running `installJRMC --help`
     rpm: Build and install MC locally (RPM-based OSes only)
 --build
     Build RPM from source DEB (no installation)
+--build-suse
+    Override OS detection and build SUSE RPM
 --mcversion VERSION
     Build or install a specific MC version, ex. "28.0.25"
 --outputdir PATH
@@ -37,7 +39,10 @@ You can always find the latest supported options by running `installJRMC --help`
     Install systemd services and containers for user USER (Default: executing user)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
+--createrepo
     Build rpm, copy to webroot, and run createrepo
+--createrepo-suse
+    Override OS detection and run --createrepo with SUSE RPM
 --createrepo-webroot PATH
     The webroot directory to install the repo (Default: /srv/jriver/)
 --createrepo-user USER
