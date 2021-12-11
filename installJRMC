@@ -20,7 +20,7 @@
 
 shopt -s extglob
 
-_scriptversion="1.0b4"
+_scriptversion="1.0b5"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
 _exec_user="$(whoami)"
@@ -173,7 +173,7 @@ init() {
     [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
 
     echo "Using MC version $_mcversion determined by $_version_source"
-    echo "To override, use --mcversion"
+    [[ "$_version_source" != "user input" ]] && echo "To override, use --mcversion"
 
     # Extract major version number
     _mversion="${_mcversion%%.*}"
@@ -353,34 +353,34 @@ getLatestVersion() {
     # This can be overriden w/ --mcversion
     # TODO need user input here
     # disable version checks for createrepo or rpmbuild (servers)
-    if [[ -v _install ]]; then
-        if [[ "$ID" == "ubuntu" ]]; then
-            # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
-            #     _base="bullseye"
-            [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
-                _base="buster"
-            [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
-                _mcversion="26.0.107"
-            [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
-                _mcversion="26.0.107" 
-        elif [[ "$ID" == "debian" ]]; then
-            _base="$VERSION_CODENAME"
-            [[ $VERSION_ID -eq 10 ]] && \
-                _base="buster"
-            [[ $VERSION_ID -le 9 ]] && \
-                _mcversion="26.0.107" # For 9 and 8
-        elif [[ "$ID" == "centos" ]]; then
-            [[ "$VERSION_ID" -eq "8" ]] && \
-                _base="buster"
-            [[ "$VERSION_ID" -lt "8" ]] && \
-                _mcversion="26.0.107" # Doubtful
-        fi
+    # if [[ -v _install ]]; then
+    #     if [[ "$ID" == "ubuntu" ]]; then
+    #         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
+    #         #     _base="bullseye"
+    #         [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
+    #             _base="buster"
+    #         [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
+    #             _mcversion="26.0.107"
+    #         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
+    #             _mcversion="26.0.107" 
+    #     elif [[ "$ID" == "debian" ]]; then
+    #         _base="$VERSION_CODENAME"
+    #         [[ $VERSION_ID -eq 10 ]] && \
+    #             _base="buster"
+    #         [[ $VERSION_ID -le 9 ]] && \
+    #             _mcversion="26.0.107" # For 9 and 8
+    #     elif [[ "$ID" == "centos" ]]; then
+    #         [[ "$VERSION_ID" -eq "8" ]] && \
+    #             _base="buster"
+    #         [[ "$VERSION_ID" -lt "8" ]] && \
+    #             _mcversion="26.0.107" # Doubtful
+    #     fi
 
-        [[ -v _mcversion ]] && \
-            _version_source="compatibility lookup" && \
-            debug "To override, use --mcversion" && \
-            return 0
-    fi
+    #     [[ -v _mcversion ]] && \
+    #         _version_source="compatibility lookup" && \
+    #         debug "To override, use --mcversion" && \
+    #         return 0
+    # fi
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($_base=buster)?
