@@ -392,10 +392,13 @@ getLatestVersion() {
             "apt-get update --allow-insecure-repositories -y > /dev/null 2>&1"
         if _mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1); then
             _version_source="containerized package manager"
+            buildah rm "$CNT" > /dev/null 2>&1
+            return 0
         fi
         buildah rm "$CNT" > /dev/null 2>&1
-    # Else scrape from Interact
-    elif _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+    fi
+    # Scrape from Interact
+    if _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         _version_source="webscrape"
     fi
 
