@@ -691,7 +691,7 @@ buildRPM() {
 		AutoReq:  0
 
 		${_global_requires:-}
-        ${_custom_requires:-}
+		${_custom_requires:-}
 
 		Recommends: vorbis-tools >= 1.4.0
 		Recommends: lame >= 3.0
