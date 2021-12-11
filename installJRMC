@@ -1187,98 +1187,98 @@ service_jriver-createrepo() {
 # }
 
 
-container_jriver-mediacenter() {
+# container_jriver-mediacenter() {
 
-    installPackage buildah podman
+#     installPackage buildah podman
 
-    # Eventually try to switch to Debian
-    # if ! CNT=$(buildah from debian:$_base); then
-    #     echo "Bad base image for container $CNAME, skipping"
-    #     continue
-    # fi
+#     # Eventually try to switch to Debian
+#     # if ! CNT=$(buildah from debian:$_base); then
+#     #     echo "Bad base image for container $CNAME, skipping"
+#     #     continue
+#     # fi
 
-    if ! CNT=$(buildah from jlesage/baseimage-gui:debian-10-v3.5.7); then
-        echo "Bad base image for container $CNAME, skipping"
-        continue
-    fi
+#     if ! CNT=$(buildah from jlesage/baseimage-gui:debian-10-v3.5.7); then
+#         echo "Bad base image for container $CNAME, skipping"
+#         continue
+#     fi
 
-    buildah run "$CNT" add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg
+#     buildah run "$CNT" add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg
 
 
-    # #BASEIMAGE=jlesage/baseimage-gui:debian-10-v3.5.7
-    # JRIVER_RELEASE=28
-    # JRIVER_TAG=stable
-    # ARCH=amd64
-    # REBUILD_MIN=22
-    # REBUILD_MAX=120
+#     # #BASEIMAGE=jlesage/baseimage-gui:debian-10-v3.5.7
+#     # JRIVER_RELEASE=28
+#     # JRIVER_TAG=stable
+#     # ARCH=amd64
+#     # REBUILD_MIN=22
+#     # REBUILD_MAX=120
 
-    # # JRiver Version tag (latest, stable or beta)
-    # ARG jriver_tag
+#     # # JRiver Version tag (latest, stable or beta)
+#     # ARG jriver_tag
 
-    # # JRiver Release Version (25, 26 etc.)
-    # ARG jriver_release
+#     # # JRiver Release Version (25, 26 etc.)
+#     # ARG jriver_release
 
-    # # Image Version of the build
-    # ARG image_version
+#     # # Image Version of the build
+#     # ARG image_version
 
-    # # .deb download URL, if set to "repository" the JRiver repository will be used
-    # ARG deb_url
+#     # # .deb download URL, if set to "repository" the JRiver repository will be used
+#     # ARG deb_url
 
-    # RUN add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg
+#     # RUN add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg
 
-    # Install JRiver
-    RUN \
-        add-pkg --virtual build-dependencies wget && \
-        # Install from Repository
-        if [ "${deb_url}" = "repository" ]; then \
-            echo "Installing JRiver from repository ${jriver_release}:${jriver_tag}" && \
-            wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - && \
-            wget http://dist.jriver.com/${jriver_tag}/mediacenter/mediacenter${jriver_release}.list -O /etc/apt/sources.list.d/mediacenter${jriver_release}.list && \
-            apt-get update && \
-            add-pkg mediacenter${jriver_release}; \
-        # Install from .deb URL
-        else \
-            echo "Installing JRiver from URL: ${deb_url}" && \
-            wget -q -O "jrivermc.deb" ${deb_url} && \
-            add-pkg "./jrivermc.deb"; \
-        fi && \
-        # Cleanup
-        del-pkg build-dependencies && \
-        rm -rf /tmp/* /tmp/.[!.]*
+#     # Install JRiver
+#     RUN \
+#         add-pkg --virtual build-dependencies wget && \
+#         # Install from Repository
+#         if [ "${deb_url}" = "repository" ]; then \
+#             echo "Installing JRiver from repository ${jriver_release}:${jriver_tag}" && \
+#             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - && \
+#             wget http://dist.jriver.com/${jriver_tag}/mediacenter/mediacenter${jriver_release}.list -O /etc/apt/sources.list.d/mediacenter${jriver_release}.list && \
+#             apt-get update && \
+#             add-pkg mediacenter${jriver_release}; \
+#         # Install from .deb URL
+#         else \
+#             echo "Installing JRiver from URL: ${deb_url}" && \
+#             wget -q -O "jrivermc.deb" ${deb_url} && \
+#             add-pkg "./jrivermc.deb"; \
+#         fi && \
+#         # Cleanup
+#         del-pkg build-dependencies && \
+#         rm -rf /tmp/* /tmp/.[!.]*
 
-    # Add rootfs
-    COPY rootfs/ /
+#     # Add rootfs
+#     COPY rootfs/ /
 
-    VOLUME ["/config"]
+#     VOLUME ["/config"]
 
-    # Application Icon
-    RUN \
-        APP_ICON_URL=https://gitlab.com/shiomax/jrivermc-docker/raw/master/assets/Application.png && \
-        install_app_icon.sh "$APP_ICON_URL"
+#     # Application Icon
+#     RUN \
+#         APP_ICON_URL=https://gitlab.com/shiomax/jrivermc-docker/raw/master/assets/Application.png && \
+#         install_app_icon.sh "$APP_ICON_URL"
 
-    # Various configuration vars
-    ENV KEEP_APP_RUNNING=1 \
-        DISPLAY_WIDTH=1280 \
-        DISPLAY_HEIGHT=768 \
-        APP_NAME="JRiver MediaCenter ${jriver_release}" \
-        MAXIMIZE_POPUPS=0 \
-        S6_KILL_GRACETIME=8000
+#     # Various configuration vars
+#     ENV KEEP_APP_RUNNING=1 \
+#         DISPLAY_WIDTH=1280 \
+#         DISPLAY_HEIGHT=768 \
+#         APP_NAME="JRiver MediaCenter ${jriver_release}" \
+#         MAXIMIZE_POPUPS=0 \
+#         S6_KILL_GRACETIME=8000
 
-    # Modify startapp.sh and rc.xml with JRiver version
-    RUN sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
-            /startapp.sh && \
-        sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
-            /etc/xdg/openbox/rc.xml
+#     # Modify startapp.sh and rc.xml with JRiver version
+#     RUN sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
+#             /startapp.sh && \
+#         sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
+#             /etc/xdg/openbox/rc.xml
 
-    EXPOSE 5800 5900 52100 52101 52199 1900/udp
+#     EXPOSE 5800 5900 52100 52101 52199 1900/udp
 
-    # Metadata.
-    LABEL \
-        org.label-schema.name="jrivermc${jriver_release}" \
-        org.label-schema.description="Docker image for JRiver Media Center ${jriver_release}." \
-        org.label-schema.version="${image_version}" \
-        org.label-schema.vcs-url="https://gitlab.com/shiomax/jrivermc-docker" \
-        org.label-schema.schema-version="1.0"
+#     # Metadata.
+#     LABEL \
+#         org.label-schema.name="jrivermc${jriver_release}" \
+#         org.label-schema.description="Docker image for JRiver Media Center ${jriver_release}." \
+#         org.label-schema.version="${image_version}" \
+#         org.label-schema.vcs-url="https://gitlab.com/shiomax/jrivermc-docker" \
+#         org.label-schema.schema-version="1.0"
 
 #     installPackage buildah podman
 #     cnt=$(buildah from docker.io/jlesage/baseimage-gui:debian-10)
