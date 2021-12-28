@@ -426,7 +426,7 @@ installPackage() {
     local -a _pkg_array _install_flags
     local _pkg _nocheck _silent _return
 
-    if _input=$(getopt -o +s -l nocheck,nogpgcheck,skip-broken,silent -- "$@"); then
+    if _input=$(getopt -o +s -l nocheck,nogpgcheck,nobest,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -440,9 +440,9 @@ installPackage() {
                         _install_flags+=("--allow-unsigned-rpm")
                     fi
                     ;;
-                --skip-broken)
+                --nobest)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        _install_flags+=("--skip-broken")
+                        _install_flags+=("--nobest")
                     fi
                     ;;
                 --silent|-s)
@@ -1477,7 +1477,7 @@ main() {
 
         #rpm --upgrade "$_mcrpm"        
 
-        if installPackage --nocheck --nogpgcheck "$_mcrpm"; then
+        if installPackage --nocheck --nogpgcheck --nobest "$_mcrpm"; then
             echo "JRiver Media Center installed successfully"
         else
             err "JRiver Media Center installation failed"
