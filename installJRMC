@@ -399,6 +399,7 @@ getLatestVersion() {
         buildah rm "$CNT" > /dev/null 2>&1
     fi
     # Scrape from Interact
+    installPackage wget
     if _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         _version_source="webscrape"
     fi
