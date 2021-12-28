@@ -1468,7 +1468,7 @@ main() {
 
     # Install RPM
     if [[ -v _install && "$_install" == "rpm" ]]; then
-        if installPackage --nocheck --nogpgcheck "$_mcrpm"; then
+        if installPackage --nocheck --nogpgcheck --skip-broken "$_mcrpm"; then
             echo "JRiver Media Center installed successfully"
         else
             err "JRiver Media Center installation failed"
