@@ -47,6 +47,8 @@ You can always find the latest supported options by running `installJRMC --help`
     The webroot directory to install the repo (Default: /srv/jriver/)
 --createrepo-user USER
     The web server user (Default: current user)
+--universal
+    Build/install RPM without minimum version specifiers
 --version, -v
     Print this script version and exit
 --debug, -d

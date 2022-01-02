@@ -23,7 +23,7 @@ shopt -s extglob
 _scriptversion="1.0b5"
 _outputdir="$PWD/output"
 _createrepo_webroot="/var/www/jriver"
-_exec_user="$(whoami)"
+_exec_user=$(whoami)
 _systemddir="/usr/lib/systemd/system"
 
 # MC version
@@ -68,6 +68,8 @@ printHelp() {
 		            The web server user (Default: current user)
             --createrepo-suse
                 Override OS detection and run --createrepo with SUSE RPM
+            --universal
+                Build/install RPM without minimum version specifiers
 		    --version, -v
 		        Print this script version and exit
 		    --debug, -d
@@ -236,7 +238,7 @@ parseInput() {
         _install="repo"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,universal -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -296,6 +298,9 @@ parseInput() {
                     ;;
                 --display)
                     shift && _display="$1"
+                    ;;
+                --universal)
+                    _universal=true
                     ;;
                 --container|-c)
                     shift && _containers+=("$1")
@@ -641,6 +646,8 @@ buildRPM() {
 		Requires: vulkan-headers >= 1.1
 		Requires: ca-certificates
 		Requires: libXScrnSaver
+		Recommends: vorbis-tools >= 1.4.0
+		Recommends: lame >= 3.0
 	EOF
 
     # SUSE dependency name variations
@@ -683,8 +690,12 @@ buildRPM() {
 			Requires: nss >= 3.42
 		EOF
     fi
-
-    #debug "Requires: $_requires"
+	
+	if [[ -v _universal ]]; then
+		# Strip minimum versions
+		_custom_requires=$(echo "$_custom_requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
+		_global_requires=$(echo "$_global_requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
+	fi
 
     # Create spec file
     cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
@@ -702,9 +713,6 @@ buildRPM() {
 
 		${_global_requires:-}
 		${_custom_requires:-}
-
-		Recommends: vorbis-tools >= 1.4.0
-		Recommends: lame >= 3.0
 
 		Provides: mediacenter$_mversion
 
@@ -1477,7 +1485,7 @@ main() {
 
         #rpm --upgrade "$_mcrpm"        
 
-        if installPackage --nocheck --nogpgcheck --nobest "$_mcrpm"; then
+        if installPackage --nocheck --nogpgcheck "$_mcrpm"; then
             echo "JRiver Media Center installed successfully"
         else
             err "JRiver Media Center installation failed"
