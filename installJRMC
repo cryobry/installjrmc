@@ -68,7 +68,7 @@ printHelp() {
 		            The web server user (Default: current user)
             --createrepo-suse
                 Override OS detection and run --createrepo with SUSE RPM
-            --universal
+            --compat
                 Build/install RPM without minimum version specifiers
 		    --version, -v
 		        Print this script version and exit
@@ -238,7 +238,7 @@ parseInput() {
         _install="repo"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,universal -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -299,8 +299,8 @@ parseInput() {
                 --display)
                     shift && _display="$1"
                     ;;
-                --universal)
-                    _universal=true
+                --compat)
+                    _compat=true
                     ;;
                 --container|-c)
                     shift && _containers+=("$1")
@@ -691,7 +691,7 @@ buildRPM() {
 		EOF
     fi
 	
-	if [[ -v _universal ]]; then
+	if [[ -v _compat ]]; then
 		# Strip minimum versions
 		_custom_requires=$(echo "$_custom_requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
 		_global_requires=$(echo "$_global_requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
