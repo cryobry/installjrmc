@@ -163,7 +163,7 @@ init() {
         PKG_ALIASES["tigervnc-server"]="tigervnc-standalone-server"
     fi
 
-    # Install script dependencies
+    # Install dependency dependencies :-)
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
     # Select MC version to work with
@@ -389,7 +389,7 @@ getLatestVersion() {
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($_base=buster)?
-    [[ ! -x $(command -v buildah) ]] && installPackage --silent buildah
+    installPackage --silent buildah
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$_base); then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $_base main' > /etc/apt/sources.list 2>&1"
@@ -607,12 +607,104 @@ acquireDeb() {
 
 
 #######################################
+# Translate deb package dependencies for each distro
+#######################################
+packageTranslations() {
+
+    declare -ga requires recommends
+
+    # Load deb dependencies into array
+    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
+    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
+
+    # Clean up formatting
+    for i in "${!requires[@]}"; do
+        requires[$i]="${requires[$i]%%|*}"
+        requires[$i]="${requires[$i]/?:/}"
+        requires[$i]="${requires[$i]# }"
+        requires[$i]="${requires[$i]% }"
+        requires[$i]="${requires[$i]//\(/}"
+        requires[$i]="${requires[$i]//)/}"
+    done
+
+    # Translate package names
+    case "$ID" in
+        fedora|centos)
+            requires=("${requires[@]/libc6/glibc}")
+            requires=("${requires[@]/libasound2/alsa-lib}")
+            requires=("${requires[@]/libuuid1/libuuid}")
+            requires=("${requires[@]/libX11-6/libX11}")
+            requires=("${requires[@]/libext6/libXext}")
+            requires=("${requires[@]/libxcb1/libxcb}")
+            requires=("${requires[@]/libxdmcp6/libXdmcp}")
+            requires=("${requires[@]/libstdc++6/libstdc++}")
+            requires=("${requires[@]/libgtk-3-0/gtk3}")
+            requires=("${requires[@]/libgl1-mesa-glx/mesa-libGL}")
+            requires=("${requires[@]/libpango-1.0-0/pango}")
+            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
+            requires=("${requires[@]/libpangox-1.0-0/pango}")
+            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
+            requires=("${requires[@]/libnss3/nss}")
+            requires=("${requires[@]/libnspr4/nspr}")
+            requires=("${requires[@]/libgomp1/libgomp}")
+            requires=("${requires[@]/libfribidi0/fribidi}")
+            requires=("${requires[@]/libfontconfig1/fontconfig}")
+            requires=("${requires[@]/libfreetype6/freetype}")
+            requires=("${requires[@]/libharfbuzz0b/harfbuzz}")
+            requires=("${requires[@]/libgbm1/mesa-libgbm}")
+            requires=("${requires[@]/libva2/libva}")
+            requires=("${requires[@]/libepoxy0/libepoxy}")
+            requires=("${requires[@]/liblcms2-2/lcms2}")
+            requires=("${requires[@]/libvulkan1/vulkan-loader}")
+            requires=("${requires[@]/libepoxy0/libepoxy}")
+            ;;
+        opensuse.*)
+            requires=("${requires[@]/libc6/glibc}")
+            requires=("${requires[@]/libasound2/alsa-lib}")
+            requires=("${requires[@]/libuuid1/libuuid}")
+            requires=("${requires[@]/libext6/libXext6}")
+            requires=("${requires[@]/libxdmcp6/libXdmcp6}")
+            requires=("${requires[@]/libgtk-3-0/gtk3}")
+            requires=("${requires[@]/libgl1-mesa-glx/Mesa-libGL1}")
+            requires=("${requires[@]/libpango-1.0-0/pango}")
+            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
+            requires=("${requires[@]/libpangox-1.0-0/pango}")
+            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
+            requires=("${requires[@]/libnss3/mozilla-nss}")
+            requires=("${requires[@]/libnspr4/mozilla-nspr}")
+            requires=("${requires[@]/libfribidi0/fribidi}")
+            requires=("${requires[@]/libfontconfig1/fontconfig}")
+            requires=("${requires[@]/libfreetype6/freetype}")
+            requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
+            ;;
+    esac
+
+    # Remove duplicates
+    declare -A dupes
+    for i in "${requires[@]}"; do
+        if [[ ! -v dupes[${i%% *}] ]]; then
+            cleaned_requires+=("$i")
+        fi
+        dupes["${i%% *}"]=1
+    done
+    requires=("${cleaned_requires[@]}")
+
+    # Convert array to newline delim'd string (for heredoc)
+    printf -v requires "Requires: %s\n" "${requires[@]}"
+    printf -v recommends "Recommends: %s\n" "${recommends[@]}"
+    # Strip last newline
+    requires="${requires%?}" 
+    recommends="${recommends%?}"
+}
+
+
+#######################################
 # Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
 #######################################
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local _build_requires _global_requires _custom_requires _ec
+    local _ec
 
     declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
 
@@ -622,79 +714,11 @@ buildRPM() {
         return 0
     fi
 
-    # install build dependencies
-    installPackage "wget" "dpkg" "rpm-build"
-
     [[ ! -d "$_outputdir/SPECS" ]] && mkdir -p "$_outputdir/SPECS"
 
-    # rpmbuild uses rpm to check for build dependencies
-    # this will fail on non-rpm distros
-    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        _build_requires=$'BuildRequires: rpm >= 4.11.0\nBuildRequires: dpkg'
-    fi
-
-    read -r -d '' _global_requires <<- 'EOF'
-		Requires: glibc >= 2.28
-		Requires: alsa-lib >= 1.1.8
-		Requires: gtk3 >= 3.24
-		Requires: pango >= 1.42
-		Requires: python3
-		Requires: xdg-utils
-		Requires: fribidi >= 1.0.5
-		Requires: fontconfig >= 2.13
-		Requires: lcms2 >= 2.9
-		Requires: vulkan-headers >= 1.1
-		Requires: ca-certificates
-		Requires: libXScrnSaver
-		Recommends: vorbis-tools >= 1.4.0
-		Recommends: lame >= 3.0
-	EOF
-
-    # SUSE dependency name variations
-    if [[ "$ID" =~ ^opensuse.*$ || -v _build_suse ]]; then
-        read -r -d '' _custom_requires <<- 'EOF'
-			Requires: Mesa-libVulkan-devel
-			Requires: freetype >= 1.3.1
-			Requires: libharfbuzz0 >= 2.3.1
-			Requires: libX11-6 >= 1.6
-			Requires: libX11-data >= 1.6
-			Requires: libXdmcp6 >= 1.1
-			Requires: libXext6 >= 1.3
-			Requires: libepoxy0 >= 1.5.3
-			Requires: libgomp1 >= 7.4
-			Requires: libstdc++6 >= 7.4
-			Requires: libuuid1 >= 2.33
-			Requires: libva2 >= 2.4.0
-			Requires: libxcb1 >= 1.1
-			Requires: libgbm1 >= 18.3.6
-			Requires: mozilla-nspr >= 4.20
-			Requires: mozilla-nss >= 3.42
-		EOF
-    else
-        read -r -d '' _custom_requires <<- 'EOF'
-			Requires: mesa-vulkan-drivers
-			Requires: freetype >= 2.9.1
-			Requires: harfbuzz >= 2.3.1
-			Requires: libX11 >= 1.6
-			Requires: libX11-common >= 1.6
-			Requires: libXdmcp >= 1.1
-			Requires: libXext >= 1.3
-			Requires: libepoxy >= 1.5.3
-			Requires: libgomp >= 7.4
-			Requires: libstdc++ >= 7.4
-			Requires: libuuid >= 2.33
-			Requires: libva >= 2.4.0
-			Requires: libxcb >= 1.1
-			Requires: mesa-libgbm >= 18.3.6
-			Requires: nspr >= 4.20
-			Requires: nss >= 3.42
-		EOF
-    fi
-	
 	if [[ -v _compat ]]; then
 		# Strip minimum versions
-		_custom_requires=$(echo "$_custom_requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
-		_global_requires=$(echo "$_global_requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
+		requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
 	fi
 
     # Create spec file
@@ -705,14 +729,13 @@ buildRPM() {
 		Summary: JRiver Media Center
 		Group:   Applications/Media
 		Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb
-		${_build_requires:-}
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
 		AutoReq:  0
 
-		${_global_requires:-}
-		${_custom_requires:-}
+		${requires:-}
+		${recommends:-}
 
 		Provides: mediacenter$_mversion
 
@@ -1466,9 +1489,13 @@ main() {
     # Build RPM from source deb package
     if [[ -v _build ]]; then
         acquireDeb
+        installPackage "wget" "dpkg" "rpm-build"
+        packageTranslations
+
         if ! buildRPM; then
             err "Build failed."
-            # For automation, let's remove the source DEB and reaquire it on next run in case it is corrupted or buggy
+            # For automation, let's remove the source DEB and reaquire it on next run 
+            # after failure in case it is corrupted or buggy
             [[ -f "$DEBFILENAME" ]] && echo "Removing source DEB" && rm -f "$DEBFILENAME"
             exit 1
         fi
