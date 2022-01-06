@@ -27,7 +27,7 @@ _exec_user=$(whoami)
 _systemddir="/usr/lib/systemd/system"
 
 # MC version
-# _mcversion="28.0.87" # to set manually, if unset use automatic latest check
+# mcversion="28.0.87" # to set manually, if unset use automatic latest check
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -167,21 +167,21 @@ init() {
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
     # Select MC version to work with
-    if [[ -v _mcversion ]]; then
+    if [[ -v mcversion ]]; then
         _version_source="user input"
     else
         getLatestVersion
     fi
-    [[ ! "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
+    [[ ! "$mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
 
-    echo "Using MC version $_mcversion determined by $_version_source"
+    echo "Using MC version $mcversion determined by $_version_source"
     [[ "$_version_source" != "user input" ]] && echo "To override, use --mcversion"
 
     # Extract major version number
-    _mversion="${_mcversion%%.*}"
+    _mversion="${mcversion%%.*}"
 
     # Saving this substituion in case it's needed in the future
-    # _variation="${_mcversion##*.}"
+    # _variation="${mcversion##*.}"
 }
 
 # Some helper functions
@@ -264,7 +264,7 @@ parseInput() {
                     shift && _outputdir="$1"
                     ;;
                 --mcversion)
-                    shift && _mcversion="$1"
+                    shift && mcversion="$1"
                     ;;
                 --restorefile)
                     shift && _restorefile="$1"
@@ -344,15 +344,15 @@ parseInput() {
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g _mcversion
+    declare -g mcversion base boardurl
 
     # Latest defaults
-    _base="buster" # For container method
-    _boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
-    #_base_next="bullseye" # TODO use for fallback to smooth upgrades
+    base="buster" # For container method
+    boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
+    #base_next="bullseye" # TODO use for fallback to smooth upgrades
 
     # Legacy
-    #_boardurl26="https://yabb.jriver.com/interact/index.php/board,64.0.html" # jessie/stretch
+    #boardurl26="https://yabb.jriver.com/interact/index.php/board,64.0.html" # jessie/stretch
 
     # Peg older versions to prevent ABI and dependency mismatches in automatic mode
     # This can be overriden w/ --mcversion
@@ -361,42 +361,42 @@ getLatestVersion() {
     # if [[ -v _install ]]; then
     #     if [[ "$ID" == "ubuntu" ]]; then
     #         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
-    #         #     _base="bullseye"
+    #         #     base="bullseye"
     #         [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
-    #             _base="buster"
+    #             base="buster"
     #         [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
-    #             _mcversion="26.0.107"
+    #             mcversion="26.0.107"
     #         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
-    #             _mcversion="26.0.107" 
+    #             mcversion="26.0.107" 
     #     elif [[ "$ID" == "debian" ]]; then
-    #         _base="$VERSION_CODENAME"
+    #         base="$VERSION_CODENAME"
     #         [[ $VERSION_ID -eq 10 ]] && \
-    #             _base="buster"
+    #             base="buster"
     #         [[ $VERSION_ID -le 9 ]] && \
-    #             _mcversion="26.0.107" # For 9 and 8
+    #             mcversion="26.0.107" # For 9 and 8
     #     elif [[ "$ID" == "centos" ]]; then
     #         [[ "$VERSION_ID" -eq "8" ]] && \
-    #             _base="buster"
+    #             base="buster"
     #         [[ "$VERSION_ID" -lt "8" ]] && \
-    #             _mcversion="26.0.107" # Doubtful
+    #             mcversion="26.0.107" # Doubtful
     #     fi
 
-    #     [[ -v _mcversion ]] && \
+    #     [[ -v mcversion ]] && \
     #         _version_source="compatibility lookup" && \
     #         debug "To override, use --mcversion" && \
     #         return 0
     # fi
 
     # Use a containerized package manager
-    # TODO but how to determine build distro ($_base=buster)?
+    # TODO but how to determine build distro ($base=buster)?
     installPackage --silent buildah
-    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$_base); then 
+    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$base); then 
         buildah run "$CNT" -- bash -c \
-            "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $_base main' > /etc/apt/sources.list 2>&1"
+            "echo 'deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $base main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
             "apt-get update --allow-insecure-repositories -y > /dev/null 2>&1"
-        if _mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
-            && [[ "$_mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        if mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
+            && [[ "$mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
             _version_source="containerized package manager"
             buildah rm "$CNT" > /dev/null 2>&1
             return 0
@@ -405,12 +405,12 @@ getLatestVersion() {
     fi
     # Scrape from Interact
     installPackage wget
-    if _mcversion=$(wget -qO- "$_boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+    if mcversion=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         _version_source="webscrape"
     fi
 
-    if ! [[ -v _mcversion ]]; then
-        err "MC version could not be determined. Please check the boardurl: $_boardurl or specify a version manually using --mcversion"
+    if ! [[ -v mcversion ]]; then
+        err "MC version could not be determined. Please check the boardurl: $boardurl or specify a version manually using --mcversion"
         exit 1
     fi
 }
@@ -506,7 +506,7 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        # _mversion will depend on _base unless --mcversion is passed
+        # _mversion will depend on base unless --mcversion is passed
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
         ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list" > /dev/null 2>&1
@@ -524,7 +524,7 @@ installMCFromRepo() {
 
     local _mcpkg
 
-    echo "Installing JRiver Media Center $_mcversion from repository."
+    echo "Installing JRiver Media Center $mcversion from repository."
     echo "Future updates will be handled by your package manager."
 
     if ! debug; then
@@ -549,9 +549,9 @@ installMCFromRepo() {
 
     if [[ -v _specific_version ]]; then
         if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-            _mcpkg="$_mcpkg-$_mcversion"
+            _mcpkg="$_mcpkg-$mcversion"
         elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-            _mcpkg="$_mcpkg=$_mcversion"
+            _mcpkg="$_mcpkg=$mcversion"
         fi
     fi
 
@@ -573,7 +573,7 @@ acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g DEBFILENAME
-    DEBFILENAME="$_outputdir/SOURCES/MediaCenter-$_mcversion-amd64.deb"
+    DEBFILENAME="$_outputdir/SOURCES/MediaCenter-$mcversion-amd64.deb"
 
     # If necessary, create SOURCES dir
     [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
@@ -584,15 +584,15 @@ acquireDeb() {
     elif [[ -v _betapass ]]; then
         echo "Checking beta repo..."
         if wget -q -O "$DEBFILENAME" \
-        "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$_mcversion-amd64.deb"; then
+        "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$mcversion-amd64.deb"; then
             echo "Found!"
         fi
     elif echo "Checking test repo..." && wget -q -O "$DEBFILENAME" \
-    "https://files.jriver.com/mediacenter/test/MediaCenter-$_mcversion-amd64.deb"; then
+    "https://files.jriver.com/mediacenter/test/MediaCenter-$mcversion-amd64.deb"; then
         echo "Found!"
     # Else check latest repo
     elif echo "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
-    "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb"; then
+    "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$mcversion-amd64.deb"; then
         echo "Found!"
     else
         err "Cannot find DEB file."
@@ -706,7 +706,7 @@ buildRPM() {
 
     local _ec
 
-    declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$_mcversion.x86_64.rpm"
+    declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$mcversion.x86_64.rpm"
 
     # skip rebuilding the rpm if it already exists
     if [[ -f "$_mcrpm" ]]; then
@@ -724,11 +724,11 @@ buildRPM() {
     # Create spec file
     cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
 		Name:    MediaCenter
-		Version: $_mcversion
+		Version: $mcversion
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$_mcversion-amd64.deb
+		Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$mcversion-amd64.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
@@ -767,7 +767,7 @@ buildRPM() {
 	EOF
 
     # Run rpmbuild
-    echo "Building version $_mcversion, please wait..."
+    echo "Building version $mcversion, please wait..."
 
     if debug; then
         rpmbuild --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"
@@ -1233,7 +1233,7 @@ service_jriver-createrepo() {
 #     installPackage buildah podman
 
 #     # Eventually try to switch to Debian
-#     # if ! CNT=$(buildah from debian:$_base); then
+#     # if ! CNT=$(buildah from debian:$base); then
 #     #     echo "Bad base image for container $CNAME, skipping"
 #     #     continue
 #     # fi
