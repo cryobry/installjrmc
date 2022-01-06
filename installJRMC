@@ -143,7 +143,7 @@ init() {
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
-        pkg_remove(){ ifSudo zypper --non-interactive remove --clean-deps "$@"; }
+        pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ ifSudo zypper --non-interactive -q refresh jriver; }
         pkg_query(){ ifSudo rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
@@ -1436,10 +1436,10 @@ uninstall() {
     fi
 
     if debug; then
-        debug "pkg_remove -q $_mcpkg"
-        pkg_remove "-q" "$_mcpkg"
+        debug "pkg_remove $_mcpkg"
+        pkg_remove "$_mcpkg"
     else
-        pkg_remove "-q" "$_mcpkg" > /dev/null 2>&1
+        pkg_remove "$_mcpkg" > /dev/null 2>&1
     fi
 
     echo "JRiver Media Center has been completely uninstalled."
