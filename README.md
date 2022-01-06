@@ -44,7 +44,7 @@ You can always find the latest supported options by running `installJRMC --help`
 --createrepo-suse
     Override OS detection and run --createrepo with SUSE RPM
 --createrepo-webroot PATH
-    The webroot directory to install the repo (Default: /srv/jriver/)
+    The webroot directory to install the repo (Default: /var/www/jriver/)
 --createrepo-user USER
     The web server user (Default: current user)
 --compat
@@ -61,7 +61,7 @@ You can always find the latest supported options by running `installJRMC --help`
 
 ### services
 
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some server installations it may be necessary to execute the script as root. If so, use `--service-user root` to override safety checks.
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some installations (container) it may be necessary to execute the script as root. If so, use `--service-user root` to override safety checks.
 
 ```text
 jriver-mediaserver
