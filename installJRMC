@@ -154,15 +154,6 @@ init() {
     _service_user="${_service_user:-$_exec_user}"
     _createrepo_user="${_createrepo_user:-$_exec_user}"
 
-    # Set package aliases
-    if [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        declare -Ag PKG_ALIASES
-        PKG_ALIASES["xorg-x11-utils"]="xorg-x11"
-        PKG_ALIASES["rpm-build"]="rpm"
-        PKG_ALIASES["createrepo_c"]="createrepo"
-        PKG_ALIASES["tigervnc-server"]="tigervnc-standalone-server"
-    fi
-
     # Install dependency dependencies :-)
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
@@ -389,7 +380,7 @@ getLatestVersion() {
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($base=buster)?
-    installPackage --silent buildah
+    [[ -x $(command -v buildah) ]] || installPackage --silent buildah
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$base); then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $base main' > /etc/apt/sources.list 2>&1"
@@ -464,14 +455,25 @@ installPackage() {
         exit 1
     fi
 
+    # Aliases
+    if [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        declare -A PKG_ALIASES
+        PKG_ALIASES["xorg-x11-utils"]="xorg-x11"
+        PKG_ALIASES["rpm-build"]="rpm"
+        PKG_ALIASES["createrepo_c"]="createrepo"
+        PKG_ALIASES["tigervnc-server"]="tigervnc-standalone-server"
+    fi
+
     for _pkg in "$@"; do
         # Check for alias
         if [[ ! -v _nocheck && -v PKG_ALIASES[$_pkg] ]]; then
             _pkg=${PKG_ALIASES[$_pkg]}
         fi
         # Check if already installed
-        if [[ -v _nocheck ]] || ! pkg_query "$_pkg" > /dev/null 2>&1; then
-            _pkg_array+=("$_pkg")
+        if  [[ -v _nocheck ]] \
+            || ([[ ! -x $(command -v $_pkg) ]] \
+            && ! pkg_query "$_pkg" > /dev/null 2>&1); then
+                _pkg_array+=("$_pkg")
         fi
     done
 
