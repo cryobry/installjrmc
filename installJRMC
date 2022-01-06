@@ -1415,8 +1415,7 @@ uninstall() {
             fi
         done
         for f in "$_service_fname" "$_timer_fname"; do
-            debug "Removing $f"
-            rm_cmd "$f"
+            [[ -f "$f" ]] && debug "Removing $f" && rm_cmd "$f"
         done
         systemctl_reload
     done
