@@ -20,14 +20,14 @@
 
 shopt -s extglob
 
-_scriptversion="1.0b5"
-_outputdir="$PWD/output"
-_createrepo_webroot="/var/www/jriver"
-_exec_user=$(whoami)
-_systemddir="/usr/lib/systemd/system"
+SCRIPTVERSION="1.0b5"
+OUTPUTDIR="$PWD/output"
+CREATEREPO_WEBROOT="/var/www/jriver"
+EXEC_USER=$(whoami)
+SERVICEDIR="/usr/lib/systemd/system"
 
 # MC version
-# mcversion="28.0.87" # to set manually, if unset use automatic latest check
+# MCVERSION="28.0.87" # to set manually, if unset use automatic latest check
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -46,7 +46,7 @@ printHelp() {
 		        Build RPM from source DEB (but don't install it)
             --build-suse
                 Override OS detection and build SUSE RPM
-		    --mcversion VERSION
+		    --MCVERSION VERSION
 		        Specify the MC version, ex. "28.0.25" (Default: latest version)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: $PWD/output)
@@ -81,11 +81,11 @@ printHelp() {
 
 		SERVICES
 		    jriver-mediaserver
-		        Enable and start a mediaserver systemd service (requires an existing X server)
+		        Enable and start a mediaserver systemd service (REQUIRES an existing X server)
 		    jriver-mediacenter
-		        Enable and start a mediacenter systemd service (requires an existing X server)
+		        Enable and start a mediacenter systemd service (REQUIRES an existing X server)
 		    jriver-x11vnc
-		        Enable and start x11vnc for the local desktop (requires an existing X server)
+		        Enable and start x11vnc for the local desktop (REQUIRES an existing X server)
 		        Usually combined with jriver-mediaserver or jriver-mediacenter services
 		        --vncpass and --display are optional (see below)
 		    jriver-xvnc
@@ -108,6 +108,9 @@ printHelp() {
 
 init() {
     debug "Running: ${FUNCNAME[0]}"
+
+    declare _version_source
+    declare -g SERVICE_USER CREATEREPO_USER MCVERSION MVERSION
 
     getOS
 
@@ -151,35 +154,36 @@ init() {
 
     parseInput "$@"
 
-    _service_user="${_service_user:-$_exec_user}"
-    _createrepo_user="${_createrepo_user:-$_exec_user}"
+    SERVICE_USER="${SERVICE_USER:-$EXEC_USER}"
+    CREATEREPO_USER="${CREATEREPO_USER:-$EXEC_USER}"
 
     # Select MC version to work with
-    if [[ -v mcversion ]]; then
+    if [[ -v MCVERSION ]]; then
         _version_source="user input"
     else
         getLatestVersion
     fi
-    [[ ! "$mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
+    [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
 
-    echo "Using MC version $mcversion determined by $_version_source"
-    [[ "$_version_source" != "user input" ]] && echo "To override, use --mcversion"
+    echo "Using MC version $MCVERSION determined by $_version_source"
+    [[ "$_version_source" != "user input" ]] && echo "To override, use --MCVERSION"
 
     # Extract major version number
-    mversion="${mcversion%%.*}"
+    MVERSION="${MCVERSION%%.*}"
 
     # Saving this substituion in case it's needed in the future
-    # _variation="${mcversion##*.}"
+    # _variation="${MCVERSION##*.}"
 }
 
-# Some helper functions
 askOk() {
-    local _response
+    declare _response
     read -r -p "$* [y/N]" _response
     _response=${_response,,}
     [[ ! "$_response" =~ ^(yes|y)$ ]] && return 1
     return 0
 }
+
+
 debug() { 
     if [[ -v _debug ]]; then
         if [[ $# -gt 0 ]]; then
@@ -189,7 +193,11 @@ debug() {
         return 1
     fi
 }
+
+
 err() { echo "Error: $*" >&2; }
+
+
 getOS() {
     debug "Running: ${FUNCNAME[0]}"
     if [[ -e "/etc/os-release" ]]; then
@@ -201,29 +209,33 @@ getOS() {
     fi
     debug "Platform: $ID $VERSION_ID"
 }
+
+
 ifSudo() {
-    local _user="root"
+    declare _user="root"
     if [[ $# == 0 ]]; then
-        [[ "$_exec_user" == "root" ]]; return $?
+        [[ "$EXEC_USER" == "root" ]]; return $?
     elif [[ $# -eq 2 && "$1" == "-u" ]]; then
         _user="$2"
-        [[ "$_exec_user" == "$_user" ]]; return $?
+        [[ "$EXEC_USER" == "$_user" ]]; return $?
     elif [[ $# -gt 2 && "$1" == "-u" ]]; then
         _user="$2"
         shift 2
     fi
-    if [[ "$_user" == "$_exec_user" ]]; then
+    if [[ "$_user" == "$EXEC_USER" ]]; then
         "$@"
     else
         sudo -u "$_user" "$@"
     fi
 }
+
+
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
         debug "No options passed, defaulting to repo installation method"
-        _install="repo"
+        INSTALL_TYPE="repo"
     fi
 
     if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
@@ -232,81 +244,81 @@ parseInput() {
             case "$1" in
                 --install|-i)
                     shift 
-                    _install="$1"
-                    if [[ "$_install" == "rpm" ]]; then
+                    INSTALL_TYPE="$1"
+                    if [[ "$INSTALL_TYPE" == "rpm" ]]; then
                         if [[ ! "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
                             err "RPM install method not available on $ID"
                             printHelp && exit 1
                         fi
-                        _build=true
+                        BUILD_SWITCH=true
                     fi
                     ;;
                 --build)
-                    _build=true
+                    BUILD_SWITCH=true
                     ;;
                 --build-suse)
-                    _build=true
-                    _build_suse=true
+                    BUILD_SWITCH=true
+                    BUILD_SUSE_SWITCH=true
                     ;;
                 --outputdir)
-                    shift && _outputdir="$1"
+                    shift && OUTPUTDIR="$1"
                     ;;
                 --mcversion)
-                    shift && mcversion="$1"
+                    shift && MCVERSION="$1"
                     ;;
                 --restorefile)
-                    shift && _restorefile="$1"
+                    shift && RESTOREFILE="$1"
                     ;;
                 --betapass)
-                    shift && _betapass="$1"
+                    shift && BETAPASS="$1"
                     ;;
                 --service-user)
-                    shift && _service_user="$1"
+                    shift && SERVICE_USER="$1"
                     ;;
                 --service|-s)
-                    shift && _services+=("$1")
+                    shift && SERVICES+=("$1")
                     ;;
                 --createrepo)
-                    _build=true
-                    _createrepo=true
+                    BUILD_SWITCH=true
+                    CREATEREPO_SWITCH=true
                     ;;
                 --createrepo-suse)
-                    _build=true
-                    _build_suse=true
-                    _createrepo=true
+                    BUILD_SWITCH=true
+                    BUILD_SUSE_SWITCH=true
+                    CREATEREPO_SWITCH=true
                     ;;
                 --createrepo-webroot)
-                    shift && _createrepo_webroot="$1"
+                    shift && CREATEREPO_WEBROOT="$1"
                     ;;
                 --createrepo-user)
-                    shift && _createrepo_user="$1"
+                    shift && CREATEREPO_USER="$1"
                     ;;
                 --vncpass)
-                    shift && _vncpass="$1"
+                    shift && VNCPASS="$1"
                     ;;
                 --display)
-                    shift && _display="$1"
+                    shift && USER_DISPLAY="$1"
                     ;;
                 --compat)
-                    _compat=true
+                    COMPAT_SWITCH=true
                     ;;
                 --container|-c)
-                    shift && _containers+=("$1")
+                    shift && CONTAINERS+=("$1")
                     ;;
                 --version|-v)
-                    echo "Version: $_scriptversion"
+                    echo "Version: $SCRIPTVERSION"
                     exit 0
                     ;;
                 --debug|-d)
                     echo "Debugging on"
-                    echo "installJRMC version: $_scriptversion"
+                    echo "installJRMC version: $SCRIPTVERSION"
                     _debug="true"
                     ;;
                 --help|-h)
                     printHelp && exit $?
                     ;;
                 --uninstall|-u)
-                    _uninstall=true
+                    UNINSTALL_SWITCH=true
                     ;;
                 --tests)
                     echo "Running tests, all other options are skipped"
@@ -332,61 +344,59 @@ parseInput() {
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g mcversion base boardurl
-
-    installPackage --silent buildah
+    declare -g MCVERSION BASE BOARDURL
 
     # Latest defaults
-    base="buster" # For container method
-    boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
-    #base_next="bullseye" # TODO use for fallback to smooth upgrades
+    BASE="buster" # For container method
+    BOARDURL="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
+    #BASE_next="bullseye" # TODO use for fallback to smooth upgrades
 
     # Legacy
     #boardurl26="https://yabb.jriver.com/interact/index.php/board,64.0.html" # jessie/stretch
 
     # Peg older versions to prevent ABI and dependency mismatches in automatic mode
-    # This can be overriden w/ --mcversion
+    # This can be overriden w/ --MCVERSION
     # TODO need user input here
     # disable version checks for createrepo or rpmbuild (servers)
-    # if [[ -v _install ]]; then
+    # if [[ -v INSTALL_TYPE ]]; then
     #     if [[ "$ID" == "ubuntu" ]]; then
     #         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
-    #         #     base="bullseye"
+    #         #     BASE="bullseye"
     #         [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
-    #             base="buster"
+    #             BASE="buster"
     #         [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
-    #             mcversion="26.0.107"
+    #             MCVERSION="26.0.107"
     #         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
-    #             mcversion="26.0.107" 
+    #             MCVERSION="26.0.107" 
     #     elif [[ "$ID" == "debian" ]]; then
-    #         base="$VERSION_CODENAME"
+    #         BASE="$VERSION_CODENAME"
     #         [[ $VERSION_ID -eq 10 ]] && \
-    #             base="buster"
+    #             BASE="buster"
     #         [[ $VERSION_ID -le 9 ]] && \
-    #             mcversion="26.0.107" # For 9 and 8
+    #             MCVERSION="26.0.107" # For 9 and 8
     #     elif [[ "$ID" == "centos" ]]; then
     #         [[ "$VERSION_ID" -eq "8" ]] && \
-    #             base="buster"
+    #             BASE="buster"
     #         [[ "$VERSION_ID" -lt "8" ]] && \
-    #             mcversion="26.0.107" # Doubtful
+    #             MCVERSION="26.0.107" # Doubtful
     #     fi
 
-    #     [[ -v mcversion ]] && \
+    #     [[ -v MCVERSION ]] && \
     #         _version_source="compatibility lookup" && \
-    #         debug "To override, use --mcversion" && \
+    #         debug "To override, use --MCVERSION" && \
     #         return 0
     # fi
 
     # Use a containerized package manager
-    # TODO but how to determine build distro ($base=buster)?
-
-    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$base); then 
+    # TODO but how to determine build distro ($BASE=buster)?
+    installPackage --silent buildah
+    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$BASE); then 
         buildah run "$CNT" -- bash -c \
-            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $base main' > /etc/apt/sources.list 2>&1"
+            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
             "apt-get update --allow-insecure-repositories > /dev/null 2>&1"
-        if mcversion=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
-            && [[ "$mcversion" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        if MCVERSION=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
+            && [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
             _version_source="containerized package manager"
         fi
         buildah rm "$CNT" > /dev/null 2>&1
@@ -394,12 +404,12 @@ getLatestVersion() {
     fi
     # Scrape from Interact
     installPackage --silent wget
-    if mcversion=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+    if MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         _version_source="webscrape"
     fi
 
-    if ! [[ -v mcversion ]]; then
-        err "MC version could not be determined. Please check the boardurl: $boardurl or specify a version manually using --mcversion"
+    if ! [[ -v MCVERSION ]]; then
+        err "MC version could not be determined. Please check the boardurl: $BOARDURL or specify a version manually using --MCVERSION"
         exit 1
     fi
 }
@@ -417,8 +427,8 @@ getLatestVersion() {
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    local -a _pkg_array _install_flags
-    local _pkg _nocheck _silent _return
+    declare -a _pkg_array _install_flags
+    declare _pkg _nocheck _silent _return
 
     if _input=$(getopt -o +s -l nocheck,nogpgcheck,nobest,silent -- "$@"); then
         eval set -- "$_input"
@@ -506,10 +516,10 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        # mversion will depend on base unless --mcversion is passed
+        # MVERSION depends on $BASE unless --MCVERSION is passed
         installPackage --silent wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
-        ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$mversion.list" -O "/etc/apt/sources.list.d/mediacenter$mversion.list" > /dev/null 2>&1
+        ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" > /dev/null 2>&1
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         ifSudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver > /dev/null 2>&1
     fi
@@ -522,9 +532,9 @@ addRepo() {
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local _mcpkg
+    declare _mcpkg
 
-    echo "Installing JRiver Media Center $mcversion from repository."
+    echo "Installing JRiver Media Center $MCVERSION from repository."
     echo "Future updates will be handled by your package manager."
 
     if ! debug; then
@@ -544,19 +554,18 @@ installMCFromRepo() {
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        _mcpkg="mediacenter$mversion"
+        _mcpkg="mediacenter$MVERSION"
     fi
 
     if [[ -v _specific_version ]]; then
         if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-            _mcpkg="$_mcpkg-$mcversion"
+            _mcpkg="$_mcpkg-$MCVERSION"
         elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-            _mcpkg="$_mcpkg=$mcversion"
+            _mcpkg="$_mcpkg=$MCVERSION"
         fi
     fi
 
     if debug; then
-        debug "installPackage --nocheck $_mcpkg"
         installPackage --nocheck --nogpgcheck "$_mcpkg"
     else
         installPackage --nocheck --nogpgcheck "$_mcpkg" > /dev/null 2>&1
@@ -572,27 +581,30 @@ installMCFromRepo() {
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g DEBFILENAME
-    DEBFILENAME="$_outputdir/SOURCES/MediaCenter-$mcversion-amd64.deb"
+    declare -g DEBFILENAME="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-amd64.deb"
 
     # If necessary, create SOURCES dir
-    [[ ! -d "$_outputdir/SOURCES" ]] && mkdir -p "$_outputdir/SOURCES"
+    [[ ! -d "$OUTPUTDIR/SOURCES" ]] && mkdir -p "$OUTPUTDIR/SOURCES"
 
     # If deb file already exists, skip download
     if [[ -f "$DEBFILENAME" ]]; then
         echo "Using local DEB file: $DEBFILENAME"
-    elif [[ -v _betapass ]]; then
+        return 0
+    fi
+
+    installPackage --silent wget
+    if [[ -v BETAPASS ]]; then
         echo "Checking beta repo..."
         if wget -q -O "$DEBFILENAME" \
-        "https://files.jriver.com/mediacenter/channels/v$mversion/beta/$_betapass/MediaCenter-$mcversion-amd64.deb"; then
+        "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
             echo "Found!"
         fi
     elif echo "Checking test repo..." && wget -q -O "$DEBFILENAME" \
-    "https://files.jriver.com/mediacenter/test/MediaCenter-$mcversion-amd64.deb"; then
+    "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     # Else check latest repo
     elif echo "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
-    "https://files.jriver.com/mediacenter/channels/v$mversion/latest/MediaCenter-$mcversion-amd64.deb"; then
+    "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     else
         err "Cannot find DEB file."
@@ -610,100 +622,105 @@ acquireDeb() {
 # Translate deb package dependencies for each distro
 #######################################
 packageTranslations() {
+    debug "Running: ${FUNCNAME[0]}"
 
-    declare -ga requires recommends
+    declare requires id i
+    declare -A dupes
+    declare -ga REQUIRES RECOMMENDS
+    
+    id="$ID" # For crossbuilding, use a temp mutable ID
 
     # Load deb dependencies into array
-    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
-    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
+    IFS=',' read -ra REQUIRES <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
+    IFS=',' read -ra RECOMMENDS <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
 
     # Clean up formatting
-    for i in "${!requires[@]}"; do
-        requires[$i]="${requires[$i]%%|*}"
-        requires[$i]="${requires[$i]/?:/}"
-        requires[$i]="${requires[$i]# }"
-        requires[$i]="${requires[$i]% }"
-        requires[$i]="${requires[$i]//\(/}"
-        requires[$i]="${requires[$i]//)/}"
+    for i in "${!REQUIRES[@]}"; do
+        REQUIRES[$i]="${REQUIRES[$i]%%|*}"
+        REQUIRES[$i]="${REQUIRES[$i]/?:/}"
+        REQUIRES[$i]="${REQUIRES[$i]# }"
+        REQUIRES[$i]="${REQUIRES[$i]% }"
+        REQUIRES[$i]="${REQUIRES[$i]//\(/}"
+        REQUIRES[$i]="${REQUIRES[$i]//)/}"
     done
 
-    for i in "${!recommends[@]}"; do
-        recommends[$i]="${recommends[$i]%%|*}"
-        recommends[$i]="${recommends[$i]/?:/}"
-        recommends[$i]="${recommends[$i]# }"
-        recommends[$i]="${recommends[$i]% }"
-        recommends[$i]="${recommends[$i]//\(/}"
-        recommends[$i]="${recommends[$i]//)/}"
+    for i in "${!RECOMMENDS[@]}"; do
+        RECOMMENDS[$i]="${RECOMMENDS[$i]%%|*}"
+        RECOMMENDS[$i]="${RECOMMENDS[$i]/?:/}"
+        RECOMMENDS[$i]="${RECOMMENDS[$i]# }"
+        RECOMMENDS[$i]="${RECOMMENDS[$i]% }"
+        RECOMMENDS[$i]="${RECOMMENDS[$i]//\(/}"
+        RECOMMENDS[$i]="${RECOMMENDS[$i]//)/}"
     done
 
     # Translate package names
-    case "$ID" in
+    [[ -v BUILD_SUSE_SWITCH ]] && id="opensuse"
+    case "$id" in
         fedora|centos)
-            requires=("${requires[@]/libc6/glibc}")
-            requires=("${requires[@]/libasound2/alsa-lib}")
-            requires=("${requires[@]/libuuid1/libuuid}")
-            requires=("${requires[@]/libX11-6/libX11}")
-            requires=("${requires[@]/libext6/libXext}")
-            requires=("${requires[@]/libxcb1/libxcb}")
-            requires=("${requires[@]/libxdmcp6/libXdmcp}")
-            requires=("${requires[@]/libstdc++6/libstdc++}")
-            requires=("${requires[@]/libgtk-3-0/gtk3}")
-            requires=("${requires[@]/libgl1-mesa-glx/mesa-libGL}")
-            requires=("${requires[@]/libpango-1.0-0/pango}")
-            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
-            requires=("${requires[@]/libpangox-1.0-0/pango}")
-            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
-            requires=("${requires[@]/libnss3/nss}")
-            requires=("${requires[@]/libnspr4/nspr}")
-            requires=("${requires[@]/libgomp1/libgomp}")
-            requires=("${requires[@]/libfribidi0/fribidi}")
-            requires=("${requires[@]/libfontconfig1/fontconfig}")
-            requires=("${requires[@]/libfreetype6/freetype}")
-            requires=("${requires[@]/libharfbuzz0b/harfbuzz}")
-            requires=("${requires[@]/libgbm1/mesa-libgbm}")
-            requires=("${requires[@]/libva2/libva}")
-            requires=("${requires[@]/libepoxy0/libepoxy}")
-            requires=("${requires[@]/liblcms2-2/lcms2}")
-            requires=("${requires[@]/libvulkan1/vulkan-loader}")
-            requires=("${requires[@]/libepoxy0/libepoxy}")
+            REQUIRES=("${REQUIRES[@]/libc6/glibc}")
+            REQUIRES=("${REQUIRES[@]/libasound2/alsa-lib}")
+            REQUIRES=("${REQUIRES[@]/libuuid1/libuuid}")
+            REQUIRES=("${REQUIRES[@]/libX11-6/libX11}")
+            REQUIRES=("${REQUIRES[@]/libext6/libXext}")
+            REQUIRES=("${REQUIRES[@]/libxcb1/libxcb}")
+            REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp}")
+            REQUIRES=("${REQUIRES[@]/libstdc++6/libstdc++}")
+            REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
+            REQUIRES=("${REQUIRES[@]/libgl1-mesa-glx/mesa-libGL}")
+            REQUIRES=("${REQUIRES[@]/libpango-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libpangoft2-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libpangox-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libpangoxft-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libnss3/nss}")
+            REQUIRES=("${REQUIRES[@]/libnspr4/nspr}")
+            REQUIRES=("${REQUIRES[@]/libgomp1/libgomp}")
+            REQUIRES=("${REQUIRES[@]/libfribidi0/fribidi}")
+            REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
+            REQUIRES=("${REQUIRES[@]/libfreetype6/freetype}")
+            REQUIRES=("${REQUIRES[@]/libharfbuzz0b/harfbuzz}")
+            REQUIRES=("${REQUIRES[@]/libgbm1/mesa-libgbm}")
+            REQUIRES=("${REQUIRES[@]/libva2/libva}")
+            REQUIRES=("${REQUIRES[@]/libepoxy0/libepoxy}")
+            REQUIRES=("${REQUIRES[@]/liblcms2-2/lcms2}")
+            REQUIRES=("${REQUIRES[@]/libvulkan1/vulkan-loader}")
+            REQUIRES=("${REQUIRES[@]/libepoxy0/libepoxy}")
             ;;
         opensuse*)
-            requires=("${requires[@]/libc6/glibc}")
-            requires=("${requires[@]/libasound2/alsa-lib}")
-            requires=("${requires[@]/libuuid1/libuuid}")
-            requires=("${requires[@]/libext6/libXext6}")
-            requires=("${requires[@]/libxdmcp6/libXdmcp6}")
-            requires=("${requires[@]/libgtk-3-0/gtk3}")
-            requires=("${requires[@]/libgl1-mesa-glx/Mesa-libGL1}")
-            requires=("${requires[@]/libpango-1.0-0/pango}")
-            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
-            requires=("${requires[@]/libpangox-1.0-0/pango}")
-            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
-            requires=("${requires[@]/libnss3/mozilla-nss}")
-            requires=("${requires[@]/libnspr4/mozilla-nspr}")
-            requires=("${requires[@]/libfribidi0/fribidi}")
-            requires=("${requires[@]/libfontconfig1/fontconfig}")
-            requires=("${requires[@]/libfreetype6/freetype}")
-            requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
+            REQUIRES=("${REQUIRES[@]/libc6/glibc}")
+            REQUIRES=("${REQUIRES[@]/libasound2/alsa-lib}")
+            REQUIRES=("${REQUIRES[@]/libuuid1/libuuid}")
+            REQUIRES=("${REQUIRES[@]/libext6/libXext6}")
+            REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp6}")
+            REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
+            REQUIRES=("${REQUIRES[@]/libgl1-mesa-glx/Mesa-libGL1}")
+            REQUIRES=("${REQUIRES[@]/libpango-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libpangoft2-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libpangox-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libpangoxft-1.0-0/pango}")
+            REQUIRES=("${REQUIRES[@]/libnss3/mozilla-nss}")
+            REQUIRES=("${REQUIRES[@]/libnspr4/mozilla-nspr}")
+            REQUIRES=("${REQUIRES[@]/libfribidi0/fribidi}")
+            REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
+            REQUIRES=("${REQUIRES[@]/libfreetype6/freetype}")
+            REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
             ;;
     esac
 
     # Remove duplicates
-    declare -A dupes
-    for i in "${requires[@]}"; do
+    for i in "${REQUIRES[@]}"; do
         if [[ ! -v dupes[${i%% *}] ]]; then
-            cleaned_requires+=("$i")
+            requires+=("$i")
         fi
         dupes["${i%% *}"]=1
     done
-    requires=("${cleaned_requires[@]}")
+    REQUIRES=("${requires[@]}")
 
     # Convert array to newline delim'd string (for heredoc)
-    printf -v requires "Requires: %s\n" "${requires[@]}"
-    printf -v recommends "Recommends: %s\n" "${recommends[@]}"
+    printf -v REQUIRES "Requires: %s\n" "${REQUIRES[@]}"
+    printf -v RECOMMENDS "Recommends: %s\n" "${RECOMMENDS[@]}"
     # Strip last newline
-    requires="${requires%?}" 
-    recommends="${recommends%?}"
+    REQUIRES="${REQUIRES%?}" 
+    RECOMMENDS="${RECOMMENDS%?}"
 }
 
 
@@ -713,40 +730,39 @@ packageTranslations() {
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local _ec
-
-    declare -g _mcrpm="$_outputdir/RPMS/x86_64/MediaCenter-$mcversion.x86_64.rpm"
+    declare _ec
+    declare -g MCRPM="$OUTPUTDIR/RPMS/x86_64/MediaCenter-$MCVERSION.x86_64.rpm"
 
     # skip rebuilding the rpm if it already exists
-    if [[ -f "$_mcrpm" ]]; then
-        echo "$_mcrpm already exists. Skipping build step."
+    if [[ -f "$MCRPM" ]]; then
+        echo "$MCRPM already exists. Skipping build step."
         return 0
     fi
 
-    [[ ! -d "$_outputdir/SPECS" ]] && mkdir -p "$_outputdir/SPECS"
+    [[ ! -d "$OUTPUTDIR/SPECS" ]] && mkdir -p "$OUTPUTDIR/SPECS"
 
-	if [[ -v _compat ]]; then
+	if [[ -v COMPAT_SWITCH ]]; then
 		# Strip minimum versions
-		requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
+		REQUIRES=$(echo "$REQUIRES" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
 	fi
 
     # Create spec file
-    cat <<- EOF > "$_outputdir/SPECS/mediacenter.spec"
+    cat <<- EOF > "$OUTPUTDIR/SPECS/mediacenter.spec"
 		Name:    MediaCenter
-		Version: $mcversion
+		Version: $MCVERSION
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver.com/mediacenter/channels/v$mversion/latest/MediaCenter-$mcversion-amd64.deb
+		Source0: http://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
 		AutoReq:  0
 
-		${requires:-}
-		${recommends:-}
+		${REQUIRES:-}
+		${RECOMMENDS:-}
 
-		Provides: mediacenter$mversion
+		Provides: mediacenter$MVERSION
 
 		License: Copyright 1998-2022, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
@@ -768,23 +784,23 @@ buildRPM() {
 		%postun -p /sbin/ldconfig
 
 		%files
-		%{_bindir}/mediacenter$mversion
+		%{_bindir}/mediacenter$MVERSION
 		%{_libdir}/jriver
 		%{_datadir}
-		%exclude %{_datadir}/applications/media_center_packageinstaller_$mversion.desktop
+		%exclude %{_datadir}/applications/media_center_packageinstaller_$MVERSION.desktop
 		/etc/security/limits.d/*
 	EOF
 
     # Run rpmbuild
-    echo "Building version $mcversion, please wait..."
+    echo "Building version $MCVERSION, please wait..."
 
     if debug; then
-        rpmbuild --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec"
+        rpmbuild --define="%_topdir $OUTPUTDIR" --define="%_libdir /usr/lib" -bb "$OUTPUTDIR/SPECS/mediacenter.spec"
     else
-        rpmbuild --quiet --define="%_topdir $_outputdir" --define="%_libdir /usr/lib" -bb "$_outputdir/SPECS/mediacenter.spec" > /dev/null 2>&1
+        rpmbuild --quiet --define="%_topdir $OUTPUTDIR" --define="%_libdir /usr/lib" -bb "$OUTPUTDIR/SPECS/mediacenter.spec" > /dev/null 2>&1
     fi
     _ec=$?
-    [[ "$_ec" == 0 ]] && echo "Build successful. The RPM file is located at: $_mcrpm"
+    [[ "$_ec" == 0 ]] && echo "Build successful. The RPM file is located at: $MCRPM"
     return $_ec
 }
 
@@ -800,40 +816,40 @@ runCreaterepo() {
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
-    if [[ ! -d "$_createrepo_webroot" ]]; then
-        debug "ifSudo -u $_createrepo_user mkdir -p $_createrepo_webroot"
-        if ! ifSudo -u "$_createrepo_user" mkdir -p "$_createrepo_webroot" > /dev/null 2>&1; then
-            debug "ifSudo mkdir -p $_createrepo_webroot"
-            if ifSudo mkdir -p "$_createrepo_webroot" && \
-                ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
+    if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
+        debug "ifSudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
+        if ! ifSudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT" > /dev/null 2>&1; then
+            debug "ifSudo mkdir -p $CREATEREPO_WEBROOT"
+            if ifSudo mkdir -p "$CREATEREPO_WEBROOT" && \
+                ifSudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
                 :
             else
                 err "Could not create the createrepo-webroot path!"
-                err "Make sure that the createrepo-webroot is writeable by createrepo-user: $_createrepo_user"
+                err "Make sure that the createrepo-webroot is writeable by createrepo-user: $CREATEREPO_USER"
                 return 1
             fi
         fi
     fi
 
     # Copy built rpms to webroot
-    debug "ifSudo -u $_createrepo_user cp -n -f $_mcrpm $_createrepo_webroot"
-    if ! ifSudo -u "$_createrepo_user" cp -n -f "$_mcrpm" "$_createrepo_webroot" > /dev/null 2>&1; then
-        debug "cp_cmd $_mcrpm $_createrepo_webroot"
-        if cp_cmd "$_mcrpm" "$_createrepo_webroot" && \
-            ifSudo chown -R "$_createrepo_user":"$_createrepo_user" "$_createrepo_webroot"; then
+    debug "ifSudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
+    if ! ifSudo -u "$CREATEREPO_USER" cp -n -f "$MCRPM" "$CREATEREPO_WEBROOT" > /dev/null 2>&1; then
+        debug "cp_cmd $MCRPM $CREATEREPO_WEBROOT"
+        if cp_cmd "$MCRPM" "$CREATEREPO_WEBROOT" && \
+            ifSudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
             :
         else
-            err "Could not copy $_mcrpm to $_createrepo_webroot"
-            err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $_createrepo_user"
+            err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
+            err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $CREATEREPO_USER"
             return 1
         fi
     fi
 
     # Run createrepo
-    createrepo_cmd=("sudo" "-u" "$_createrepo_user" "createrepo" "-q")
-    [[ -d "$_createrepo_webroot/repodata" ]] && createrepo_cmd+=("--update")
-    debug "${createrepo_cmd[*]} $_createrepo_webroot"
-    if "${createrepo_cmd[@]}" "$_createrepo_webroot"; then
+    createrepo_cmd=("sudo" "-u" "$CREATEREPO_USER" "createrepo" "-q")
+    [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && createrepo_cmd+=("--update")
+    debug "${createrepo_cmd[*]} $CREATEREPO_WEBROOT"
+    if "${createrepo_cmd[@]}" "$CREATEREPO_WEBROOT"; then
         echo "Successfully updated repo"
         return 0
     else
@@ -861,23 +877,23 @@ symlinkCerts() {
 
 #######################################
 # Automatically restore the mjr license file if it is found next to 
-# installJRMC or _restorefile is set
+# installJRMC or RESTOREFILE is set
 #######################################
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local _mjr
+    declare _mjr
 
     # Allow user to put the mjr file next to installJRMC
-    if [[ ! -v _restorefile ]]; then
+    if [[ ! -v RESTOREFILE ]]; then
         for _mjr in "$PWD"/*.mjr; do
-            [[ $_mjr -nt $_restorefile ]] && _restorefile="$_mjr"
+            [[ $_mjr -nt $RESTOREFILE ]] && RESTOREFILE="$_mjr"
         done
     fi
 
     # Restore license
-    if [[ -f "$_restorefile" ]]; then
-        if ! "mediacenter$mversion" /RestoreFromFile "$_restorefile"; then
+    if [[ -f "$RESTOREFILE" ]]; then
+        if ! "mediacenter$MVERSION" /RestoreFromFile "$RESTOREFILE"; then
             err "Automatic license restore failed"
             return 1
         fi
@@ -894,8 +910,8 @@ openFirewall() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     # Create OS-specific port rules based on argument (service) name
-    local -a _f_ports # for firewall-cmd
-    local _u_ports # for ufw
+    declare -a _f_ports # for firewall-cmd
+    declare _u_ports # for ufw
     if [[ "$1" == "jriver" ]]; then
         _f_ports=("52100-52200/tcp" "1900/udp")
         _u_ports="52100:52200/tcp|1900/udp"
@@ -951,7 +967,7 @@ setX11VNCPass() {
     [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
 
     if [[ -f "$_vncpassfile" ]]; then
-        if [[ ! -v _vncpass ]]; then
+        if [[ ! -v VNCPASS ]]; then
             err "Refusing to overwrite existing $_vncpassfile with an empty password"
             err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
             exit 1
@@ -960,8 +976,8 @@ setX11VNCPass() {
         fi
     fi
 
-    if [[ -v _vncpass ]]; then
-        if ! x11vnc -storepasswd "$_vncpass" "$_vncpassfile"; then
+    if [[ -v VNCPASS ]]; then
+        if ! x11vnc -storepasswd "$VNCPASS" "$_vncpassfile"; then
             err "Could not create VNC password file"
             return 1
         fi
@@ -977,12 +993,12 @@ setX11VNCPass() {
 setVNCPass() {
     debug "Running: ${FUNCNAME[0]}"
 
-    _vncpassfile="$HOME/.vnc/jrmc_passwd"
+    declare _vncpassfile="$HOME/.vnc/jrmc_passwd"
 
     [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
 
     if [[ -f "$_vncpassfile" ]]; then
-        if [[ ! -v _vncpass ]]; then
+        if [[ ! -v VNCPASS ]]; then
             err "Refusing to overwrite existing $_vncpassfile with an empty password"
             err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
             exit 1
@@ -991,8 +1007,8 @@ setVNCPass() {
         fi
     fi
 
-    if [[ -v _vncpass ]]; then
-        if ! echo "$_vncpass" | vncpasswd -f > "$_vncpassfile"; then
+    if [[ -v VNCPASS ]]; then
+        if ! echo "$VNCPASS" | vncpasswd -f > "$_vncpassfile"; then
             err "Could not create VNC password file"
             return 1
         fi
@@ -1008,21 +1024,21 @@ setVNCPass() {
 setDisplay() {
     debug "Running: ${FUNCNAME[0]}"
 
-    # Check _display, else DISPLAY, else set to :0 by default
-    if [[ -v _display ]]; then
-        _next_display="$_display"
+    # Check USER_DISPLAY, else DISPLAY, else set to :0 by default
+    if [[ -v USER_DISPLAY ]]; then
+        _next_display="$USER_DISPLAY"
     elif [[ -v DISPLAY ]]; then
-        _display="${DISPLAY}"
-        _displaynum="${_display#:}" # strip colon
+        USER_DISPLAY="${DISPLAY}"
+        _displaynum="${USER_DISPLAY#:}" # strip colon
         _displaynum="${_displaynum%.*}" # strip suffix
         _next_displaynum=$(( _displaynum + 1 ))
         _next_display=":$_next_displaynum"
     else
-        _display=":0"
+        USER_DISPLAY=":0"
         _next_display=":1"
     fi
 
-    _displaynum="${_display#:}" # strip colon
+    _displaynum="${USER_DISPLAY#:}" # strip colon
     _displaynum="${_displaynum%.*}" # strip suffix
     _next_displaynum=$(( _displaynum + 1 ))
 }
@@ -1034,17 +1050,17 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if [[ "$_service_user" == "root" ]]; then
-        _service_fname="$_systemddir/${1}.service"
-        _timer_fname="$_systemddir/${1}.timer"
+    if [[ "$SERVICE_USER" == "root" ]]; then
+        _service_fname="$SERVICEDIR/${1}.service"
+        _timer_fname="$SERVICEDIR/${1}.timer"
         _service_name="${1}.service"
         _timer_name="${1}.timer"
         _user_specifier=""
     else
-        _service_fname="$_systemddir/${1}@.service"
-        _timer_fname="$_systemddir/${1}@.timer"
-        _service_name="${1}@$_service_user.service"
-        _timer_name="${1}@$_service_user.timer"
+        _service_fname="$SERVICEDIR/${1}@.service"
+        _timer_fname="$SERVICEDIR/${1}@.timer"
+        _service_name="${1}@$SERVICE_USER.service"
+        _timer_name="${1}@$SERVICE_USER.timer"
         _user_specifier="User=%I"
     fi
 }
@@ -1060,15 +1076,15 @@ service_jriver-mediacenter() {
 
     bash_cmd "cat <<- EOF > $_service_fname
 		[Unit]
-		Description=JRiver Media Center $mversion
+		Description=JRiver Media Center $MVERSION
 		After=graphical.target
 
 		[Service]
 		$_user_specifier
 		Type=simple
-		Environment=DISPLAY=$_display
+		Environment=DISPLAY=$USER_DISPLAY
 		Environment=XAUTHORITY=$XAUTHORITY
-		ExecStart=/usr/bin/mediacenter$mversion $*
+		ExecStart=/usr/bin/mediacenter$MVERSION $*
 		Restart=always
 		RestartSec=10
 		KillSignal=SIGHUP
@@ -1104,12 +1120,12 @@ service_jriver-xvnc() {
 
     setVNCPass
 
-    local _port=$(( _next_displaynum + 5900 ))
+    declare _port=$(( _next_displaynum + 5900 ))
 
     if [[ -v _novncauth ]]; then
-        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$mversion"
+        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     else
-        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$mversion"
+        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
 
     bash_cmd "cat <<- EOF > $_service_fname
@@ -1147,7 +1163,7 @@ service_jriver-x11vnc() {
 
     setX11VNCPass
 
-    local _port=$(( _displaynum + 5900 ))
+    declare _port=$(( _displaynum + 5900 ))
 
     # Get current desktop resolution
     # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
@@ -1159,9 +1175,9 @@ service_jriver-x11vnc() {
     _getResolution
 
     if [[ -v _novncauth ]]; then
-        _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -nopw"
+        _exec_start_cmd="/usr/bin/x11vnc -display $USER_DISPLAY -noscr -geometry $_res -auth guess -forever -bg -nopw"
     else
-        _exec_start_cmd="/usr/bin/x11vnc -display $_display -noscr -geometry $_res -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
+        _exec_start_cmd="/usr/bin/x11vnc -display $USER_DISPLAY -noscr -geometry $_res -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
     fi
 
     bash_cmd "cat <<-EOF > $_service_fname
@@ -1172,7 +1188,7 @@ service_jriver-x11vnc() {
 		[Service]
 		$_user_specifier
 		Type=forking
-		Environment=DISPLAY=$_display
+		Environment=DISPLAY=$USER_DISPLAY
 		ExecStart=$_exec_start_cmd
 		Restart=always
 		RestartSec=10
@@ -1201,7 +1217,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$_user_specifier
-		ExecStart=$PWD/installJRMC --outputdir $_outputdir --createrepo --createrepo-webroot $_createrepo_webroot --createrepo-user $_createrepo_user
+		ExecStart=$PWD/installJRMC --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
 
 		[Install]
 		WantedBy=default.target
@@ -1242,7 +1258,7 @@ service_jriver-createrepo() {
 #     installPackage buildah podman
 
 #     # Eventually try to switch to Debian
-#     # if ! CNT=$(buildah from debian:$base); then
+#     # if ! CNT=$(buildah from debian:$BASE); then
 #     #     echo "Bad base image for container $CNAME, skipping"
 #     #     continue
 #     # fi
@@ -1338,10 +1354,10 @@ service_jriver-createrepo() {
 #         "--label" "maintainer=$MAINTAINER" \
 #         "--env" "TZ=$TZ" \
 #         "--workingdir" "/app" \
-#         "--cmd" "mediacenter$mversion")
+#         "--cmd" "mediacenter$MVERSION")
 
 #     mkcdirs() {
-#         local dir
+#         declare dir
 #         for dir in "$@"; do
 #             if [[ ! -d "$dir" ]]; then 
 #                 if ! mkdir -p "$dir"; then
@@ -1371,11 +1387,11 @@ service_jriver-createrepo() {
 # 		wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - > /dev/null 2>&1
 # 	EOF
 
-#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$mversion.list" -O "/etc/apt/sources.list.d/mediacenter$mversion.list"
+#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list"
 
 #     brc apt-get update -y -q0
 
-#     brc add-pkg "mediacenter$mversion"
+#     brc add-pkg "mediacenter$MVERSION"
 
 #     brc del-pkg .build-deps
 # }
@@ -1442,7 +1458,7 @@ uninstall() {
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        _mcpkg="mediacenter$mversion"
+        _mcpkg="mediacenter$MVERSION"
     fi
 
     if debug; then
@@ -1454,7 +1470,7 @@ uninstall() {
 
     echo "JRiver Media Center has been completely uninstalled."
     echo "To remove your library files, run: rm -rf $HOME/.jriver"
-    echo "To remove your rpmbuild output files, run: rm -rf $_outputdir"
+    echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
 
     exit 0
 }
@@ -1472,7 +1488,7 @@ main() {
     init "$@"
 
     # Uninstall and exit
-    if [[ -v _uninstall ]]; then
+    if [[ -v UNINSTALL_SWITCH ]]; then
         uninstall
         exit $?
     fi
@@ -1481,7 +1497,7 @@ main() {
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
     # Install MC using package manager
-    if [[ -v _install && "$_install" == "repo" ]]; then
+    if [[ -v INSTALL_TYPE && "$INSTALL_TYPE" == "repo" ]]; then
         if [[ "$ID" =~ ^opensuse.*$ ]]; then
             echo "A SUSE repository is not yet available."
             echo "Use --install rpm to build and install a SUSE RPM instead."
@@ -1499,7 +1515,7 @@ main() {
     fi
 
     # Build RPM from source deb package
-    if [[ -v _build ]]; then
+    if [[ -v BUILD_SWITCH ]]; then
         acquireDeb
         installPackage "wget" "dpkg" "rpm-build"
         packageTranslations
@@ -1514,17 +1530,17 @@ main() {
     fi
 
     # Run createrepo
-    if [[ -v _createrepo ]]; then
+    if [[ -v CREATEREPO_SWITCH ]]; then
         runCreaterepo
         exit $?
     fi
 
     # Install RPM
-    if [[ -v _install && "$_install" == "rpm" ]]; then
+    if [[ -v INSTALL_TYPE && "$INSTALL_TYPE" == "rpm" ]]; then
 
-        #rpm --upgrade "$_mcrpm"        
+        #rpm --upgrade "$MCRPM"        
 
-        if installPackage --nocheck --nogpgcheck "$_mcrpm"; then
+        if installPackage --nocheck --nogpgcheck "$MCRPM"; then
             echo "JRiver Media Center installed successfully"
         else
             err "JRiver Media Center installation failed"
@@ -1536,10 +1552,10 @@ main() {
     fi
 
     # Install services
-    if [[ "${#_services[@]}" -gt 0 ]]; then
+    if [[ "${#SERVICES[@]}" -gt 0 ]]; then
         setDisplay
-        ! [[ -d "$_systemddir" ]] && ifSudo mkdir -p "$_systemddir"
-        for _service in "${_services[@]}"; do
+        ! [[ -d "$SERVICEDIR" ]] && ifSudo mkdir -p "$SERVICEDIR"
+        for _service in "${SERVICES[@]}"; do
             setServiceVars "$_service"
             if ! "service_$_service"; then
                 if [[ $? -eq 127 ]]; then
@@ -1552,7 +1568,7 @@ main() {
     fi
 
     # Install containers
-    # for _container in "${_containers[@]}"; do
+    # for _container in "${CONTAINERS[@]}"; do
     #     if ! "_container_$_container"; then
     #         if [[ $? -eq 127 ]]; then
     #             err "Container $_container does not exist, check your container name"
