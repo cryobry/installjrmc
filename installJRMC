@@ -626,6 +626,15 @@ packageTranslations() {
         requires[$i]="${requires[$i]//)/}"
     done
 
+    for i in "${!recommends[@]}"; do
+        recommends[$i]="${recommends[$i]%%|*}"
+        recommends[$i]="${recommends[$i]/?:/}"
+        recommends[$i]="${recommends[$i]# }"
+        recommends[$i]="${recommends[$i]% }"
+        recommends[$i]="${recommends[$i]//\(/}"
+        recommends[$i]="${recommends[$i]//)/}"
+    done
+
     # Translate package names
     case "$ID" in
         fedora|centos)
