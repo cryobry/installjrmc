@@ -154,9 +154,6 @@ init() {
     _service_user="${_service_user:-$_exec_user}"
     _createrepo_user="${_createrepo_user:-$_exec_user}"
 
-    # Install dependency dependencies :-)
-    [[ "$ID" == "centos" ]] && installPackage epel-release
-
     # Select MC version to work with
     if [[ -v mcversion ]]; then
         _version_source="user input"
@@ -169,7 +166,7 @@ init() {
     [[ "$_version_source" != "user input" ]] && echo "To override, use --mcversion"
 
     # Extract major version number
-    _mversion="${mcversion%%.*}"
+    mversion="${mcversion%%.*}"
 
     # Saving this substituion in case it's needed in the future
     # _variation="${mcversion##*.}"
@@ -337,6 +334,8 @@ getLatestVersion() {
 
     declare -g mcversion base boardurl
 
+    installPackage --silent buildah
+
     # Latest defaults
     base="buster" # For container method
     boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
@@ -380,7 +379,7 @@ getLatestVersion() {
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($base=buster)?
-    [[ -x $(command -v buildah) ]] || installPackage --silent buildah
+
     if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$base); then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $base main' > /etc/apt/sources.list 2>&1"
@@ -394,7 +393,7 @@ getLatestVersion() {
         return 0
     fi
     # Scrape from Interact
-    installPackage wget
+    installPackage --silent wget
     if mcversion=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         _version_source="webscrape"
     fi
@@ -507,10 +506,10 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        # _mversion will depend on base unless --mcversion is passed
-        installPackage wget
+        # mversion will depend on base unless --mcversion is passed
+        installPackage --silent wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - > /dev/null 2>&1
-        ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list" > /dev/null 2>&1
+        ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$mversion.list" -O "/etc/apt/sources.list.d/mediacenter$mversion.list" > /dev/null 2>&1
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         ifSudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver > /dev/null 2>&1
     fi
@@ -545,7 +544,7 @@ installMCFromRepo() {
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        _mcpkg="mediacenter$_mversion"
+        _mcpkg="mediacenter$mversion"
     fi
 
     if [[ -v _specific_version ]]; then
@@ -585,7 +584,7 @@ acquireDeb() {
     elif [[ -v _betapass ]]; then
         echo "Checking beta repo..."
         if wget -q -O "$DEBFILENAME" \
-        "https://files.jriver.com/mediacenter/channels/v$_mversion/beta/$_betapass/MediaCenter-$mcversion-amd64.deb"; then
+        "https://files.jriver.com/mediacenter/channels/v$mversion/beta/$_betapass/MediaCenter-$mcversion-amd64.deb"; then
             echo "Found!"
         fi
     elif echo "Checking test repo..." && wget -q -O "$DEBFILENAME" \
@@ -593,7 +592,7 @@ acquireDeb() {
         echo "Found!"
     # Else check latest repo
     elif echo "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
-    "https://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$mcversion-amd64.deb"; then
+    "https://files.jriver.com/mediacenter/channels/v$mversion/latest/MediaCenter-$mcversion-amd64.deb"; then
         echo "Found!"
     else
         err "Cannot find DEB file."
@@ -738,7 +737,7 @@ buildRPM() {
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver.com/mediacenter/channels/v$_mversion/latest/MediaCenter-$mcversion-amd64.deb
+		Source0: http://files.jriver.com/mediacenter/channels/v$mversion/latest/MediaCenter-$mcversion-amd64.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
@@ -747,7 +746,7 @@ buildRPM() {
 		${requires:-}
 		${recommends:-}
 
-		Provides: mediacenter$_mversion
+		Provides: mediacenter$mversion
 
 		License: Copyright 1998-2022, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
@@ -769,10 +768,10 @@ buildRPM() {
 		%postun -p /sbin/ldconfig
 
 		%files
-		%{_bindir}/mediacenter$_mversion
+		%{_bindir}/mediacenter$mversion
 		%{_libdir}/jriver
 		%{_datadir}
-		%exclude %{_datadir}/applications/media_center_packageinstaller_$_mversion.desktop
+		%exclude %{_datadir}/applications/media_center_packageinstaller_$mversion.desktop
 		/etc/security/limits.d/*
 	EOF
 
@@ -878,7 +877,7 @@ restoreLicense() {
 
     # Restore license
     if [[ -f "$_restorefile" ]]; then
-        if ! "mediacenter$_mversion" /RestoreFromFile "$_restorefile"; then
+        if ! "mediacenter$mversion" /RestoreFromFile "$_restorefile"; then
             err "Automatic license restore failed"
             return 1
         fi
@@ -907,7 +906,7 @@ openFirewall() {
 
     # Open the ports
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        [[ ! -x $(command -v firewall-cmd) ]] && installPackage firewalld
+        installPackage firewalld
         if ! firewall_cmd --get-services | grep -q "$1"; then
             firewall_cmd --permanent --new-service="$1" > /dev/null 2>&1
             firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" > /dev/null 2>&1
@@ -920,7 +919,7 @@ openFirewall() {
         fi
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         # Debian ufw package state is broken on fresh installations
-        [[ ! -x $(command -v ufw) ]] && installPackage ufw
+        installPackage ufw
         if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
             bash_cmd "cat <<- EOF > /etc/ufw/applications.d/$1
 				[$1]
@@ -1061,7 +1060,7 @@ service_jriver-mediacenter() {
 
     bash_cmd "cat <<- EOF > $_service_fname
 		[Unit]
-		Description=JRiver Media Center $_mversion
+		Description=JRiver Media Center $mversion
 		After=graphical.target
 
 		[Service]
@@ -1069,7 +1068,7 @@ service_jriver-mediacenter() {
 		Type=simple
 		Environment=DISPLAY=$_display
 		Environment=XAUTHORITY=$XAUTHORITY
-		ExecStart=/usr/bin/mediacenter$_mversion $*
+		ExecStart=/usr/bin/mediacenter$mversion $*
 		Restart=always
 		RestartSec=10
 		KillSignal=SIGHUP
@@ -1108,9 +1107,9 @@ service_jriver-xvnc() {
     local _port=$(( _next_displaynum + 5900 ))
 
     if [[ -v _novncauth ]]; then
-        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$_mversion"
+        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -name jriver$_next_display -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$mversion"
     else
-        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$_mversion"
+        _exec_start_cmd="/usr/bin/vncserver $_next_display -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$mversion"
     fi
 
     bash_cmd "cat <<- EOF > $_service_fname
@@ -1339,7 +1338,7 @@ service_jriver-createrepo() {
 #         "--label" "maintainer=$MAINTAINER" \
 #         "--env" "TZ=$TZ" \
 #         "--workingdir" "/app" \
-#         "--cmd" "mediacenter$_mversion")
+#         "--cmd" "mediacenter$mversion")
 
 #     mkcdirs() {
 #         local dir
@@ -1372,11 +1371,11 @@ service_jriver-createrepo() {
 # 		wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - > /dev/null 2>&1
 # 	EOF
 
-#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$_mversion.list" -O "/etc/apt/sources.list.d/mediacenter$_mversion.list"
+#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$mversion.list" -O "/etc/apt/sources.list.d/mediacenter$mversion.list"
 
 #     brc apt-get update -y -q0
 
-#     brc add-pkg "mediacenter$_mversion"
+#     brc add-pkg "mediacenter$mversion"
 
 #     brc del-pkg .build-deps
 # }
@@ -1443,7 +1442,7 @@ uninstall() {
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         _mcpkg="MediaCenter"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        _mcpkg="mediacenter$_mversion"
+        _mcpkg="mediacenter$mversion"
     fi
 
     if debug; then
@@ -1477,6 +1476,9 @@ main() {
         uninstall
         exit $?
     fi
+
+    # Install dependency dependencies :-)
+    [[ "$ID" == "centos" ]] && installPackage epel-release
 
     # Install MC using package manager
     if [[ -v _install && "$_install" == "repo" ]]; then
