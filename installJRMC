@@ -754,7 +754,7 @@ buildRPM() {
     # Run rpmbuild
     echo "Building version $MCVERSION, please wait..."
 
-    rpmbuild_cmd="rpmbuild --define=%_topdir $OUTPUTDIR --define=%_libdir /usr/lib -bb $OUTPUTDIR/SPECS/mediacenter.spec"
+    rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb $OUTPUTDIR/SPECS/mediacenter.spec"
     $DEBUG || rpmbuild_cmd+=" &>/dev/null"
     if eval "$rpmbuild_cmd" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
