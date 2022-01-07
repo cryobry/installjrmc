@@ -252,8 +252,11 @@ parseInput() {
                     fi
                     ;;
                 --build)
+
+                    echo HERE
+                    echo "$1" "$2"
                     BUILD_SWITCH=true
-                    BUILD_TARGET="$2"
+                    #BUILD_TARGET="$2"
                     shift
                     ;;
                 --build-suse)
@@ -335,9 +338,6 @@ parseInput() {
         err "Incorrect options provided"
         printHelp && exit 1
     fi
-
-    echo HERE
-    [[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
 }
 
 
