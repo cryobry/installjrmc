@@ -651,9 +651,6 @@ packageTranslations() {
     RECOMMENDS=("${RECOMMENDS[@]//\(/}")
     RECOMMENDS=("${RECOMMENDS[@]//)/}")
 
-    debug "Cleaned:"
-    debug "${REQUIRES[@]}"
-
     # Translate package names
     [[ -v BUILD_SUSE_SWITCH ]] && id="opensuse"
     case "$id" in
@@ -667,7 +664,7 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp}")
             REQUIRES=("${REQUIRES[@]/libstdc++6/libstdc++}")
             REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
-            REQUIRES=("${REQUIRES[@]/libgl1-mesa-glx/mesa-libGL}")
+            REQUIRES=("${REQUIRES[@]/libgl1/mesa-libGL}")
             REQUIRES=("${REQUIRES[@]/libpango-1.0-0/pango}")
             REQUIRES=("${REQUIRES[@]/libpangoft2-1.0-0/pango}")
             REQUIRES=("${REQUIRES[@]/libpangox-1.0-0/pango}")
@@ -693,7 +690,7 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libext6/libXext6}")
             REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp6}")
             REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
-            REQUIRES=("${REQUIRES[@]/libgl1-mesa-glx/Mesa-libGL1}")
+            REQUIRES=("${REQUIRES[@]/libgl1/Mesa-libGL1}")
             REQUIRES=("${REQUIRES[@]/libpango-1.0-0/pango}")
             REQUIRES=("${REQUIRES[@]/libpangoft2-1.0-0/pango}")
             REQUIRES=("${REQUIRES[@]/libpangox-1.0-0/pango}")
