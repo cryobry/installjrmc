@@ -683,7 +683,6 @@ packageTranslations() {
         opensuse*)
             REQUIRES=("${REQUIRES[@]/libc6/glibc}")
             REQUIRES=("${REQUIRES[@]/libasound2/alsa-lib}")
-            REQUIRES=("${REQUIRES[@]/libuuid1/libuuid}")
             REQUIRES=("${REQUIRES[@]/libext6/libXext6}")
             REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp6}")
             REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
