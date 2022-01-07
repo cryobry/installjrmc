@@ -42,11 +42,9 @@ printHelp() {
 		    --install, -i repo|rpm
 		        repo: Install MC from repository, updates are handled by the system package manager
 		        rpm: Build and install RPM locally (RPM-based distros only)
-		    --build
-		        Build RPM from source DEB (but don't install it)
-            --build-suse
-                Override OS detection and build SUSE RPM
-		    --MCVERSION VERSION
+		    --build [TARGET DISTRO]
+		        Build RPM from source DEB but do not install. Optional parameter allows cross-building RPMs (ex. 'suse', 'fedora', 'centos').
+		    --mcversion VERSION
 		        Specify the MC version, ex. "28.0.25" (Default: latest version)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: $PWD/output)
@@ -81,11 +79,11 @@ printHelp() {
 
 		SERVICES
 		    jriver-mediaserver
-		        Enable and start a mediaserver systemd service (REQUIRES an existing X server)
+		        Enable and start a mediaserver systemd service (requires an existing X server)
 		    jriver-mediacenter
-		        Enable and start a mediacenter systemd service (REQUIRES an existing X server)
+		        Enable and start a mediacenter systemd service (requires an existing X server)
 		    jriver-x11vnc
-		        Enable and start x11vnc for the local desktop (REQUIRES an existing X server)
+		        Enable and start x11vnc for the local desktop (requires an existing X server)
 		        Usually combined with jriver-mediaserver or jriver-mediacenter services
 		        --vncpass and --display are optional (see below)
 		    jriver-xvnc
@@ -238,7 +236,7 @@ parseInput() {
         INSTALL_TYPE="repo"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,build-suse,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build::,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-suse,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -255,6 +253,7 @@ parseInput() {
                     ;;
                 --build)
                     BUILD_SWITCH=true
+                    shift && BUILD_TARGET="$1"
                     ;;
                 --build-suse)
                     BUILD_SWITCH=true
@@ -335,6 +334,8 @@ parseInput() {
         err "Incorrect options provided"
         printHelp && exit 1
     fi
+
+    [[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
 }
 
 
@@ -592,7 +593,6 @@ acquireDeb() {
         return 0
     fi
 
-    installPackage --silent wget
     if [[ -v BETAPASS ]]; then
         echo "Checking beta repo..."
         if wget -q -O "$DEBFILENAME" \
@@ -624,103 +624,7 @@ acquireDeb() {
 packageTranslations() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare requires id i
-    declare -A dupes
-    declare -ga REQUIRES RECOMMENDS
-    
-    id="$ID" # For crossbuilding, use a temp mutable ID
 
-    # Load deb dependencies into array
-    IFS=',' read -ra REQUIRES <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
-    IFS=',' read -ra RECOMMENDS <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
-
-    # Clean up formatting
-    REQUIRES=("${REQUIRES[@]%%|*}")
-    REQUIRES=("${REQUIRES[@]/?:/}")
-    REQUIRES=("${REQUIRES[@]# }")
-    REQUIRES=("${REQUIRES[@]% }")
-    REQUIRES=("${REQUIRES[@]//\(/}")
-    REQUIRES=("${REQUIRES[@]//)/}")
-    RECOMMENDS=("${RECOMMENDS[@]%%|*}")
-    RECOMMENDS=("${RECOMMENDS[@]/?:/}")
-    RECOMMENDS=("${RECOMMENDS[@]# }")
-    RECOMMENDS=("${RECOMMENDS[@]% }")
-    RECOMMENDS=("${RECOMMENDS[@]//\(/}")
-    RECOMMENDS=("${RECOMMENDS[@]//)/}")
-
-    # Translate package names
-    [[ -v BUILD_SUSE_SWITCH ]] && id="opensuse"
-    case "$id" in
-        fedora|centos)
-            REQUIRES=("${REQUIRES[@]/libc6/glibc}")
-            REQUIRES=("${REQUIRES[@]/libasound2/alsa-lib}")
-            REQUIRES=("${REQUIRES[@]/libuuid1/libuuid}")
-            REQUIRES=("${REQUIRES[@]/libx11-6/libX11}")
-            REQUIRES=("${REQUIRES[@]/libxext6/libXext}")
-            REQUIRES=("${REQUIRES[@]/libxcb1/libxcb}")
-            REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp}")
-            REQUIRES=("${REQUIRES[@]/libstdc++6/libstdc++}")
-            REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
-            REQUIRES=("${REQUIRES[@]/libgl1/mesa-libGL}")
-            REQUIRES=("${REQUIRES[@]/libpango-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libpangoft2-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libpangox-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libpangoxft-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libnss3/nss}")
-            REQUIRES=("${REQUIRES[@]/libnspr4/nspr}")
-            REQUIRES=("${REQUIRES[@]/libgomp1/libgomp}")
-            REQUIRES=("${REQUIRES[@]/libfribidi0/fribidi}")
-            REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
-            REQUIRES=("${REQUIRES[@]/libfreetype6/freetype}")
-            REQUIRES=("${REQUIRES[@]/libharfbuzz0b/harfbuzz}")
-            REQUIRES=("${REQUIRES[@]/libgbm1/mesa-libgbm}")
-            REQUIRES=("${REQUIRES[@]/libva2/libva}")
-            REQUIRES=("${REQUIRES[@]/libepoxy0/libepoxy}")
-            REQUIRES=("${REQUIRES[@]/liblcms2-2/lcms2}")
-            REQUIRES=("${REQUIRES[@]/libvulkan1/vulkan-loader}")
-            REQUIRES=("${REQUIRES[@]/libepoxy0/libepoxy}")
-            ;;
-        opensuse*)
-            REQUIRES=("${REQUIRES[@]/libc6/glibc}")
-            REQUIRES=("${REQUIRES[@]/libasound2/alsa-lib}")
-            REQUIRES=("${REQUIRES[@]/libx11-6/libX11-6}")
-            REQUIRES=("${REQUIRES[@]/libxext6/libXext6}")
-            REQUIRES=("${REQUIRES[@]/libxdmcp6/libXdmcp6}")
-            REQUIRES=("${REQUIRES[@]/libgtk-3-0/gtk3}")
-            REQUIRES=("${REQUIRES[@]/libgl1/Mesa-libGL1}")
-            REQUIRES=("${REQUIRES[@]/libpango-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libpangoft2-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libpangox-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libpangoxft-1.0-0/pango}")
-            REQUIRES=("${REQUIRES[@]/libnss3/mozilla-nss}")
-            REQUIRES=("${REQUIRES[@]/libnspr4/mozilla-nspr}")
-            REQUIRES=("${REQUIRES[@]/libfribidi0/fribidi}")
-            REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
-            REQUIRES=("${REQUIRES[@]/libfreetype6*/freetype}") # Remove minimum version specifier
-            REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
-            for i in "${!REQUIRES[@]}"; do
-                [[ "${REQUIRES[$i]}" == "mesa-vulkan-drivers" ]] && unset -v 'REQUIRES[i]'
-            done
-            RECOMMENDS+=("libvulkan_intel")
-            RECOMMENDS+=("libvulkan_radeon")
-            ;;
-    esac
-
-    # Remove duplicates
-    for i in "${REQUIRES[@]}"; do
-        if [[ ! -v dupes[${i%% *}] ]]; then
-            requires+=("$i")
-        fi
-        dupes["${i%% *}"]=1
-    done
-    REQUIRES=("${requires[@]}")
-
-    # Convert array to newline delim'd string (for heredoc)
-    printf -v REQUIRES "Requires: %s\n" "${REQUIRES[@]}"
-    printf -v RECOMMENDS "Recommends: %s\n" "${RECOMMENDS[@]}"
-    # Strip last newline
-    REQUIRES="${REQUIRES%?}" 
-    RECOMMENDS="${RECOMMENDS%?}"
 }
 
 
@@ -730,7 +634,9 @@ packageTranslations() {
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare _ec
+    declare _ec id i
+    declare -a requires recommends
+    declare -A dupes
     declare -g MCRPM="$OUTPUTDIR/RPMS/x86_64/MediaCenter-$MCVERSION.x86_64.rpm"
 
     # skip rebuilding the rpm if it already exists
@@ -740,10 +646,104 @@ buildRPM() {
     fi
 
     [[ ! -d "$OUTPUTDIR/SPECS" ]] && mkdir -p "$OUTPUTDIR/SPECS"
+    
+    id="$ID" # For crossbuilding, use a temp mutable ID
+    [[ -v BUILD_SUSE_SWITCH ]] && id="opensuse"
+
+    # Load deb dependencies into array
+    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
+    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
+
+    # Clean up formatting
+    requires=("${requires[@]%%|*}")
+    requires=("${requires[@]/?:/}")
+    requires=("${requires[@]# }")
+    requires=("${requires[@]% }")
+    requires=("${requires[@]//\(/}")
+    requires=("${requires[@]//)/}")
+    recommends=("${recommends[@]%%|*}")
+    recommends=("${recommends[@]/?:/}")
+    recommends=("${recommends[@]# }")
+    recommends=("${recommends[@]% }")
+    recommends=("${recommends[@]//\(/}")
+    recommends=("${recommends[@]//)/}")
+
+    # Translate package names
+    case "$id" in
+        fedora|centos)
+            requires=("${requires[@]/libc6/glibc}")
+            requires=("${requires[@]/libasound2/alsa-lib}")
+            requires=("${requires[@]/libuuid1/libuuid}")
+            requires=("${requires[@]/libx11-6/libX11}")
+            requires=("${requires[@]/libxext6/libXext}")
+            requires=("${requires[@]/libxcb1/libxcb}")
+            requires=("${requires[@]/libxdmcp6/libXdmcp}")
+            requires=("${requires[@]/libstdc++6/libstdc++}")
+            requires=("${requires[@]/libgtk-3-0/gtk3}")
+            requires=("${requires[@]/libgl1/mesa-libGL}")
+            requires=("${requires[@]/libpango-1.0-0/pango}")
+            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
+            requires=("${requires[@]/libpangox-1.0-0/pango}")
+            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
+            requires=("${requires[@]/libnss3/nss}")
+            requires=("${requires[@]/libnspr4/nspr}")
+            requires=("${requires[@]/libgomp1/libgomp}")
+            requires=("${requires[@]/libfribidi0/fribidi}")
+            requires=("${requires[@]/libfontconfig1/fontconfig}")
+            requires=("${requires[@]/libfreetype6/freetype}")
+            requires=("${requires[@]/libharfbuzz0b/harfbuzz}")
+            requires=("${requires[@]/libgbm1/mesa-libgbm}")
+            requires=("${requires[@]/libva2/libva}")
+            requires=("${requires[@]/libepoxy0/libepoxy}")
+            requires=("${requires[@]/liblcms2-2/lcms2}")
+            requires=("${requires[@]/libvulkan1/vulkan-loader}")
+            requires=("${requires[@]/libepoxy0/libepoxy}")
+            ;;
+        opensuse*)
+            requires=("${requires[@]/libc6/glibc}")
+            requires=("${requires[@]/libasound2/alsa-lib}")
+            requires=("${requires[@]/libx11-6/libX11-6}")
+            requires=("${requires[@]/libxext6/libXext6}")
+            requires=("${requires[@]/libxdmcp6/libXdmcp6}")
+            requires=("${requires[@]/libgtk-3-0/gtk3}")
+            requires=("${requires[@]/libgl1/Mesa-libGL1}")
+            requires=("${requires[@]/libpango-1.0-0/pango}")
+            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
+            requires=("${requires[@]/libpangox-1.0-0/pango}")
+            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
+            requires=("${requires[@]/libnss3/mozilla-nss}")
+            requires=("${requires[@]/libnspr4/mozilla-nspr}")
+            requires=("${requires[@]/libfribidi0/fribidi}")
+            requires=("${requires[@]/libfontconfig1/fontconfig}")
+            requires=("${requires[@]/libfreetype6*/freetype}") # Remove minimum version specifier
+            requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
+            for i in "${!requires[@]}"; do
+                [[ "${requires[$i]}" == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
+            done
+            recommends+=("libvulkan_intel")
+            recommends+=("libvulkan_radeon")
+            ;;
+    esac
+
+    # Remove duplicates
+    for i in "${requires[@]}"; do
+        if [[ ! -v dupes[${i%% *}] ]]; then
+            tmp+=("$i")
+        fi
+        dupes["${i%% *}"]=1
+    done
+    requires=("${tmp[@]}")
+
+    # Convert array to newline delim'd string (for heredoc)
+    printf -v requires "Requires: %s\n" "${requires[@]}"
+    printf -v recommends "Recommends: %s\n" "${recommends[@]}"
+    # Strip last newline
+    requires="${requires%?}" 
+    recommends="${recommends%?}"
 
 	if [[ -v COMPAT_SWITCH ]]; then
 		# Strip minimum versions
-		REQUIRES=$(echo "$REQUIRES" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
+		requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
 	fi
 
     # Create spec file
@@ -759,8 +759,8 @@ buildRPM() {
 
 		AutoReq:  0
 
-		${REQUIRES:-}
-		${RECOMMENDS:-}
+		${requires:-}
+		${recommends:-}
 
 		Provides: mediacenter$MVERSION
 
@@ -1515,10 +1515,8 @@ main() {
 
     # Build RPM from source deb package
     if [[ -v BUILD_SWITCH ]]; then
-        acquireDeb
         installPackage --silent "wget" "dpkg" "rpm-build"
-        packageTranslations
-
+        acquireDeb
         if ! buildRPM; then
             err "Build failed."
             # For automation, let's remove the source DEB and reaquire it on next run 
