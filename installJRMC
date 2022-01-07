@@ -252,12 +252,7 @@ parseInput() {
                     fi
                     ;;
                 --build)
-
-                    echo HERE
-                    echo "$1" "$2"
-                    BUILD_SWITCH=true
-                    #BUILD_TARGET="$2"
-                    shift
+                    shift && BUILD_TARGET="$1"
                     ;;
                 --build-suse)
                     BUILD_SWITCH=true
@@ -340,6 +335,7 @@ parseInput() {
     fi
 }
 
+[[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
 
 #######################################
 # Use several methods to determine the latest JRiver MC version
