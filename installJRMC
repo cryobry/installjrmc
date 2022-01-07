@@ -709,6 +709,7 @@ packageTranslations() {
 
     # Remove duplicates
     for i in "${REQUIRES[@]}"; do
+        debug "i: $i"
         if [[ ! -v dupes[${i%% *}] ]]; then
             requires+=("$i")
         fi
