@@ -698,10 +698,9 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
             REQUIRES=("${REQUIRES[@]/libfreetype6*/freetype}") # Remove minimum version specifier
             REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
-            REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers}")
-            # for i in "${!REQUIRES[@]}"; do
-            #     [[ "${REQUIRES[$i]}" == "mesa-vulkan-drivers" ]] && unset "REQUIRES[$i]"
-            # done
+            for i in "${!REQUIRES[@]}"; do
+                [[ "${REQUIRES[$i]}" == "mesa-vulkan-drivers" ]] && unset -v 'REQUIRES[i]'
+            done
             RECOMMENDS+=("libvulkan_intel")
             RECOMMENDS+=("libvulkan_radeon")
             ;;
@@ -709,7 +708,6 @@ packageTranslations() {
 
     # Remove duplicates
     for i in "${REQUIRES[@]}"; do
-        debug "i: $i"
         if [[ ! -v dupes[${i%% *}] ]]; then
             requires+=("$i")
         fi
