@@ -638,23 +638,21 @@ packageTranslations() {
     debug "${REQUIRES[@]}"
 
     # Clean up formatting
-    for i in "${!REQUIRES[@]}"; do
-        REQUIRES[$i]="${REQUIRES[$i]%%|*}"
-        REQUIRES[$i]="${REQUIRES[$i]/?:/}"
-        REQUIRES[$i]="${REQUIRES[$i]# }"
-        REQUIRES[$i]="${REQUIRES[$i]% }"
-        REQUIRES[$i]="${REQUIRES[$i]//\(/}"
-        REQUIRES[$i]="${REQUIRES[$i]//)/}"
-    done
+    REQUIRES=("${REQUIRES[@]%%|*}")
+    REQUIRES=("${REQUIRES[@]/?:/}")
+    REQUIRES=("${REQUIRES[@]# }")
+    REQUIRES=("${REQUIRES[@]% }")
+    REQUIRES=("${REQUIRES[@]//\(/}")
+    REQUIRES=("${REQUIRES[@]//)/}")
+    RECOMMENDS=("${RECOMMENDS[@]%%|*}")
+    RECOMMENDS=("${RECOMMENDS[@]/?:/}")
+    RECOMMENDS=("${RECOMMENDS[@]# }")
+    RECOMMENDS=("${RECOMMENDS[@]% }")
+    RECOMMENDS=("${RECOMMENDS[@]//\(/}")
+    RECOMMENDS=("${RECOMMENDS[@]//)/}")
 
-    for i in "${!RECOMMENDS[@]}"; do
-        RECOMMENDS[$i]="${RECOMMENDS[$i]%%|*}"
-        RECOMMENDS[$i]="${RECOMMENDS[$i]/?:/}"
-        RECOMMENDS[$i]="${RECOMMENDS[$i]# }"
-        RECOMMENDS[$i]="${RECOMMENDS[$i]% }"
-        RECOMMENDS[$i]="${RECOMMENDS[$i]//\(/}"
-        RECOMMENDS[$i]="${RECOMMENDS[$i]//)/}"
-    done
+    debug "Cleaned:"
+    debug "${REQUIRES[@]}"
 
     # Translate package names
     [[ -v BUILD_SUSE_SWITCH ]] && id="opensuse"
@@ -708,9 +706,6 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
             ;;
     esac
-
-    debug "Cleaned:"
-    debug "${REQUIRES[@]}"
 
     # Remove duplicates
     for i in "${REQUIRES[@]}"; do
