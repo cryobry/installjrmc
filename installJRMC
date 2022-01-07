@@ -136,19 +136,19 @@ init() {
         pkg_install(){ ifSudo dnf install -y "$@"; }
         pkg_remove(){ ifSudo dnf remove -y "$@"; }
         pkg_update(){ ifSudo dnf makecache; }
-        pkg_query(){ ifSudo rpm -q "$@"; }
+        pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         pkg_install(){ ifSudo apt-get install -y -q0 "$@"; }
         pkg_remove(){ ifSudo apt-get remove --auto-remove -y -q0 "$@"; }
         pkg_update(){ ifSudo apt-get update -y -q0; }
-        pkg_query(){ ifSudo dpkg -s "$@"; }
+        pkg_query(){ dpkg -s "$@"; }
         firewall_cmd(){ ifSudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
         pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ ifSudo zypper --non-interactive -q refresh jriver; }
-        pkg_query(){ ifSudo rpm -q "$@"; }
+        pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ ifSudo firewall-cmd "$@"; }
     fi
 
@@ -1525,7 +1525,7 @@ main() {
     # Build RPM from source deb package
     if [[ -v BUILD_SWITCH ]]; then
         acquireDeb
-        installPackage "wget" "dpkg" "rpm-build"
+        installPackage --silent "wget" "dpkg" "rpm-build"
         packageTranslations
 
         if ! buildRPM; then
