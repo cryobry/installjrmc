@@ -696,7 +696,7 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libnspr4/mozilla-nspr}")
             REQUIRES=("${REQUIRES[@]/libfribidi0/fribidi}")
             REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
-            REQUIRES=("${REQUIRES[@]/libfreetype6/freetype}")
+            REQUIRES=("${REQUIRES[@]/libfreetype6*/freetype}") # Remove minimum version specifier
             REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
             REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers/libvulkan_intel}")
             ;;
