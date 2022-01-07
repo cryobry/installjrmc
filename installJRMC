@@ -253,7 +253,8 @@ parseInput() {
                     ;;
                 --build)
                     BUILD_SWITCH=true
-                    shift && BUILD_TARGET="$1"
+                    BUILD_TARGET="$2"
+                    shift
                     ;;
                 --build-suse)
                     BUILD_SWITCH=true
