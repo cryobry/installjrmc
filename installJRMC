@@ -699,6 +699,7 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libfreetype6*/freetype}") # Remove minimum version specifier
             REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
             REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers/libvulkan_intel}")
+            REQUIRES+=("libvulkan_radeon")
             ;;
     esac
 
