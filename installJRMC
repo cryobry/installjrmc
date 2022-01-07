@@ -170,6 +170,7 @@ init() {
 
     # Set target package name
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
+        echo here
         MCPKG="MediaCenter"
         [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
