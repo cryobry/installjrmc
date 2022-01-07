@@ -475,7 +475,7 @@ installPackage() {
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
         debug "pkg_install ${install_flags[*]} ${pkg_array[*]}"
-        if DEBUG; then
+        if $DEBUG; then
             pkg_install "${install_flags[@]}" "${pkg_array[@]}"
         else
             pkg_install "${install_flags[@]}" "${pkg_array[@]}" &>/dev/null
@@ -536,7 +536,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    if DEBUG; then
+    if $DEBUG; then
         installPackage --nocheck --nogpgcheck "$MCPKG"
     else
         installPackage --nocheck --nogpgcheck "$MCPKG" &>/dev/null
@@ -755,7 +755,7 @@ buildRPM() {
     echo "Building version $MCVERSION, please wait..."
 
     rpmbuild_cmd="rpmbuild --define=%_topdir $OUTPUTDIR --define=%_libdir /usr/lib -bb $OUTPUTDIR/SPECS/mediacenter.spec"
-    DEBUG || rpmbuild_cmd+=" &>/dev/null"
+    $DEBUG || rpmbuild_cmd+=" &>/dev/null"
     if eval "$rpmbuild_cmd" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
@@ -1423,7 +1423,7 @@ uninstall() {
         MCPKG="mediacenter$MVERSION"
     fi
 
-    if DEBUG; then
+    if $DEBUG; then
         debug "pkg_remove $MCPKG"
         pkg_remove "$MCPKG"
     else
