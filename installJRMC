@@ -698,8 +698,9 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
             REQUIRES=("${REQUIRES[@]/libfreetype6*/freetype}") # Remove minimum version specifier
             REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
-            REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers/libvulkan_intel}")
-            REQUIRES+=("libvulkan_radeon")
+            REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers}")
+            RECOMMENDS+=("libvulkan_intel")
+            RECOMMENDS+=("libvulkan_radeon")
             ;;
     esac
 
