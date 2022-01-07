@@ -20,7 +20,7 @@
 
 shopt -s extglob
 
-SCRIPTVERSION="1.0b5"
+SCRIPTVERSION="1.0b6"
 OUTPUTDIR="$PWD/output"
 CREATEREPO_WEBROOT="/var/www/jriver"
 EXEC_USER=$(whoami)
@@ -698,7 +698,7 @@ packageTranslations() {
             REQUIRES=("${REQUIRES[@]/libfontconfig1/fontconfig}")
             REQUIRES=("${REQUIRES[@]/libfreetype6/freetype}")
             REQUIRES=("${REQUIRES[@]/libharfbuzz0b/libharfbuzz0}")
-            REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers/}")
+            REQUIRES=("${REQUIRES[@]/mesa-vulkan-drivers/libvulkan_intel}")
             ;;
     esac
 
