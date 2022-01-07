@@ -333,9 +333,11 @@ parseInput() {
         err "Incorrect options provided"
         printHelp && exit 1
     fi
+
+    [[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
 }
 
-[[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
+
 
 #######################################
 # Use several methods to determine the latest JRiver MC version
