@@ -335,6 +335,7 @@ parseInput() {
         printHelp && exit 1
     fi
 
+    echo HERE
     [[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
 }
 
