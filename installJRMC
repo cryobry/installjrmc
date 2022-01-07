@@ -252,11 +252,8 @@ parseInput() {
                     fi
                     ;;
                 --build)
-                    shift && BUILD_TARGET="$1"
-                    ;;
-                --build-suse)
                     BUILD_SWITCH=true
-                    BUILD_SUSE_SWITCH=true
+                    shift && BUILD_TARGET="$1"
                     ;;
                 --outputdir)
                     shift && OUTPUTDIR="$1"
@@ -334,7 +331,8 @@ parseInput() {
         printHelp && exit 1
     fi
 
-    [[ -v BUILD_TARGET ]] && echo "$BUILD_TARGET"
+    echo "Build target:"
+    echo "$BUILD_TARGET"
 }
 
 
