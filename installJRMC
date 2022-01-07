@@ -389,7 +389,7 @@ getLatestVersion() {
         return 0
     fi
     # Scrape from Interact
-    installPackage --silent wget
+    installPackage wget
     if MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         version_source="webscrape"
     fi
@@ -414,7 +414,7 @@ installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
-    declare pkg nocheck silent _return
+    declare pkg nocheck silent _return pkg_install_cmd
 
     if _input=$(getopt -o +s -l nocheck,nogpgcheck,nobest,silent -- "$@"); then
         eval set -- "$_input"
@@ -474,15 +474,12 @@ installPackage() {
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
-        debug "pkg_install ${install_flags[*]} ${pkg_array[*]}"
-        if $DEBUG; then
-            pkg_install "${install_flags[@]}" "${pkg_array[@]}"
-        else
-            pkg_install "${install_flags[@]}" "${pkg_array[@]}" &>/dev/null
+        pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
+        debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
+        if ! eval "$pkg_install_cmd" && [[ ! -v silent ]]; then       
+            err "Failed to install ${pkg_array[*]}. Attempting to continue..."
         fi
-        _return=$?       
-        [[ $_return -ne 0 && ! -v silent ]] && err "Failed to install ${pkg_array[*]}. Attempting to continue..."
-        return $_return
+
     fi
 }
 
@@ -502,7 +499,7 @@ addRepo() {
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         # MVERSION depends on $BASE unless --MCVERSION is passed
-        installPackage --silent wget
+        installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - &>/dev/null
         ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
     elif [[ "$ID" =~ ^opensuse.* ]]; then
@@ -530,19 +527,15 @@ installMCFromRepo() {
     addRepo
 
     # Update package list
-    debug "Updating package list"
-    if ! pkg_update &>/dev/null; then
+    debug "$pkg_update_cmd" || pkg_update_cmd+=" &>/dev/null"
+    if ! eval "$pkg_update_cmd"; then
         err "Package update failed!"
         exit 1
     fi
 
-    if $DEBUG; then
-        installPackage --nocheck --nogpgcheck "$MCPKG"
-    else
-        installPackage --nocheck --nogpgcheck "$MCPKG" &>/dev/null
-    fi
-
-    return $?
+    pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCPKG"
+    debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
+    eval "$pkg_install_cmd"
 }
 
 
@@ -753,9 +746,8 @@ buildRPM() {
 
     # Run rpmbuild
     echo "Building version $MCVERSION, please wait..."
-
     rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb $OUTPUTDIR/SPECS/mediacenter.spec"
-    $DEBUG || rpmbuild_cmd+=" &>/dev/null"
+    debug "$rpmbuild_cmd" || rpmbuild_cmd+=" &>/dev/null"
     if eval "$rpmbuild_cmd" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
@@ -774,19 +766,20 @@ buildRPM() {
 runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a createrepo_cmd
+    declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
 
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        debug "ifSudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
-        if ! ifSudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT" &>/dev/null; then
-            debug "ifSudo mkdir -p $CREATEREPO_WEBROOT"
-            if ifSudo mkdir -p "$CREATEREPO_WEBROOT" && \
-                ifSudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
-                :
-            else
+        cr_mkdir_cmd="ifSudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
+        debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
+        if ! eval "$cr_mkdir_cmd"; then
+            cr_mkdir_cmd="ifSudo mkdir -p $CREATEREPO_WEBROOT"
+            debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
+            cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
+            debug "$cr_chown_cmd" || cr_chown_cmd+=" &>/dev/null"
+            if ! ( eval "$cr_mkdir_cmd" && eval "$cr_chown_cmd" ); then
                 err "Could not create the createrepo-webroot path!"
                 err "Make sure that the createrepo-webroot is writeable by createrepo-user: $CREATEREPO_USER"
                 return 1
@@ -795,13 +788,13 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    debug "ifSudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
-    if ! ifSudo -u "$CREATEREPO_USER" cp -n -f "$MCRPM" "$CREATEREPO_WEBROOT" &>/dev/null; then
-        debug "cp_cmd $MCRPM $CREATEREPO_WEBROOT"
-        if cp_cmd "$MCRPM" "$CREATEREPO_WEBROOT" && \
-            ifSudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
-            :
-        else
+    cr_cp_cmd="ifSudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
+    cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
+    debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
+    if ! (eval "$cr_cp_cmd" && eval "$cr_chown_cmd"); then
+        cr_cp_cmd="cp_cmd $MCRPM $CREATEREPO_WEBROOT"
+        debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
+        if ! eval "$cr_cp_cmd"; then
             err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
             err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $CREATEREPO_USER"
             return 1
@@ -809,10 +802,10 @@ runCreaterepo() {
     fi
 
     # Run createrepo
-    createrepo_cmd=("sudo" "-u" "$CREATEREPO_USER" "createrepo" "-q")
-    [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && createrepo_cmd+=("--update")
-    debug "${createrepo_cmd[*]} $CREATEREPO_WEBROOT"
-    if "${createrepo_cmd[@]}" "$CREATEREPO_WEBROOT"; then
+    cr_cmd="sudo -u $CREATEREPO_USER createrepo -q"
+    [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
+    debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
+    if eval "$cr_cmd $CREATEREPO_WEBROOT"; then
         echo "Successfully updated repo"
         return 0
     else
@@ -1407,34 +1400,24 @@ uninstall() {
             firewall_cmd --reload &>/dev/null
         fi
     elif [[ -x $(command -v ufw) ]]; then
-        if [[ -v debug ]]; then
-            firewall_cmd delete allow jriver
-        else
-            firewall_cmd delete allow jriver &>/dev/null
-        fi
+        firewall_cmd="firewall_cmd delete allow jriver"
+        debug "$firewall_cmd" || firewall_cmd+=" &>/dev/null"
+        eval "$firewall_cmd"
         [[ -f "/etc/ufw/applications.d/jriver" ]] \
             && rm_cmd /etc/ufw/applications.d/jriver
     fi
 
-    debug "Uninstalling Media Center packages"
-    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        MCPKG="MediaCenter"
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        MCPKG="mediacenter$MVERSION"
-    fi
-
-    if $DEBUG; then
-        debug "pkg_remove $MCPKG"
-        pkg_remove "$MCPKG"
+    debug "Uninstalling Media Center package"
+    mc_pkg_rm_cmd="pkg_remove $MCPKG"
+    debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
+    if eval "$mc_pkg_rm_cmd"; then 
+        echo "JRiver Media Center has been completely uninstalled."
+        echo "To remove your library files, run: rm -rf $HOME/.jriver"
+        echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
+        exit 0
     else
-        pkg_remove "$MCPKG" &>/dev/null
+        exit $?
     fi
-
-    echo "JRiver Media Center has been completely uninstalled."
-    echo "To remove your library files, run: rm -rf $HOME/.jriver"
-    echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
-
-    exit 0
 }
 
 
@@ -1478,7 +1461,7 @@ main() {
 
     # Build RPM from source deb package
     if [[ -v BUILD_SWITCH ]]; then
-        installPackage --silent "wget" "dpkg" "rpm-build"
+        installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
         buildRPM
     fi
