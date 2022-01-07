@@ -22,9 +22,9 @@ You can always find the latest supported options by running `installJRMC --help`
     repo: Install MC from repository, future updates will be handled by the system package manager
     rpm: Build and install MC locally (RPM-based OSes only)
 --build
-    Build RPM from source DEB (no installation)
---build-suse
-    Override OS detection and build SUSE RPM
+     Build RPM from source DEB but do not install
+--target opensuse|fedora|centos
+    Crossbuild RPM for target distro 
 --mcversion VERSION
     Build or install a specific MC version, ex. "28.0.25"
 --outputdir PATH
@@ -35,20 +35,18 @@ You can always find the latest supported options by running `installJRMC --help`
     Enter beta team password for access to beta builds
 --service, -s SERVICE
     See SERVICES section below for the list of services to deploy
---service-user USER
-    Install systemd services and containers for user USER (Default: executing user)
+  --service-user USER
+      Install systemd services and containers for user USER (Default: executing user)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
 --createrepo
-    Build rpm, copy to webroot, and run createrepo
---createrepo-suse
-    Override OS detection and run --createrepo with SUSE RPM
---createrepo-webroot PATH
-    The webroot directory to install the repo (Default: /var/www/jriver/)
---createrepo-user USER
-    The web server user (Default: current user)
+    Build rpm, copy to webroot, and run createrepo.
+  --createrepo-webroot PATH
+      The webroot directory to install the repo (Default: /var/www/jriver/)
+  --createrepo-user USER
+      The web server user (Default: current user)
 --compat
-    Build/install RPM without minimum version specifiers
+    Build/install RPM without minimum library specifiers.
 --version, -v
     Print this script version and exit
 --debug, -d
@@ -74,11 +72,9 @@ jriver-x11vnc
 jriver-xvnc
     Enable and start a new Xvnc session running JRiver Media Center
     --vncpass PASSWORD
-        Set vnc password for x11vnc/Xvnc access. If no password is set, the script
-        will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+        Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
     --display DISPLAY
-        Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
-        current display incremented by 1 (Xvnc))
+        Manually specify display to use for x11vnc/Xvnc (ex. )
 jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
 ```
