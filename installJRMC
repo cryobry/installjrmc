@@ -634,6 +634,9 @@ packageTranslations() {
     IFS=',' read -ra REQUIRES <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
     IFS=',' read -ra RECOMMENDS <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
 
+    debug "Original:"
+    debug "${REQUIRES[@]}"
+
     # Clean up formatting
     for i in "${!REQUIRES[@]}"; do
         REQUIRES[$i]="${REQUIRES[$i]%%|*}"
@@ -706,7 +709,7 @@ packageTranslations() {
             ;;
     esac
 
-    debug "Original:"
+    debug "Cleaned:"
     debug "${REQUIRES[@]}"
 
     # Remove duplicates
@@ -717,9 +720,6 @@ packageTranslations() {
         dupes["${i%% *}"]=1
     done
     REQUIRES=("${requires[@]}")
-    debug "Dupes removed:"
-    debug "${REQUIRES[@]}"
-
 
     # Convert array to newline delim'd string (for heredoc)
     printf -v REQUIRES "Requires: %s\n" "${REQUIRES[@]}"
@@ -727,9 +727,6 @@ packageTranslations() {
     # Strip last newline
     REQUIRES="${REQUIRES%?}" 
     RECOMMENDS="${RECOMMENDS%?}"
-
-    debug "Final requires:"
-    debug "${REQUIRES[@]}"
 }
 
 
