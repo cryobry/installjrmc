@@ -634,9 +634,6 @@ packageTranslations() {
     IFS=',' read -ra REQUIRES <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
     IFS=',' read -ra RECOMMENDS <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
 
-    debug "Original: "
-    debug "${REQUIRES[@]}"
-
     # Clean up formatting
     REQUIRES=("${REQUIRES[@]%%|*}")
     REQUIRES=("${REQUIRES[@]/?:/}")
@@ -705,7 +702,6 @@ packageTranslations() {
     esac
 
     # Remove duplicates
-    unset requires
     for i in "${REQUIRES[@]}"; do
         if [[ ! -v dupes[${i%% *}] ]]; then
             requires+=("$i")
@@ -720,9 +716,6 @@ packageTranslations() {
     # Strip last newline
     REQUIRES="${REQUIRES%?}" 
     RECOMMENDS="${RECOMMENDS%?}"
-
-    debug "Final: "
-    debug "${REQUIRES[@]}"
 }
 
 
