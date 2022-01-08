@@ -376,7 +376,7 @@ getLatestVersion() {
     # Use a containerized package manager
     # TODO but how to determine build distro ($BASE=buster)?
     installPackage --silent buildah
-    if CNT=$(buildah from debian:$BASE &>/dev/null); then 
+    if CNT=$(buildah from debian:$BASE) &>/dev/null; then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
@@ -786,17 +786,17 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    cr_cp_cmd="ifSudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
+    #cr_cp_cmd="ifSudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
+    #cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
+    #debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
+    cr_cp_cmd="ifSudo cp_cmd $MCRPM $CREATEREPO_WEBROOT"
     cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-    debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
+    debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
+    debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
     if ! (eval "$cr_cp_cmd" && eval "$cr_chown_cmd"); then
-        cr_cp_cmd="cp_cmd $MCRPM $CREATEREPO_WEBROOT"
-        debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
-        if ! eval "$cr_cp_cmd"; then
-            err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
-            err "Make sure that the createrepo-webroot path is writeable by createrepo-user: $CREATEREPO_USER"
-            return 1
-        fi
+        err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
+        #err "Is the createrepo-webroot $CREATEREPO_WEBROOT writeable by createrepo-user: $CREATEREPO_USER?"
+        return 1
     fi
 
     # Run createrepo
