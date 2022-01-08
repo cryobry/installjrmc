@@ -22,7 +22,6 @@ shopt -s extglob
 SCRIPTVERSION="1.0b6"
 OUTPUTDIR="$PWD/output"
 CREATEREPO_WEBROOT="/var/www/jriver"
-EXEC_USER=$(whoami)
 SERVICEDIR="/usr/lib/systemd/system"
 
 # MC version
@@ -57,14 +56,16 @@ printHelp() {
 		        See SERVICES section below for a list of possible services to install
 		        --service-user USER
 		            Install systemd services and containers for user USER (Default: current user)
+		        --service-type user|system 
+		            Installs service(s) as a system or user service (Default: per-service)
 		    --container, -c CONTAINER (TODO: Under construction)
 		        See CONTAINERS section below for a list of possible services to install
 		    --createrepo
 		        Build rpm, copy to webroot, and run createrepo. Use in conjunction with --build=TARGET for crossbuilding repos
 		        --createrepo-webroot PATH
-		            The webroot directory to install the repo (Default: /var/www/jriver)
+		            Specify the webroot directory to install the repo (Default: /var/www/jriver)
 		        --createrepo-user USER
-		            The web server user (Default: current user)
+		            Specify the web server user
             --compat
                 Build/install RPM without minimum library specifiers
 		    --version, -v
@@ -74,7 +75,7 @@ printHelp() {
 		    --help, -h
 		        Print help dialog and exit
 		    --uninstall, -u
-		        Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
+		        Uninstall JRiver MC, remove services, and remove firewall rules (does not remove library files)
 
 		SERVICES
 		    jriver-mediaserver
@@ -94,7 +95,7 @@ printHelp() {
 		            Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
 		            current display incremented by 1 (Xvnc))
 		    jriver-createrepo
-		        Install hourly service to build latest MC RPM and run createrepo
+		        Install hourly service to build latest MC RPM and run createrepo ()
 
 		CONTAINERS (TODO: Under construction)
 		    mediacenter-xvnc
@@ -107,9 +108,13 @@ init() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare version_source
-    declare -g SERVICE_USER CREATEREPO_USER MCVERSION MVERSION MCPKG
+    declare -g USER SERVICE_USER CREATEREPO_USER MCVERSION MVERSION MCPKG
 
     getOS
+
+    USER="${USER:-$(id -un)}"
+    SERVICE_USER="${SERVICE_USER:-$USER}"
+    CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     # Make sure universe repo is installed on Ubuntu
     if [[ "$ID" == "ubuntu" ]]; then
@@ -151,9 +156,6 @@ init() {
     fi
 
     parseInput "$@"
-
-    SERVICE_USER="${SERVICE_USER:-$EXEC_USER}"
-    CREATEREPO_USER="${CREATEREPO_USER:-$EXEC_USER}"
 
     # Select MC version to work with
     if [[ -v MCVERSION ]]; then
@@ -205,20 +207,22 @@ getOS() {
 
 
 ifSudo() {
-    declare _user="root"
+    declare user="root"
     if [[ $# == 0 ]]; then
-        [[ "$EXEC_USER" == "root" ]]; return $?
+        [[ "$USER" == "root" ]]
+        return $?
     elif [[ $# -eq 2 && "$1" == "-u" ]]; then
-        _user="$2"
-        [[ "$EXEC_USER" == "$_user" ]]; return $?
+        user="$2"
+        [[ "$USER" == "$user" ]]
+        return $?
     elif [[ $# -gt 2 && "$1" == "-u" ]]; then
-        _user="$2"
+        user="$2"
         shift 2
     fi
-    if [[ "$_user" == "$EXEC_USER" ]]; then
+    if [[ "$user" == "$USER" ]]; then
         "$@"
     else
-        sudo -u "$_user" "$@"
+        sudo -u "$user" "$@"
     fi
 }
 
@@ -498,7 +502,7 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        # MVERSION depends on $BASE unless --MCVERSION is passed
+        # MVERSION depends on $BASE unless --mcversion is passed
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - &>/dev/null
         ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
@@ -767,6 +771,10 @@ runCreaterepo() {
     declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
 
     installPackage createrepo_c
+
+    # if [[ "$CREATEREPO_USER" != "$USER" ]]
+
+
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
