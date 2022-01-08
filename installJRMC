@@ -183,7 +183,7 @@ init() {
 }
 
 # Helpers
-debug() { [[ -v DEBUG && $# -gt 0 ]] && echo "Debug: $*"; }
+debug() { (( DEBUG )) && [[ $# -gt 0 ]] && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 askOk() {
     declare response
@@ -243,11 +243,11 @@ parseInput() {
                             err "RPM install method not available on $ID"
                             printHelp && exit 1
                         fi
-                        BUILD_SWITCH=true
+                        BUILD_SWITCH=1
                     fi
                     ;;
                 --build)
-                    BUILD_SWITCH=true
+                    BUILD_SWITCH=1
                     ;;
                 --target)
                     shift && TARGET="$1"
@@ -271,8 +271,8 @@ parseInput() {
                     shift && SERVICES+=("$1")
                     ;;
                 --createrepo)
-                    BUILD_SWITCH=true
-                    CREATEREPO_SWITCH=true
+                    BUILD_SWITCH=1
+                    CREATEREPO_SWITCH=1
                     ;;
                 --createrepo-webroot)
                     shift && CREATEREPO_WEBROOT="$1"
@@ -287,7 +287,7 @@ parseInput() {
                     shift && USER_DISPLAY="$1"
                     ;;
                 --compat)
-                    COMPAT_SWITCH=true
+                    COMPAT_SWITCH=1
                     ;;
                 --container|-c)
                     shift && CONTAINERS+=("$1")
@@ -299,13 +299,13 @@ parseInput() {
                 --debug|-d)
                     echo "Debugging on"
                     echo "installJRMC version: $SCRIPTVERSION"
-                    DEBUG=true
+                    DEBUG=1
                     ;;
                 --help|-h)
                     printHelp && exit $?
                     ;;
                 --uninstall|-u)
-                    UNINSTALL_SWITCH=true
+                    UNINSTALL_SWITCH=1
                     ;;
                 --tests)
                     echo "Running tests, all other options are skipped"
@@ -422,7 +422,7 @@ installPackage() {
         while true; do
             case "$1" in
                 --nocheck)
-                    nocheck=true
+                    nocheck=1
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -437,7 +437,7 @@ installPackage() {
                     fi
                     ;;
                 --silent|-s)
-                    silent=true
+                    silent=1
                     ;;
                 --)
                     shift
@@ -466,8 +466,7 @@ installPackage() {
             pkg=${PKG_ALIASES[$pkg]}
         fi
         # Check if already installed
-        if  [[ -v nocheck ]] \
-            || ([[ ! -x $(command -v $pkg) ]] \
+        if (( nocheck )) || ([[ ! -x $(command -v $pkg) ]] \
             && ! pkg_query "$pkg" &>/dev/null); then
                 pkg_array+=("$pkg")
         fi
@@ -477,7 +476,7 @@ installPackage() {
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
         pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-        if ! eval "$pkg_install_cmd" && [[ ! -v silent ]]; then       
+        if ! eval "$pkg_install_cmd" && (( silent )); then       
             err "Failed to install ${pkg_array[*]}. Attempting to continue..."
         fi
 
@@ -693,7 +692,7 @@ buildRPM() {
     requires="${requires%?}" 
     recommends="${recommends%?}"
 
-	if [[ -v COMPAT_SWITCH ]]; then
+	if (( COMPAT_SWITCH )); then
 		# Strip minimum versions
 		requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
 	fi
@@ -771,9 +770,9 @@ runCreaterepo() {
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
-        debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-        if ! eval "$cr_mkdir_cmd"; then
+        #cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
+        #debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
+        #if ! eval "$cr_mkdir_cmd"; then
             cr_mkdir_cmd="mkdir_cmd $CREATEREPO_WEBROOT"
             debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
             cr_chown_cmd="chown_cmd $CREATEREPO_USER $CREATEREPO_WEBROOT"
@@ -783,14 +782,14 @@ runCreaterepo() {
                 err "Make sure that the createrepo-webroot is writeable by createrepo-user: $CREATEREPO_USER"
                 return 1
             fi
-        fi
+        #fi
     fi
 
     # Copy built rpms to webroot
-    cr_cp_cmd="sudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
-    cr_chown_cmd="sudo -u $CREATEREPO_USER chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-    debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
-    if ! ( exec "$cr_cp_cmd" && exec "$cr_chown_cmd" ); then
+    #cr_cp_cmd="sudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
+    #cr_chown_cmd="sudo -u $CREATEREPO_USER chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
+    #debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
+    #if ! ( exec "$cr_cp_cmd" && exec "$cr_chown_cmd" ); then
         cr_cp_cmd="cp_cmd $MCRPM $CREATEREPO_WEBROOT"
         cr_chown_cmd="chown_cmd $CREATEREPO_USER $CREATEREPO_WEBROOT"
         debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
@@ -800,7 +799,7 @@ runCreaterepo() {
             #err "Is the createrepo-webroot $CREATEREPO_WEBROOT writeable by createrepo-user: $CREATEREPO_USER?"
             return 1
         fi
-    fi
+    #fi
 
     # Run createrepo
     cr_cmd="sudo -u $CREATEREPO_USER createrepo -q"
@@ -1438,7 +1437,7 @@ main() {
     init "$@"
 
     # Uninstall and exit
-    if [[ -v UNINSTALL_SWITCH ]]; then
+    if (( UNINSTALL_SWITCH )); then
         uninstall
         exit $?
     fi
@@ -1465,14 +1464,14 @@ main() {
     fi
 
     # Build RPM from source deb package
-    if [[ -v BUILD_SWITCH ]]; then
+    if (( BUILD_SWITCH )); then
         installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
         buildRPM
     fi
 
     # Run createrepo
-    if [[ -v CREATEREPO_SWITCH ]]; then
+    if (( CREATEREPO_SWITCH )); then
         runCreaterepo
         exit $?
     fi
