@@ -376,7 +376,7 @@ getLatestVersion() {
     # Use a containerized package manager
     # TODO but how to determine build distro ($BASE=buster)?
     installPackage --silent buildah
-    if [[ -x $(command -v buildah) ]] && CNT=$(buildah from debian:$BASE); then 
+    if CNT=$(buildah from debian:$BASE) &>/dev/null; then 
         buildah run "$CNT" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1"
         buildah run "$CNT" -- bash  -c \
