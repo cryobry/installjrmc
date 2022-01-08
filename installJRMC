@@ -123,6 +123,7 @@ init() {
     rm_cmd(){ ifSudo rm -rf "$@"; }
     cp_cmd(){ ifSudo cp -n -f "$@"; }
     mkdir_cmd(){ ifSudo mkdir -p "$@"; }
+    chown_cmd(){ ifSudo chown "$1":"$1" -R "${@:2}"}
     ln_cmd(){ ifSudo ln -s "$@"; }
     systemctl_reload(){ ifSudo systemctl daemon-reload; }
     systemctl_enable(){ ifSudo systemctl enable --now "$@"; }
@@ -770,12 +771,12 @@ runCreaterepo() {
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        cr_mkdir_cmd="ifSudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
+        cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
         debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
         if ! eval "$cr_mkdir_cmd"; then
-            cr_mkdir_cmd="ifSudo mkdir -p $CREATEREPO_WEBROOT"
+            cr_mkdir_cmd="mkdir_cmd -p $CREATEREPO_WEBROOT"
             debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-            cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
+            cr_chown_cmd="chown_cmd $CREATEREPO_USER $CREATEREPO_WEBROOT"
             debug "$cr_chown_cmd" || cr_chown_cmd+=" &>/dev/null"
             if ! ( eval "$cr_mkdir_cmd" && eval "$cr_chown_cmd" ); then
                 err "Could not create the createrepo-webroot path!"
@@ -786,30 +787,37 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    #cr_cp_cmd="ifSudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
-    #cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-    #debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
-    cr_cp_cmd="ifSudo cp_cmd $MCRPM $CREATEREPO_WEBROOT"
-    cr_chown_cmd="ifSudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-    debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
-    debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
-    if ! (eval "$cr_cp_cmd" && eval "$cr_chown_cmd"); then
-        err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
-        #err "Is the createrepo-webroot $CREATEREPO_WEBROOT writeable by createrepo-user: $CREATEREPO_USER?"
-        return 1
+    cr_cp_cmd="sudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
+    cr_chown_cmd="sudo -u "$CREATEREPO_USER" chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
+    debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
+    if ! ( exec "$cr_cp_cmd" && exec "$cr_chown_cmd" ); then
+        cr_cp_cmd="cp_cmd $MCRPM $CREATEREPO_WEBROOT"
+        cr_chown_cmd="chown_cmd $CREATEREPO_USER $CREATEREPO_WEBROOT"
+        debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
+        debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
+        if ! (eval "$cr_cp_cmd" && eval "$cr_chown_cmd"); then
+            err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
+            #err "Is the createrepo-webroot $CREATEREPO_WEBROOT writeable by createrepo-user: $CREATEREPO_USER?"
+            return 1
+        fi
     fi
 
     # Run createrepo
     cr_cmd="sudo -u $CREATEREPO_USER createrepo -q"
     [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
     debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
-    if eval "$cr_cmd $CREATEREPO_WEBROOT"; then
-        echo "Successfully updated repo"
-        return 0
-    else
-        err "Update repo failed"
-        return 1
+    if ! eval "$cr_cmd $CREATEREPO_WEBROOT"; then
+        cr_cmd="ifSudo createrepo -q"
+        [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
+        debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
+        if ! eval "$cr_cmd $CREATEREPO_WEBROOT"; then
+            err "Update repo failed"
+            return 1
+        fi
     fi
+
+    echo "Successfully updated repo"
+    return 0
 }
 
 
