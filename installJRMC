@@ -514,8 +514,6 @@ addRepo() {
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare MCPKG
-
     echo "Installing JRiver Media Center $MCVERSION from repository."
     echo "Future updates will be handled by your package manager."
 
@@ -1352,7 +1350,7 @@ service_jriver-createrepo() {
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare MCPKG service unit f
+    declare service unit f
 
     if ! askOk "Do you really want to uninstall JRiver Media Center"; then
         echo "Cancelling uninstall..."
