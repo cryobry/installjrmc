@@ -170,7 +170,6 @@ init() {
 
     # Set target package name
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        echo here
         MCPKG="MediaCenter"
         [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
@@ -982,7 +981,6 @@ setDisplay() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY NEXT_DISPLAYNUM
-    declare displaynum
 
     # Check USER_DISPLAY, else environment DISPLAY, else set to :0 by default
     DISPLAY="${USER_DISPLAY:-${DISPLAY:-0}}"
