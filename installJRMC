@@ -19,10 +19,11 @@
 
 shopt -s extglob
 
-SCRIPTVERSION="1.0b6"
-OUTPUTDIR="$PWD/output"
-CREATEREPO_WEBROOT="/var/www/jriver"
-SERVICEDIR="/usr/lib/systemd/system"
+declare -g SCRIPTVERSION="1.0b6"
+declare -g OUTPUTDIR="$PWD/output"
+declare -g CREATEREPO_WEBROOT="/var/www/jriver"
+declare -g USER && USER="${USER:-$(id -un)}"
+declare -g USER_HOME && USER_HOME=$(grep "$USER" < /etc/passwd | cut -d":" -f6)
 
 # MC version
 # MCVERSION="28.0.87" # to set manually, if unset use automatic latest check
@@ -47,17 +48,15 @@ printHelp() {
 		    --mcversion VERSION
 		        Specify the MC version, ex. "28.0.94" (Default: latest)
 		    --outputdir PATH
-		        Generate rpmbuild output in this directory (Default: $PWD/output)
+		        Generate rpmbuild output in this directory (Default: ./output)
 		    --restorefile RESTOREFILE
 		        Restore file location for automatic license registration (Default: skip registration)
 		    --betapass PASSWORD
 		        Enter beta team password for access to beta builds
 		    --service, -s SERVICE
 		        See SERVICES section below for a list of possible services to install
-		        --service-user USER
-		            Install systemd services and containers for user USER (Default: current user)
-		        --service-type user|system 
-		            Installs service(s) as a system or user service (Default: per-service)
+		    --service-type user|system
+		        Starts services at boot (system) or at user login (user) (Default: boot)
 		    --container, -c CONTAINER (TODO: Under construction)
 		        See CONTAINERS section below for a list of possible services to install
 		    --createrepo
@@ -65,9 +64,9 @@ printHelp() {
 		        --createrepo-webroot PATH
 		            Specify the webroot directory to install the repo (Default: /var/www/jriver)
 		        --createrepo-user USER
-		            Specify the web server user
-            --compat
-                Build/install RPM without minimum library specifiers
+		            Specify the web server user if it differs from $USER
+		    --compat
+		        Build/install RPM without minimum library specifiers
 		    --version, -v
 		        Print this script version and exit
 		    --debug, -d
@@ -108,51 +107,44 @@ init() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare version_source
-    declare -g USER SERVICE_USER CREATEREPO_USER MCVERSION MVERSION MCPKG
+    declare -g MCVERSION MVERSION MCPKG
+    declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     getOS
-
-    USER="${USER:-$(id -un)}"
-    SERVICE_USER="${SERVICE_USER:-$USER}"
-    CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     # Make sure universe repo is installed on Ubuntu
     if [[ "$ID" == "ubuntu" ]]; then
         if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
-            ifSudo add-apt-repository universe
+            sudo add-apt-repository universe
         fi
     fi
    
     # Agnostic commands
-    bash_cmd(){ ifSudo bash -c "$@"; }
-    rm_cmd(){ ifSudo rm -rf "$@"; }
-    cp_cmd(){ ifSudo cp -n -f "$@"; }
-    mkdir_cmd(){ ifSudo mkdir -p "$@"; }
-    chown_cmd(){ ifSudo chown "$1":"$1" -R "${@:2}"; }
-    ln_cmd(){ ifSudo ln -s "$@"; }
-    systemctl_reload(){ ifSudo systemctl daemon-reload; }
-    systemctl_enable(){ ifSudo systemctl enable --now "$@"; }
-    systemctl_disable(){ ifSudo systemctl disable --now "$@"; }
+    bash_cmd(){ sudo bash -c "$@"; }
+    cp_cmd(){ sudo cp -nf "$@"; }
+    mkdir_cmd(){ sudo mkdir -p "$@"; }
+    chown_cmd(){ sudo chown "$1":"$1" -R "${@:2}"; }
+    ln_cmd(){ sudo ln -s "$@"; }
 
     # OS-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_install(){ ifSudo dnf install -y "$@"; }
-        pkg_remove(){ ifSudo dnf remove -y "$@"; }
-        pkg_update(){ ifSudo dnf makecache; }
+        pkg_install(){ sudo dnf install -y "$@"; }
+        pkg_remove(){ sudo dnf remove -y "$@"; }
+        pkg_update(){ sudo dnf makecache; }
         pkg_query(){ rpm -q "$@"; }
-        firewall_cmd(){ ifSudo firewall-cmd "$@"; }
+        firewall_cmd(){ sudo firewall-cmd "$@"; }
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
-        pkg_install(){ ifSudo apt-get install -y -q0 "$@"; }
-        pkg_remove(){ ifSudo apt-get remove --auto-remove -y -q0 "$@"; }
-        pkg_update(){ ifSudo apt-get update -y -q0; }
+        pkg_install(){ sudo apt-get install -y -q0 "$@"; }
+        pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
+        pkg_update(){ sudo apt-get update -y -q0; }
         pkg_query(){ dpkg -s "$@"; }
-        firewall_cmd(){ ifSudo ufw "$@"; }
+        firewall_cmd(){ sudo ufw "$@"; }
     elif [[ "$ID" =~ ^opensuse.* ]]; then
-        pkg_install(){ ifSudo zypper --non-interactive -q install --force --no-confirm "$@"; }
-        pkg_remove(){ ifSudo zypper --non-interactive -q remove --clean-deps "$@"; }
-        pkg_update(){ ifSudo zypper --non-interactive -q refresh jriver; }
+        pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
+        pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
+        pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
         pkg_query(){ rpm -q "$@"; }
-        firewall_cmd(){ ifSudo firewall-cmd "$@"; }
+        firewall_cmd(){ sudo firewall-cmd "$@"; }
     fi
 
     parseInput "$@"
@@ -166,7 +158,7 @@ init() {
     [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
 
     echo "Using MC version $MCVERSION determined by $version_source"
-    [[ "$version_source" != "user input" ]] && echo "To override, use --MCVERSION"
+    [[ "$version_source" != "user input" ]] && echo "To override, use --mcversion"
 
     # Extract major version number
     MVERSION="${MCVERSION%%.*}"
@@ -194,7 +186,6 @@ askOk() {
     return $?
 }
 getOS() {
-    debug "Running: ${FUNCNAME[0]}"
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
     else
@@ -206,36 +197,40 @@ getOS() {
 }
 
 
-ifSudo() {
-    declare user="root"
-    if [[ $# == 0 ]]; then
-        [[ "$USER" == "root" ]]
-        return $?
-    elif [[ $# -eq 2 && "$1" == "-u" ]]; then
-        user="$2"
-        [[ "$USER" == "$user" ]]
-        return $?
-    elif [[ $# -gt 2 && "$1" == "-u" ]]; then
-        user="$2"
-        shift 2
-    fi
-    if [[ "$user" == "$USER" ]]; then
-        "$@"
-    else
-        sudo -u "$user" "$@"
-    fi
-}
+# ifSudo() {
+#     declare user="root"
+#     if [[ $# == 0 ]]; then
+#         [[ "$USER" == "root" ]]
+#         return $?
+#     elif [[ $# -eq 2 && "$1" == "-u" ]]; then
+#         user="$2"
+#         [[ "$USER" == "$user" ]]
+#         return $?
+#     elif [[ $# -gt 2 && "$1" == "-u" ]]; then
+#         user="$2"
+#         shift 2
+#     fi
+#     if [[ "$user" == "$USER" ]]; then
+#         "$@"
+#     else
+#         sudo -u "$user" "$@"
+#     fi
+# }
 
 
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
+
+    declare -g BUILD_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g INSTALL_TYPE TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
+    declare -ga SERVICES CONTAINERS
 
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
         echo "No options passed, defaulting to repo installation method"
         INSTALL_TYPE="repo"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,target:,outputdir:,mcversion:,restorefile:,betapass:,service-user:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
+    if _input=$(getopt -o +i:vdhus:c: -l install:,build,target:,outputdir:,mcversion:,restorefile:,betapass:,service-type:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -268,8 +263,8 @@ parseInput() {
                 --betapass)
                     shift && BETAPASS="$1"
                     ;;
-                --service-user)
-                    shift && SERVICE_USER="$1"
+                --service-type)
+                    shift && SERVICE_TYPE="$1"
                     ;;
                 --service|-s)
                     shift && SERVICES+=("$1")
@@ -336,6 +331,7 @@ getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g MCVERSION BASE BOARDURL
+    declare cnt
 
     # Latest defaults
     BASE="buster" # For container method
@@ -381,16 +377,16 @@ getLatestVersion() {
     # Use a containerized package manager
     # TODO but how to determine build distro ($BASE=buster)?
     installPackage --silent buildah
-    if CNT=$(buildah from debian:$BASE) &>/dev/null; then 
-        buildah run "$CNT" -- bash -c \
+    if cnt=$(buildah from debian:$BASE) &>/dev/null; then 
+        buildah run "$cnt" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1"
-        buildah run "$CNT" -- bash  -c \
+        buildah run "$cnt" -- bash  -c \
             "apt-get update --allow-insecure-repositories &>/dev/null"
         if MCVERSION=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
             && [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
             version_source="containerized package manager"
         fi
-        buildah rm "$CNT" &>/dev/null
+        buildah rm "$cnt" &>/dev/null
         return 0
     fi
     # Scrape from Interact
@@ -471,8 +467,8 @@ installPackage() {
         fi
         # Check if already installed
         if (( nocheck )) || ([[ ! -x $(command -v $pkg) ]] \
-            && ! pkg_query "$pkg" &>/dev/null); then
-                pkg_array+=("$pkg")
+        && ! pkg_query "$pkg" &>/dev/null); then
+            pkg_array+=("$pkg")
         fi
     done
 
@@ -504,10 +500,10 @@ addRepo() {
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
         # MVERSION depends on $BASE unless --mcversion is passed
         installPackage wget
-        wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | ifSudo apt-key add - &>/dev/null
-        ifSudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
+        wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
+        sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
     elif [[ "$ID" =~ ^opensuse.* ]]; then
-        ifSudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
+        sudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
     fi
 }
 
@@ -814,7 +810,7 @@ runCreaterepo() {
     [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
     debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
     if ! eval "$cr_cmd $CREATEREPO_WEBROOT"; then
-        cr_cmd="ifSudo createrepo -q"
+        cr_cmd="sudo createrepo -q"
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
         debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
         if ! eval "$cr_cmd $CREATEREPO_WEBROOT"; then
@@ -1010,19 +1006,44 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g SERVICE_FNAME TIMER_FNAME SERVICE_NAME SERVICE_FNAME USER_STRING
+    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING
 
-    if [[ "$SERVICE_USER" == "root" ]]; then
-        SERVICE_FNAME="$SERVICEDIR/${1}.service"
-        TIMER_FNAME="$SERVICEDIR/${1}.timer"
+    declare service_system_dir="/usr/lib/systemd/system"
+    declare service_user_dir="$USER_HOME/.config/systemd/user"
+
+    SERVICE_TYPE="${SERVICE_TYPE:-'system'}"
+
+    if [[ "$USER" == "root" && "$SERVICE_TYPE" == "user" ]]; then
+        err "Trying to install user service as root"
+        err "Use --service-type service and/or execute installJRMC as non-root user"
+        return 1
+    fi
+
+    if [[ "$SERVICE_TYPE" == "system" ]]; then # i.e. systemd system service
+        service_dir="$service_system_dir"
+        systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
+        systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
+        systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
+    elif [[ "$SERVICE_TYPE" == "user" ]]; then # i.e. systemd user service
+        service_dir="$service_user_dir"
+        systemctl_reload_cmd(){ systemctl --user daemon-reload; }
+        systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
+        systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
+    fi
+
+    [[ ! -d "$service_dir" ]] && mkdir_cmd "$service_dir"
+
+    if [[ "$USER" == "root" || "$SERVICE_TYPE" == "user" ]]; then
         SERVICE_NAME="${1}.service"
         TIMER_NAME="${1}.timer"
+        SERVICE_FNAME="$service_dir/${SERVICE_NAME}"
+        TIMER_FNAME="$service_dir/${TIMER_NAME}"
         USER_STRING=""
     else
-        SERVICE_FNAME="$SERVICEDIR/${1}@.service"
-        TIMER_FNAME="$SERVICEDIR/${1}@.timer"
-        SERVICE_NAME="${1}@$SERVICE_USER.service"
-        TIMER_NAME="${1}@$SERVICE_USER.timer"
+        SERVICE_FNAME="$service_dir/${1}@.service"
+        TIMER_FNAME="$service_dir/${1}@.timer"
+        SERVICE_NAME="${1}@$USER.service"
+        TIMER_NAME="${1}@$USER.timer"
         USER_STRING="User=%I"
     fi
 }
@@ -1105,7 +1126,7 @@ service_jriver-xvnc() {
 		Restart=always
 
 		[Install]
-		WantedBy=multi-user.target
+		WantedBy=default.target
 	EOF"
 
     systemctl_reload && \
@@ -1158,7 +1179,7 @@ service_jriver-x11vnc() {
 		RestartSec=10
 
 		[Install]
-		WantedBy=multi-user.target
+		WantedBy=default.target
 	EOF"
 
     systemctl_reload && \
@@ -1375,7 +1396,9 @@ uninstall() {
     debug "Stopping and removing all associated Media Center services"
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
-        setServiceVars "$service"
+        if ! setServiceVars "$service"; then
+            continue
+        fi
         for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
             if systemctl is-active -q "$unit" &>/dev/null || systemctl is-enabled -q "$unit" &>/dev/null; then
                 debug "Disabling $unit"
@@ -1394,7 +1417,7 @@ uninstall() {
     [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
         && rm_cmd "/etc/apt/sources.list.d/jriver.list"
     if [[ "$ID" =~ ^opensuse.* ]]; then
-        ifSudo zypper rr jriver &>/dev/null
+        sudo zypper rr jriver &>/dev/null
     fi
 
     debug "Removing firewall rules"
@@ -1441,6 +1464,8 @@ tests() {
 
 main() {
     debug "Running: ${FUNCNAME[0]}"
+
+    declare service
 
     init "$@"
 
@@ -1503,14 +1528,15 @@ main() {
     # Install services
     if [[ "${#SERVICES[@]}" -gt 0 ]]; then
         setDisplay
-        ! [[ -d "$SERVICEDIR" ]] && ifSudo mkdir -p "$SERVICEDIR"
-        for _service in "${SERVICES[@]}"; do
-            setServiceVars "$_service"
-            if ! "service_$_service"; then
+        for service in "${SERVICES[@]}"; do
+            if ! setServiceVars "$service"; then
+                continue
+            fi
+            if ! "service_$service"; then
                 if [[ $? -eq 127 ]]; then
-                    err "Service $_service does not exist, check your service name"
+                    err "Service $service does not exist, check your service name"
                 else
-                    err "Failed to create service: $_service"
+                    err "Failed to create service: $service"
                 fi
             fi
         done

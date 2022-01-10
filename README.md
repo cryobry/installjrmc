@@ -22,7 +22,7 @@ You can always find the latest supported options by running `installJRMC --help`
     repo: Install MC from repository, future updates will be handled by the system package manager
     rpm: Build and install MC locally (RPM-based OSes only)
 --build
-     Build RPM from source DEB but do not install
+    Build RPM from source DEB but do not install
 --target opensuse|fedora|centos
     Crossbuild RPM for target distro 
 --mcversion VERSION
@@ -35,8 +35,8 @@ You can always find the latest supported options by running `installJRMC --help`
     Enter beta team password for access to beta builds
 --service, -s SERVICE
     See SERVICES section below for the list of services to deploy
-  --service-user USER
-      Install systemd services and containers for user USER (Default: executing user)
+  --service-type user|system
+      Starts services at boot (system) or at user login (user) (Default: boot)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
 --createrepo
@@ -46,7 +46,7 @@ You can always find the latest supported options by running `installJRMC --help`
   --createrepo-user USER
       The web server user (Default: current user)
 --compat
-    Build/install RPM without minimum library specifiers.
+    Build/install RPM without minimum library specifiers
 --version, -v
     Print this script version and exit
 --debug, -d
@@ -59,7 +59,7 @@ You can always find the latest supported options by running `installJRMC --help`
 
 ### services
 
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some installations (container) it may be necessary to execute the script as root. If so, use `--service-user root` to override safety checks.
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some installations (e.g. containers, servers) it may be necessary to run as root.
 
 ```text
 jriver-mediaserver
