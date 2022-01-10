@@ -113,7 +113,7 @@ init() {
     getOS
 
     # Make sure universe repo is installed on Ubuntu
-    if [[ "$ID" == "ubuntu" ]]; then
+    if [[ "$ID" == "ubuntu|neon" ]]; then
         if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
             sudo add-apt-repository universe
         fi
