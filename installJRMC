@@ -55,8 +55,8 @@ printHelp() {
 		        Enter beta team password for access to beta builds
 		    --service, -s SERVICE
 		        See SERVICES section below for a list of possible services to install
-		    --service-type user|system
-		        Starts services at boot (system) or at user login (user) (Default: boot)
+		      --service-type user|system
+		          Starts services at boot (system) or at user login (user) (Default: boot)
 		    --container, -c CONTAINER (TODO: Under construction)
 		        See CONTAINERS section below for a list of possible services to install
 		    --createrepo
@@ -133,7 +133,7 @@ init() {
         pkg_update(){ sudo dnf makecache; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         pkg_install(){ sudo apt-get install -y -q0 "$@"; }
         pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
         pkg_update(){ sudo apt-get update -y -q0; }
@@ -167,7 +167,7 @@ init() {
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         MCPKG="MediaCenter"
         [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         MCPKG="mediacenter$MVERSION"
         [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
     fi
@@ -452,7 +452,7 @@ installPackage() {
     fi
 
     # Aliases
-    if [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+    if [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         declare -A PKG_ALIASES
         PKG_ALIASES["xorg-x11-utils"]="xorg-x11"
         PKG_ALIASES["rpm-build"]="rpm"
@@ -497,7 +497,7 @@ addRepo() {
 			baseurl=https://repos.bryanroessler.com/jriver
 			gpgcheck=0
 		EOF'
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         # MVERSION depends on $BASE unless --mcversion is passed
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
@@ -898,7 +898,7 @@ openFirewall() {
             firewall_cmd --add-service "$1" --permanent &>/dev/null
             firewall_cmd --reload &>/dev/null
         fi
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmin|neon)$ ]]; then
         # Debian ufw package state is broken on fresh installations
         installPackage ufw
         if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
