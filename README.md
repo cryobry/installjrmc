@@ -18,9 +18,10 @@ Running `installJRMC` without any options will install the latest version of JRi
 You can always find the latest supported options by running `installJRMC --help`.
 
 ```text
---install, -i repo|rpm
+--install, -i repo|rpm|deb
     repo: Install MC from repository, future updates will be handled by the system package manager
     rpm: Build and install MC locally (RPM-based OSes only)
+    deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
 --build
     Build RPM from source DEB but do not install
 --target opensuse|fedora|centos

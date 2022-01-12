@@ -38,9 +38,10 @@ printHelp() {
 		    If no options (besides -d) are provided, the script will default to '--install repo'.
 
 		OPTIONS
-		    --install, -i repo|rpm
+		    --install, -i repo|rpm|deb
 		        repo: Install MC from repository, updates are handled by the system package manager
 		        rpm: Build and install RPM locally (RPM-based distros only)
+		            deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
 		    --build
 		        Build RPM from source DEB but do not install. Optional TARGET parameter enables RPM crossbuilding (ex. 'opensuse', 'fedora', 'centos')
 		    --target opensuse|fedora|centos
@@ -107,7 +108,7 @@ init() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare version_source
-    declare -g MCVERSION MVERSION MCPKG
+    declare -g MCVERSION MVERSION MCRPM
     declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     getOS
@@ -165,11 +166,11 @@ init() {
 
     # Set target package name
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        MCPKG="MediaCenter"
-        [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
+        MCRPM="MediaCenter"
+        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM-$MCVERSION"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        MCPKG="mediacenter$MVERSION"
-        [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
+        MCRPM="mediacenter$MVERSION"
+        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM=$MCVERSION"
     fi
 
     # Saving this substituion in case it's needed in the future
@@ -221,7 +222,7 @@ getOS() {
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g BUILD_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g RPM_BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH DEB_INSTALL_SWITCH
     declare -g INSTALL_TYPE TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
     declare -ga SERVICES CONTAINERS
 
@@ -237,16 +238,12 @@ parseInput() {
                 --install|-i)
                     shift 
                     INSTALL_TYPE="$1"
-                    if [[ "$INSTALL_TYPE" == "rpm" ]]; then
-                        if [[ ! "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-                            err "RPM install method not available on $ID"
-                            printHelp && exit 1
-                        fi
-                        BUILD_SWITCH=1
-                    fi
+                    [[ "$INSTALL_TYPE" == "rpm" ]] && RPM_BUILD_SWITCH=1
+                    [[ "$INSTALL_TYPE" == "deb" ]] && DEB_INSTALL_SWITCH=1
+                    [[ "$INSTALL_TYPE" == "repo" ]] && REPO_INSTALL_SWITCH=1
                     ;;
                 --build)
-                    BUILD_SWITCH=1
+                    RPM_BUILD_SWITCH=1
                     ;;
                 --target)
                     shift && TARGET="$1"
@@ -270,7 +267,7 @@ parseInput() {
                     shift && SERVICES+=("$1")
                     ;;
                 --createrepo)
-                    BUILD_SWITCH=1
+                    RPM_BUILD_SWITCH=1
                     CREATEREPO_SWITCH=1
                     ;;
                 --createrepo-webroot)
@@ -531,7 +528,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCPKG"
+    pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCRPM"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     eval "$pkg_install_cmd"
 }
@@ -543,28 +540,28 @@ installMCFromRepo() {
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g DEBFILENAME="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-amd64.deb"
+    declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-amd64.deb"
 
     # If necessary, create SOURCES dir
     [[ ! -d "$OUTPUTDIR/SOURCES" ]] && mkdir -p "$OUTPUTDIR/SOURCES"
 
     # If deb file already exists, skip download
-    if [[ -f "$DEBFILENAME" ]]; then
-        echo "Using local DEB file: $DEBFILENAME"
+    if [[ -f "$MCDEB" ]]; then
+        echo "Using local DEB file: $MCDEB"
         return 0
     fi
 
     if [[ -v BETAPASS ]]; then
         echo "Checking beta repo..."
-        if wget -q -O "$DEBFILENAME" \
+        if wget -q -O "$MCDEB" \
         "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
             echo "Found!"
         fi
-    elif echo "Checking test repo..." && wget -q -O "$DEBFILENAME" \
+    elif echo "Checking test repo..." && wget -q -O "$MCDEB" \
     "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     # Else check latest repo
-    elif echo "Checking latest repo..." && wget -q -O "$DEBFILENAME" \
+    elif echo "Checking latest repo..." && wget -q -O "$MCDEB" \
     "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     else
@@ -572,7 +569,7 @@ acquireDeb() {
         exit 1
     fi
 
-    if [[ ! -f "$DEBFILENAME" ]]; then
+    if [[ ! -f "$MCDEB" ]]; then
         err "Downloaded DEB file missing or corrupted."
         exit 1
     fi
@@ -602,8 +599,11 @@ buildRPM() {
     id="${TARGET:-$ID}"
 
     # Load deb dependencies into array
-    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$DEBFILENAME" Depends)"
-    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$DEBFILENAME" Recommends)"
+    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
+    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$MCDEB" Recommends)"
+
+    echo "${requires[@]}"
+    echo $id
 
     # Clean up formatting
     requires=("${requires[@]%%|*}")
@@ -622,6 +622,7 @@ buildRPM() {
     # Translate package names
     case "$id" in
         fedora|centos)
+            echo "HERE!""
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
             requires=("${requires[@]/libuuid1/libuuid}")
@@ -752,7 +753,7 @@ buildRPM() {
         err "Build failed."
         # For automation, let's remove the source DEB and reaquire it on next run 
         # after failure in case it is corrupted or buggy
-        [[ -f "$DEBFILENAME" ]] && echo "Removing source DEB" && rm -f "$DEBFILENAME"
+        [[ -f "$MCDEB" ]] && echo "Removing source DEB" && rm -f "$MCDEB"
         exit 1
     fi
 }
@@ -1443,7 +1444,7 @@ uninstall() {
     fi
 
     debug "Uninstalling Media Center package"
-    mc_pkg_rm_cmd="pkg_remove $MCPKG"
+    mc_pkg_rm_cmd="pkg_remove $MCRPM"
     debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
     if eval "$mc_pkg_rm_cmd"; then 
         echo "JRiver Media Center has been completely uninstalled."
@@ -1479,7 +1480,7 @@ main() {
     [[ "$ID" == "centos" ]] && installPackage epel-release
 
     # Install MC using package manager
-    if [[ -v INSTALL_TYPE && "$INSTALL_TYPE" == "repo" ]]; then
+    if (( REPO_INSTALL_SWITCH )); then
         if [[ "$ID" =~ ^opensuse.*$ ]]; then
             echo "A SUSE repository is not yet available."
             echo "Use --install rpm to build and install a SUSE RPM instead."
@@ -1496,8 +1497,25 @@ main() {
         openFirewall "jriver"
     fi
 
+    if (( DEB_INSTALL_SWITCH )); then
+        acquireDeb
+        declare extract_dir && extract_dir="$(mktemp -d)"
+        ar x --output "$extract_dir" "$MCDEB"
+        tar -xJf "$extract_dir/control.tar.xz" -C "$extract_dir"
+        # Remove minimum version specifiers from control file
+        sed -i 's/ ([^)]*)//g' "$extract_dir/control"
+        tar -C "$extract_dir" \
+            --ignore-failed-read \
+            -cvJf "control.tar.xz" "control" "postinst"
+        ar rcs "$MCDEB.compat" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
+        pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCDEB.compat"
+        debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
+        eval "$pkg_install_cmd"
+        rm -rf "$extract_dir"
+    fi
+
     # Build RPM from source deb package
-    if (( BUILD_SWITCH )); then
+    if (( RPM_BUILD_SWITCH )); then
         installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
         buildRPM
