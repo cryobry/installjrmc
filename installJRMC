@@ -1466,7 +1466,7 @@ main() {
             ar rcs "$mcdeb" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
             rm -rf "$extract_dir"
         fi
-        pkg_install_cmd="installPackage --nocheck --nogpgcheck $mcdeb"
+        pkg_install_cmd="installPackage --nocheck --nogpgcheck ${mcdeb:-$MCDEB}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         eval "$pkg_install_cmd"
     fi
