@@ -173,7 +173,7 @@ init() {
         [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM=$MCVERSION"
     fi
 
-    # Saving this substituion in case it's needed in the future
+    # Minor version (not needed)
     # _variation="${MCVERSION##*.}"
 }
 
@@ -223,12 +223,12 @@ parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g RPM_BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH DEB_INSTALL_SWITCH
-    declare -g INSTALL_TYPE TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
+    declare -g TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
     declare -ga SERVICES CONTAINERS
 
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
         echo "No options passed, defaulting to repo installation method"
-        INSTALL_TYPE="repo"
+        REPO_INSTALL_SWITCH=1
     fi
 
     if _input=$(getopt -o +i:vdhus:c: -l install:,build,target:,outputdir:,mcversion:,restorefile:,betapass:,service-type:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
@@ -236,11 +236,18 @@ parseInput() {
         while true; do
             case "$1" in
                 --install|-i)
-                    shift 
-                    INSTALL_TYPE="$1"
-                    [[ "$INSTALL_TYPE" == "rpm" ]] && RPM_BUILD_SWITCH=1
-                    [[ "$INSTALL_TYPE" == "deb" ]] && DEB_INSTALL_SWITCH=1
-                    [[ "$INSTALL_TYPE" == "repo" ]] && REPO_INSTALL_SWITCH=1
+                    shift
+                    case "$1" in
+                        rpm)
+                            RPM_BUILD_SWITCH=1
+                            ;;
+                        deb)
+                            DEB_INSTALL_SWITCH=1
+                            ;;
+                        repo)
+                            REPO_INSTALL_SWITCH=1
+                            ;;
+                    esac
                     ;;
                 --build)
                     RPM_BUILD_SWITCH=1
@@ -334,42 +341,6 @@ getLatestVersion() {
     BASE="buster" # For container method
     BOARDURL="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
     #BASE_next="bullseye" # TODO use for fallback to smooth upgrades
-
-    # Legacy
-    #boardurl26="https://yabb.jriver.com/interact/index.php/board,64.0.html" # jessie/stretch
-
-    # Peg older versions to prevent ABI and dependency mismatches in automatic mode
-    # This can be overriden w/ --mcversion
-    # TODO need user input here
-    # disable version checks for createrepo or rpmbuild (servers)
-    # if [[ -v INSTALL_TYPE ]]; then
-    #     if [[ "$ID" == "ubuntu" ]]; then
-    #         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] &&
-    #         #     BASE="bullseye"
-    #         [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] &&
-    #             BASE="buster"
-    #         [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] &&
-    #             MCVERSION="26.0.107"
-    #         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] &&
-    #             MCVERSION="26.0.107" 
-    #     elif [[ "$ID" == "debian" ]]; then
-    #         BASE="$VERSION_CODENAME"
-    #         [[ $VERSION_ID -eq 10 ]] &&
-    #             BASE="buster"
-    #         [[ $VERSION_ID -le 9 ]] &&
-    #             MCVERSION="26.0.107" # For 9 and 8
-    #     elif [[ "$ID" == "centos" ]]; then
-    #         [[ "$VERSION_ID" -eq "8" ]] &&
-    #             BASE="buster"
-    #         [[ "$VERSION_ID" -lt "8" ]] &&
-    #             MCVERSION="26.0.107" # Doubtful
-    #     fi
-
-    #     [[ -v MCVERSION ]] &&
-    #         version_source="compatibility lookup" &&
-    #         debug "To override, use --MCVERSION" &&
-    #         return 0
-    # fi
 
     # Use a containerized package manager
     # TODO but how to determine build distro ($BASE=buster)?
@@ -1524,7 +1495,7 @@ main() {
     fi
 
     # Install RPM
-    if [[ -v INSTALL_TYPE && "$INSTALL_TYPE" == "rpm" ]]; then
+    if (( REPO_INSTALL_SWITCH )); then
 
         #rpm --upgrade "$MCRPM"        
 
