@@ -123,27 +123,6 @@ getOS() {
 }
 
 
-# ifSudo() {
-#     declare user="root"
-#     if [[ $# == 0 ]]; then
-#         [[ "$USER" == "root" ]]
-#         return $?
-#     elif [[ $# -eq 2 && "$1" == "-u" ]]; then
-#         user="$2"
-#         [[ "$USER" == "$user" ]]
-#         return $?
-#     elif [[ $# -gt 2 && "$1" == "-u" ]]; then
-#         user="$2"
-#         shift 2
-#     fi
-#     if [[ "$user" == "$USER" ]]; then
-#         "$@"
-#     else
-#         sudo -u "$user" "$@"
-#     fi
-# }
-
-
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -260,35 +239,29 @@ parseInput() {
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCVERSION
-    declare cnt
-    declare base="buster" # For container method
-    #declare base_next="bullseye" # TODO possibly use for fallback to smooth upgrades
+    declare -g MCVERSION BASE="buster" # For container method
+    #declare -g BASE_NEXT="bullseye" # TODO possibly use for fallback to smooth upgrades
     declare boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
 
     # Containerized package manager
-    # TODO but how to determine build distro ($base=buster)?
+    # TODO but how to determine build distro ($BASE=buster)?
     installPackage --silent buildah
-    if cnt=$(buildah from debian:$base) &>/dev/null; then 
-        buildah run "$cnt" -- bash -c \
-            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $base main' > /etc/apt/sources.list 2>&1"
-        buildah run "$cnt" -- bash  -c \
-            "apt-get update --allow-insecure-repositories &>/dev/null"
-        if MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
-            && [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-            version_source="containerized package manager"
-        fi
+    if cnt=$(buildah from debian:$BASE) &>/dev/null &&
+    buildah run "$cnt" -- bash -c \
+        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1" &&
+    buildah run "$cnt" -- bash  -c \
+        "apt-get update --allow-insecure-repositories &>/dev/null" &&
+    MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &&
+    [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] &&
+    VERSION_SOURCE="containerized package manager"; then
         buildah rm "$cnt" &>/dev/null
-        return 0
+    # Webscrape
+    elif installPackage wget && MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+        VERSION_SOURCE="webscrape"
     else
-        installPackage wget
-        if MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
-            version_source="webscrape"
-        else
-            err "Latest MC version could not be parsed from $boardurl"
-            err "Try specifying a version manually using --mcversion"
-            exit 1
-        fi
+        MCVERSION="28.0.100"
+        VERSION_SOURCE="hardcoded version"
+        echo "Warning! Using hardcoded version number, this is probably not the latest"
     fi
 }
 
@@ -375,6 +348,7 @@ installPackage() {
 addRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
+    echo "Adding JRiver repository"
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         sudo bash -c 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
 			[jriver]
@@ -383,10 +357,16 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        # MVERSION depends on $base unless --mcversion is passed
+        # MVERSION depends on $BASE unless --mcversion is passed
         installPackage wget
+        declare sources_dir="/etc/apt/sources.list.d"
+        [[ ! -d "$sources_dir" ]] && sudo mkdir -p "$sources_dir"
+        sudo bash -c "cat <<- EOF > $sources_dir/mediacenter$MVERSION.list
+			deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main
+		EOF"
+        #echo "deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main" > "$sources_dir/mediacenter$MVERSION.list" 2>&1
+        #sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
-        sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         sudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
     fi
@@ -1085,8 +1065,9 @@ service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare id="${TARGET:-$ID}"
+    declare cr_user="${CREATEREPO_USER:$USER}"
 
-    if [[ "$USER" != "${CREATEREPO_USER:-$USER}" ]]; then
+    if [[ "$USER" != "$cr_user" ]]; then
         USER="root" SERVICE_TYPE="system" setServiceVars
     else
         setServiceVars
@@ -1098,7 +1079,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$PWD/installJRMC --target $id --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
+		ExecStart=$PWD/installJRMC --target $id --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $cr_user
 
 		[Install]
 		WantedBy=multi-user.target
@@ -1139,7 +1120,7 @@ service_jriver-createrepo() {
 #     installPackage buildah podman
 
 #     # Eventually try to switch to Debian
-#     # if ! CNT=$(buildah from debian:$base); then
+#     # if ! CNT=$(buildah from debian:$BASE); then
 #     #     echo "Bad base image for container $CNAME, skipping"
 #     #     continue
 #     # fi
@@ -1369,8 +1350,7 @@ tests() {
 main() {
     debug "Running: ${FUNCNAME[0]}"
     
-    declare version_source
-    declare -g MCVERSION MVERSION MCPKG
+    declare -g VERSION_SOURCE MCVERSION MVERSION MCPKG
 
     getOS
 
@@ -1410,13 +1390,13 @@ main() {
 
     # Select MC version to work with
     if [[ -v MCVERSION ]]; then
-        version_source="user input"
+        VERSION_SOURCE="user input"
     else
         getLatestVersion
     fi
     [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
-    echo "Using MC version $MCVERSION determined by $version_source"
-    [[ "$version_source" != "user input" ]] && echo "To override, use --mcversion"
+    echo "Using MC version $MCVERSION determined by $VERSION_SOURCE"
+    [[ "$VERSION_SOURCE" != "user input" ]] && echo "To override, use --mcversion"
 
     # Extract major version number
     MVERSION="${MCVERSION%%.*}"
@@ -1424,10 +1404,10 @@ main() {
     # Set target package name
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
         MCPKG="MediaCenter"
-        [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
+        [[ "$VERSION_SOURCE" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         MCPKG="mediacenter$MVERSION"
-        [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
+        [[ "$VERSION_SOURCE" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
     fi
 
     if (( UNINSTALL_SWITCH )); then

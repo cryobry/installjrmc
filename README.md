@@ -25,13 +25,15 @@ You can always find the latest supported options by running `installJRMC --help`
 --build
     Build RPM from source DEB but do not install
 --target opensuse|fedora|centos
-    Crossbuild RPM for target distro 
+    Crossbuild RPM for target distro
+--compat
+    Build/install RPM without minimum library specifiers
 --mcversion VERSION
     Build or install a specific MC version, ex. "28.0.25"
 --outputdir PATH
     Generate rpmbuild output in this PATH (Default: ./output)
 --restorefile RESTOREFILE
-    Restore file location for automatic license registration (Default: skip registration)
+    Restore file location for automatic license registration
 --betapass PASSWORD
     Enter beta team password for access to beta builds
 --service, -s SERVICE
@@ -45,9 +47,7 @@ You can always find the latest supported options by running `installJRMC --help`
   --createrepo-webroot PATH
       The webroot directory to install the repo (Default: /var/www/jriver/)
   --createrepo-user USER
-      The web server user (Default: current user)
---compat
-    Build/install RPM without minimum library specifiers
+      The web server user if different from the current user
 --version, -v
     Print this script version and exit
 --debug, -d
@@ -55,12 +55,12 @@ You can always find the latest supported options by running `installJRMC --help`
 --help, -h
     Print help dialog and exit
 --uninstall, -u
-    Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library files)
+    Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library or media files)
 ```
 
 ### services
 
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. MC services are installed as system-level services running in the current user namespace
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. MC services are installed as system-level services (`--service-type=system`) by default. They can be manipulated by the root user: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the current user: `systemctl --user stop jriver-mediacenter`.
 
 ```text
 jriver-mediaserver
@@ -130,7 +130,7 @@ It is possible to install multiple services at one time using multiple `--servic
 
 * `installJRMC --install deb --compat`
 
-    Install a more widely-compatible version of MC on deb-based distros
+    Install a more widely-compatible version of MC on deb-based distros.
 
 * `installJRMC --uninstall`
 
