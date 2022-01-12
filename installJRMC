@@ -379,7 +379,7 @@ getLatestVersion() {
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1"
         buildah run "$cnt" -- bash  -c \
             "apt-get update --allow-insecure-repositories &>/dev/null"
-        if MCVERSION=$(buildah run "$CNT" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
+        if MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
             && [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
             version_source="containerized package manager"
         fi
@@ -602,9 +602,6 @@ buildRPM() {
     IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
     IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$MCDEB" Recommends)"
 
-    echo "${requires[@]}"
-    echo $id
-
     # Clean up formatting
     requires=("${requires[@]%%|*}")
     requires=("${requires[@]/?:/}")
@@ -622,7 +619,6 @@ buildRPM() {
     # Translate package names
     case "$id" in
         fedora|centos)
-            echo "HERE!"
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
             requires=("${requires[@]/libuuid1/libuuid}")
