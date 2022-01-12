@@ -622,7 +622,7 @@ buildRPM() {
     # Translate package names
     case "$id" in
         fedora|centos)
-            echo "HERE!""
+            echo "HERE!"
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
             requires=("${requires[@]/libuuid1/libuuid}")
