@@ -659,58 +659,55 @@ runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
+    declare cr_user="${CREATEREPO_USER:-$USER}"
 
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        #cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
-        #debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-        #if ! eval "$cr_mkdir_cmd"; then
-            cr_mkdir_cmd="mkdir_cmd $CREATEREPO_WEBROOT"
+        cr_mkdir_cmd="sudo -u $cr_user mkdir -p $CREATEREPO_WEBROOT"
+        debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
+        if ! eval "$cr_mkdir_cmd"; then
+            cr_mkdir_cmd="sudo mkdir -p $CREATEREPO_WEBROOT"
             debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-            cr_chown_cmd="chown_cmd $CREATEREPO_USER $CREATEREPO_WEBROOT"
+            cr_chown_cmd="sudo chown -R $cr_user:$cr_user $CREATEREPO_WEBROOT"
             debug "$cr_chown_cmd" || cr_chown_cmd+=" &>/dev/null"
             if ! ( eval "$cr_mkdir_cmd" && eval "$cr_chown_cmd" ); then
                 err "Could not create the createrepo-webroot path!"
-                err "Make sure that the createrepo-webroot is writeable by createrepo-user: $CREATEREPO_USER"
+                err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $cr_user"
+                err "Or change the repo ownership with --createrepo-user"
                 return 1
             fi
-        #fi
+        fi
     fi
 
     # Copy built rpms to webroot
-    #cr_cp_cmd="sudo -u $CREATEREPO_USER cp -n -f $MCRPM $CREATEREPO_WEBROOT"
-    #cr_chown_cmd="sudo -u $CREATEREPO_USER chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-    #debug "$cr_cp_cmd && $cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null" cr_chown_cmd+=" &>/dev/null"
-    #if ! ( exec "$cr_cp_cmd" && exec "$cr_chown_cmd" ); then
-        cr_cp_cmd="cp_cmd $MCRPM $CREATEREPO_WEBROOT"
-        cr_chown_cmd="chown_cmd $CREATEREPO_USER $CREATEREPO_WEBROOT"
-        debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
-        debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
-        if ! (eval "$cr_cp_cmd" && eval "$cr_chown_cmd"); then
-            err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
-            #err "Is the createrepo-webroot $CREATEREPO_WEBROOT writeable by createrepo-user: $CREATEREPO_USER?"
-            return 1
-        fi
-    #fi
+    cr_cp_cmd="sudo cp -nf $MCRPM $CREATEREPO_WEBROOT"
+    cr_chown_cmd="sudo chown -R $cr_user:$cr_user $CREATEREPO_WEBROOT"
+    debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
+    debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
+    if ! ( eval "$cr_cp_cmd" && eval "$cr_chown_cmd" ); then
+        err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
+        return 1
+    fi
 
     # Run createrepo
-    cr_cmd="sudo -u $CREATEREPO_USER createrepo -q"
+    cr_cmd="sudo -u $cr_user createrepo -q $CREATEREPO_WEBROOT"
     [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
-    debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
-    if ! eval "$cr_cmd $CREATEREPO_WEBROOT"; then
-        cr_cmd="sudo createrepo -q"
+    debug "$cr_cmd" || cr_cmd+=" &>/dev/null"
+    if ! eval "$cr_cmd"; then
+        cr_cmd="sudo createrepo -q $CREATEREPO_WEBROOT"
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
-        debug "$cr_cmd $CREATEREPO_WEBROOT" || cr_cmd+=" &>/dev/null"
-        if ! eval "$cr_cmd $CREATEREPO_WEBROOT"; then
-            err "Update repo failed"
+        cr_chown_cmd="sudo chown -R $cr_user:$cr_user $CREATEREPO_WEBROOT"
+        debug "$cr_cmd" || cr_cmd+=" &>/dev/null"
+        debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
+        if ! ( eval "$cr_cmd" && eval "$cr_chown_cmd"); then
+            err "Createrepo failed"
             return 1
         fi
     fi
 
     echo "Successfully updated repo"
-    return 0
 }
 
 
@@ -722,7 +719,9 @@ symlinkCerts() {
 
     if [[ ! -f /etc/ssl/certs/ca-certificates.crt &&
     -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        if ! ln_cmd /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt; then
+        ln_cmd="sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt"
+        debug "$ln_cmd" || ln_cmd+=" &>/dev/null"
+        if ! exec "$ln_cmd"; then
             err "Symlinking certificates failed"
             return 1
         fi
@@ -922,7 +921,7 @@ setServiceVars() {
         systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
     fi
 
-    [[ ! -d "$service_dir" ]] && mkdir_cmd "$service_dir"
+    [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
 
     if [[ "$USER" == "root" || "$SERVICE_TYPE" == "user" ]]; then
         SERVICE_NAME="${1}.service"
@@ -1358,7 +1357,6 @@ main() {
     
     declare version_source
     declare -g MCVERSION MVERSION MCRPM
-    declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     getOS
 
@@ -1372,15 +1370,8 @@ main() {
         echo "Adding EPEL repository"
         installPackage epel-release
     fi
-   
-    # Agnostic commands
-    bash_cmd(){ sudo bash -c "$@"; }
-    cp_cmd(){ sudo cp -nf "$@"; }
-    mkdir_cmd(){ sudo mkdir -p "$@"; }
-    chown_cmd(){ sudo chown "$1":"$1" -R "${@:2}"; }
-    ln_cmd(){ sudo ln -s "$@"; }
 
-    # OS-specific commands
+    # Distro-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         pkg_install(){ sudo dnf install -y "$@"; }
         pkg_remove(){ sudo dnf remove -y "$@"; }
@@ -1451,21 +1442,20 @@ main() {
         acquireDeb
         if (( COMPAT_SWITCH )); then
             declare extract_dir && extract_dir="$(mktemp -d)"
-            MCDEB="$MCDEB.compat"
             ar x --output "$extract_dir" "$MCDEB"
             tar -xJf "$extract_dir/control.tar.xz" -C "$extract_dir"
             # Remove minimum version specifiers from control file
             sed -i 's/ ([^)]*)//g' "$extract_dir/control"
-            tar -C "$extract_dir" \
-                --ignore-failed-read \
-                -cvJf "control.tar.xz" "control" "postinst"
-            ar rcs "$MCDEB" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
+            sed -i 's/([^)]*)//g' "$extract_dir/control" # MC DEB package error
+            tar -cJf "$extract_dir/control.tar.xz" \
+                -C "$extract_dir" "control" "postinst"
+            declare mcdeb="$MCDEB.compat"
+            ar rcs "$mcdeb" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
             rm -rf "$extract_dir"
         fi
-        pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCDEB"
+        pkg_install_cmd="installPackage --nocheck --nogpgcheck $mcdeb"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         eval "$pkg_install_cmd"
-        
     fi
 
     if (( RPM_BUILD_SWITCH )); then

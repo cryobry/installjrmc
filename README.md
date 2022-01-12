@@ -128,6 +128,10 @@ It is possible to install multiple services at one time using multiple `--servic
 
     Installs an Xvnc server on display ':2' that starts Media Center.
 
+* `installJRMC --install deb --compat`
+
+    Installs a more widely-compatible version of MC on deb-based distros
+
 * `installJRMC --uninstall`
 
     Uninstalls JRiver Media Center and its associated services and firewall rules. This will **not** remove your media, media library/database, or automated library backup folder.
