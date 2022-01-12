@@ -23,7 +23,6 @@ declare -g SCRIPTVERSION="1.0b6"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER; USER="${USER:-$(id -un)}"
-declare -g USER_HOME; USER_HOME=$(grep "$USER" < /etc/passwd | cut -d":" -f6)
 
 # MC version
 # MCVERSION="28.0.87" # to set manually, if unset use automatic latest check
@@ -79,15 +78,15 @@ printHelp() {
 
 		SERVICES
 		    jriver-mediaserver
-		        Enable and start a mediaserver systemd service (requires an existing X server)
+		        Enable and start a mediaserver systemd service (requires an existing X server) (user)
 		    jriver-mediacenter
-		        Enable and start a mediacenter systemd service (requires an existing X server)
+		        Enable and start a mediacenter systemd service (requires an existing X server) (user)
 		    jriver-x11vnc
-		        Enable and start x11vnc for the local desktop (requires an existing X server)
+		        Enable and start x11vnc for the local desktop (requires an existing X server) (user)
 		        Usually combined with jriver-mediaserver or jriver-mediacenter services
 		        --vncpass and --display are optional (see below)
 		    jriver-xvnc
-		        Enable and start a new Xvnc session running JRiver Media Center
+		        Enable and start a new Xvnc session running JRiver Media Center (system)
 		        --vncpass PASSWORD
 		            Set vnc password for x11vnc/Xvnc access. If no password is set, the script
 		            will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
@@ -95,7 +94,7 @@ printHelp() {
 		            Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
 		            current display incremented by 1 (Xvnc))
 		    jriver-createrepo
-		        Install hourly service to build latest MC RPM and run createrepo ()
+		        Install hourly service to build latest MC RPM and run createrepo (system)
 
 		CONTAINERS (TODO: Under construction)
 		    mediacenter-xvnc
@@ -261,20 +260,18 @@ parseInput() {
 getLatestVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCVERSION BASE BOARDURL
+    declare -g MCVERSION
     declare cnt
+    declare base="buster" # For container method
+    #declare base_next="bullseye" # TODO possibly use for fallback to smooth upgrades
+    declare boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
 
-    # Latest defaults
-    BASE="buster" # For container method
-    BOARDURL="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
-    #BASE_next="bullseye" # TODO use for fallback to smooth upgrades
-
-    # Use a containerized package manager
-    # TODO but how to determine build distro ($BASE=buster)?
+    # Containerized package manager
+    # TODO but how to determine build distro ($base=buster)?
     installPackage --silent buildah
-    if cnt=$(buildah from debian:$BASE) &>/dev/null; then 
+    if cnt=$(buildah from debian:$base) &>/dev/null; then 
         buildah run "$cnt" -- bash -c \
-            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1"
+            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $base main' > /etc/apt/sources.list 2>&1"
         buildah run "$cnt" -- bash  -c \
             "apt-get update --allow-insecure-repositories &>/dev/null"
         if MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) \
@@ -283,16 +280,15 @@ getLatestVersion() {
         fi
         buildah rm "$cnt" &>/dev/null
         return 0
-    fi
-    # Scrape from Interact
-    installPackage wget
-    if MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
-        version_source="webscrape"
     else
-        err "$BOARDURL could not be parsed"
-        err "MC version could not be determined"
-        err "Specify a version manually using --mcversion"
-        exit 1
+        installPackage wget
+        if MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+            version_source="webscrape"
+        else
+            err "Latest MC version could not be parsed from $boardurl"
+            err "Try specifying a version manually using --mcversion"
+            exit 1
+        fi
     fi
 }
 
@@ -302,7 +298,7 @@ getLatestVersion() {
 # Arguments:
 #   One or more package names
 # Options:
-#   --nocheck: Do not check if package is already installed
+#   --skip-check-installed: Do not check if package is already installed
 #   --nogpgcheck: Disable GPG checks for RPM based distros
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
@@ -310,25 +306,20 @@ installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
-    declare pkg nocheck silent _return pkg_install_cmd
+    declare pkg skip_check_installed silent _return pkg_install_cmd
 
-    if _input=$(getopt -o +s -l nocheck,nogpgcheck,nobest,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
-                --nocheck)
-                    nocheck=1
+                --skip-check-installed)
+                    skip_check_installed=1
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
                         install_flags+=("--nogpgcheck")
                     elif [[ "$ID" =~ ^opensuse.* ]]; then
                         install_flags+=("--allow-unsigned-rpm")
-                    fi
-                    ;;
-                --nobest)
-                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        install_flags+=("--nobest")
                     fi
                     ;;
                 --silent|-s)
@@ -356,12 +347,11 @@ installPackage() {
     fi
 
     for pkg in "$@"; do
-        if [[ ! -v nocheck && -v PKG_ALIASES[$pkg] ]]; then
+        if [[ ! -v skip_check_installed && -v PKG_ALIASES[$pkg] ]]; then
             pkg=${PKG_ALIASES[$pkg]}
         fi
         # Check if already installed
-        if (( nocheck )) || ([[ ! -x $(command -v $pkg) ]] \
-        && ! pkg_query "$pkg" &>/dev/null); then
+        if (( skip_check_installed )) || ! (hash $pkg &>/dev/null || pkg_query "$pkg" &>/dev/null); then
             pkg_array+=("$pkg")
         fi
     done
@@ -370,11 +360,12 @@ installPackage() {
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
         pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-        if ! eval "$pkg_install_cmd" && (( silent )); then       
+        if ! eval "$pkg_install_cmd" && ! (( silent )); then       
             err "Failed to install ${pkg_array[*]}. Attempting to continue..."
+            return 1
         fi
-
     fi
+    return 0
 }
 
 
@@ -392,7 +383,7 @@ addRepo() {
 			gpgcheck=0
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        # MVERSION depends on $BASE unless --mcversion is passed
+        # MVERSION depends on $base unless --mcversion is passed
         installPackage wget
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
         sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
@@ -425,7 +416,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCPKG"
+    pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     eval "$pkg_install_cmd"
 }
@@ -659,7 +650,7 @@ runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
-    declare cr_user="${CREATEREPO_USER:-'www-data'}"
+    declare cr_user="${CREATEREPO_USER:$USER}"
 
     installPackage createrepo_c
 
@@ -736,12 +727,12 @@ symlinkCerts() {
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare _mjr
+    declare mjrfile
 
     # Allow user to put the mjr file next to installJRMC
     if [[ ! -v RESTOREFILE ]]; then
-        for _mjr in "$PWD"/*.mjr; do
-            [[ $_mjr -nt $RESTOREFILE ]] && RESTOREFILE="$_mjr"
+        for mjrfile in "$PWD"/*.mjr; do
+            [[ $mjrfile -nt $RESTOREFILE ]] && RESTOREFILE="$mjrfile"
         done
     fi
 
@@ -764,14 +755,14 @@ openFirewall() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     # Create OS-specific port rules based on argument (service) name
-    declare -a _f_ports # for firewall-cmd
-    declare _u_ports # for ufw
+    declare -a f_ports # for firewall-cmd
+    declare u_ports # for ufw
     if [[ "$1" == "jriver" ]]; then
-        _f_ports=("52100-52200/tcp" "1900/udp")
-        _u_ports="52100:52200/tcp|1900/udp"
+        f_ports=("52100-52200/tcp" "1900/udp")
+        u_ports="52100:52200/tcp|1900/udp"
     elif [[ "$1" =~ ^(jriver-x11vnc|jriver-xvnc)$ ]]; then
-        _f_ports=("$_port/tcp" "1900/udp")
-        _u_ports="$_port/tcp|1900/udp"
+        f_ports=("$PORT/tcp" "1900/udp")
+        u_ports="$PORT/tcp|1900/udp"
     fi
 
     # Open the ports
@@ -781,13 +772,13 @@ openFirewall() {
             firewall_cmd --permanent --new-service="$1" &>/dev/null
             firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" &>/dev/null
             firewall_cmd --permanent --service="$1" --set-short="$1" &>/dev/null
-            for _f_port in "${_f_ports[@]}"; do
-                firewall_cmd --permanent --service="$1" --add-port="$_f_port" &>/dev/null
+            for f_port in "${f_ports[@]}"; do
+                firewall_cmd --permanent --service="$1" --add-port="$f_port" &>/dev/null
             done
             firewall_cmd --add-service "$1" --permanent &>/dev/null
             firewall_cmd --reload &>/dev/null
         fi
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmin|neon)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         # Debian ufw package state is broken on fresh installations
         installPackage ufw
         if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
@@ -795,7 +786,7 @@ openFirewall() {
 				[$1]
 				title=$1
 				description=$1 installed by installJRMC
-				ports=$_u_ports
+				ports=$u_ports
 			EOF"
         fi
         firewall_cmd app update "$1"
@@ -816,27 +807,27 @@ openFirewall() {
 setX11VNCPass() {
     debug "Running: ${FUNCNAME[0]}"
 
-    _vncpassfile="$HOME/.vnc/jrmc_passwd"
+    declare vncpassfile="$HOME/.vnc/jrmc_passwd"
 
-    [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
+    [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
 
-    if [[ -f "$_vncpassfile" ]]; then
+    if [[ -f "$vncpassfile" ]]; then
         if [[ ! -v VNCPASS ]]; then
-            err "Refusing to overwrite existing $_vncpassfile with an empty password"
-            err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
+            err "Refusing to overwrite existing $vncpassfile with an empty password"
+            err "Remove existing $vncpassfile or set --vncpass to use an empty password"
             exit 1
         else
-            rm -f "$_vncpassfile"
+            rm -f "$vncpassfile"
         fi
     fi
 
     if [[ -v VNCPASS ]]; then
-        if ! x11vnc -storepasswd "$VNCPASS" "$_vncpassfile"; then
+        if ! x11vnc -storepasswd "$VNCPASS" "$vncpassfile"; then
             err "Could not create VNC password file"
             return 1
         fi
     else
-        _novncauth="true"
+        declare -g NOVNCAUTH=1
     fi
 }
 
@@ -847,27 +838,27 @@ setX11VNCPass() {
 setVNCPass() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare _vncpassfile="$HOME/.vnc/jrmc_passwd"
+    declare vncpassfile="$HOME/.vnc/jrmc_passwd"
 
-    [[ ! -d "${_vncpassfile%/*}" ]] && mkdir -p "${_vncpassfile%/*}"
+    [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
 
-    if [[ -f "$_vncpassfile" ]]; then
+    if [[ -f "$vncpassfile" ]]; then
         if [[ ! -v VNCPASS ]]; then
-            err "Refusing to overwrite existing $_vncpassfile with an empty password"
-            err "Remove existing $_vncpassfile or set --vncpass to use an empty password"
+            err "Refusing to overwrite existing $vncpassfile with an empty password"
+            err "Remove existing $vncpassfile or set --vncpass to use an empty password"
             exit 1
         else
-            rm -f "$_vncpassfile"
+            rm -f "$vncpassfile"
         fi
     fi
 
     if [[ -v VNCPASS ]]; then
-        if ! echo "$VNCPASS" | vncpasswd -f > "$_vncpassfile"; then
+        if ! echo "$VNCPASS" | vncpasswd -f > "$vncpassfile"; then
             err "Could not create VNC password file"
             return 1
         fi
     else
-        _novncauth="true"
+        declare -g NOVNCAUTH=1
     fi
 }
 
@@ -895,10 +886,9 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING EXEC_USER
+    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING
     declare -g SERVICE_TYPE"${SERVICE_TYPE:-system}"
-    declare service_system_dir="/usr/lib/systemd/system"
-    declare service_user_dir="$USER_HOME/.config/systemd/user"
+    declare service_dir="/usr/lib/systemd/$SERVICE_TYPE"
 
     if [[ "$USER" == "root" && "$SERVICE_TYPE" == "user" ]]; then
         err "Trying to install user service as root"
@@ -907,16 +897,12 @@ setServiceVars() {
     fi
 
     if [[ "$SERVICE_TYPE" == "system" ]]; then
-        service_dir="$service_system_dir"
-        EXEC_USER="root"
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
         systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
         systemctl_is_enabled_cmd(){ sudo systemctl is-enabled -q "$@"; }
         systemctl_is_active_cmd(){ sudo systemctl is-active -q "$@"; }
     elif [[ "$SERVICE_TYPE" == "user" ]]; then
-        service_dir="$service_user_dir"
-        EXEC_USER="$USER"
         systemctl_reload_cmd(){ systemctl --user daemon-reload; }
         systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
         systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
@@ -924,20 +910,20 @@ setServiceVars() {
         systemctl_is_active(){ sudo systemctl is-active -q "$@"; }
     fi
 
-    [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
+    [[ ! -d "$service_dir" ]] && sudo mkdir -p "$service_dir"
 
-    if [[ "$USER" == "root" || "$SERVICE_TYPE" == "user" ]]; then
-        SERVICE_NAME="${1}.service"
-        TIMER_NAME="${1}.timer"
-        SERVICE_FNAME="$service_dir/${SERVICE_NAME}"
-        TIMER_FNAME="$service_dir/${TIMER_NAME}"
-        USER_STRING=""
-    else
+    if [[ "$SERVICE_TYPE" == "system" && "$USER" != "root" ]]; then
         SERVICE_FNAME="$service_dir/${1}@.service"
         TIMER_FNAME="$service_dir/${1}@.timer"
         SERVICE_NAME="${1}@$USER.service"
         TIMER_NAME="${1}@$USER.timer"
         USER_STRING="User=%I"
+    else
+        SERVICE_NAME="${1}.service"
+        TIMER_NAME="${1}.timer"
+        SERVICE_FNAME="$service_dir/${SERVICE_NAME}"
+        TIMER_FNAME="$service_dir/${TIMER_NAME}"
+        USER_STRING=""
     fi
 }
 
@@ -952,7 +938,7 @@ service_jriver-mediacenter() {
 
     setServiceVars
 
-    sudo -u "$EXEC_USER" bash -c "cat <<- EOF > $SERVICE_FNAME
+    sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=JRiver Media Center $MVERSION
 		After=graphical.target
@@ -999,22 +985,22 @@ service_jriver-xvnc() {
     setServiceVars
     setDisplay
     declare start_cmd
-    declare port=$(( NEXT_DISPLAYNUM + 5900 ))
+    declare -g PORT=$(( NEXT_DISPLAYNUM + 5900 ))
 
     installPackage tigervnc-server
 
     setVNCPass
 
-    if [[ -v _novncauth ]]; then
+    if (( NOVNCAUTH )); then
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -name jriver$NEXT_DISPLAY -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     else
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
 
-    sudo -u "$EXEC_USER" bash -c "cat <<- EOF > $SERVICE_FNAME
+    sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Remote desktop service (VNC)
-		After=syslog.target network.target
+		After=multi-user.target
 
 		[Service]
 		Type=simple
@@ -1025,19 +1011,19 @@ service_jriver-xvnc() {
 		Restart=always
 
 		[Install]
-		WantedBy=default.target
+		WantedBy=multi-user.target
 	EOF"
 
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
-    echo "Xvnc running on localhost:$port" &&
+    echo "Xvnc running on localhost:$PORT" &&
     openFirewall "jriver-xvnc" &&
     openFirewall "jriver"
 }
 
 
 #######################################
-# Starts and enables (at startup) JRiver Media Server and x11vnc sharing the local desktop
+# Starts and enables (at startup) x11vnc screen sharing for the local desktop
 #######################################
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1046,7 +1032,7 @@ service_jriver-x11vnc() {
     setDisplay
 
     declare start_cmd
-    declare port=$(( DISPLAYNUM + 5900 ))
+    declare -g PORT=$(( DISPLAYNUM + 5900 ))
 
     installPackage x11vnc
 
@@ -1061,16 +1047,16 @@ service_jriver-x11vnc() {
     # }
     # _getResolution
 
-    if [[ -v _novncauth ]]; then
+    if (( NOVNCAUTH )); then
         start_cmd="/usr/bin/x11vnc -display $DISPLAY -noscr -auth guess -forever -bg -nopw"
     else
         start_cmd="/usr/bin/x11vnc -display $DISPLAY -noscr -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
     fi
 
-    sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $SERVICE_FNAME
+    sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=x11vnc
-		After=multi.service
+		After=graphical.target
 
 		[Service]
 		$USER_STRING
@@ -1081,12 +1067,12 @@ service_jriver-x11vnc() {
 		RestartSec=10
 
 		[Install]
-		WantedBy=default.target
+		WantedBy=graphical.target
 	EOF"
 
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
-    echo "x11vnc running on localhost:$port" &&
+    echo "x11vnc running on localhost:$PORT" &&
     openFirewall "jriver-x11vnc"
 }
 
@@ -1100,9 +1086,13 @@ service_jriver-createrepo() {
 
     declare id="${TARGET:-$ID}"
 
-    USER="root" setServiceVars
+    if [[ "$USER" != "${CREATEREPO_USER:-$USER}" ]]; then
+        USER="root" SERVICE_TYPE="system" setServiceVars
+    else
+        setServiceVars
+    fi
 
-    sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $SERVICE_FNAME
+    sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
 
@@ -1111,10 +1101,10 @@ service_jriver-createrepo() {
 		ExecStart=$PWD/installJRMC --target $id --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
 
 		[Install]
-		WantedBy=default.target
+		WantedBy=multi-user.target
 	EOF"
 
-    sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $TIMER_FNAME
+    sudo bash -c "cat <<-EOF > $TIMER_FNAME
 		[Unit]
 		Description=Run JRiver MC rpmbuild hourly
 
@@ -1149,7 +1139,7 @@ service_jriver-createrepo() {
 #     installPackage buildah podman
 
 #     # Eventually try to switch to Debian
-#     # if ! CNT=$(buildah from debian:$BASE); then
+#     # if ! CNT=$(buildah from debian:$base); then
 #     #     echo "Bad base image for container $CNAME, skipping"
 #     #     continue
 #     # fi
@@ -1335,7 +1325,7 @@ uninstall() {
     fi
 
     debug "Removing firewall rules"
-    if [[ -x $(command -v firewall-cmd) ]]; then
+    if hash firewall-cmd 2>/dev/null; then
         if [[ -v debug ]]; then
             debug "firewall_cmd --permanent --remove-service=jriver"
             firewall_cmd --permanent --remove-service=jriver
@@ -1348,7 +1338,7 @@ uninstall() {
             firewall_cmd --permanent --delete-service=jriver &>/dev/null
             firewall_cmd --reload &>/dev/null
         fi
-    elif [[ -x $(command -v ufw) ]]; then
+    elif hash ufw 2>/dev/null; then
         firewall_cmd="firewall_cmd delete allow jriver"
         debug "$firewall_cmd" || firewall_cmd+=" &>/dev/null"
         eval "$firewall_cmd"
@@ -1477,7 +1467,7 @@ main() {
             ar rcs "$mcdeb" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
             rm -rf "$extract_dir"
         fi
-        pkg_install_cmd="installPackage --nocheck --nogpgcheck ${mcdeb:-$MCDEB}"
+        pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck ${mcdeb:-$MCDEB}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         eval "$pkg_install_cmd"
     fi
@@ -1492,7 +1482,7 @@ main() {
 
         #rpm --upgrade "$MCRPM"        
 
-        if installPackage --nocheck --nogpgcheck "$MCRPM"; then
+        if installPackage --skip-check-installed --nogpgcheck "$MCRPM"; then
             echo "JRiver Media Center installed successfully"
         else
             err "JRiver Media Center installation failed"

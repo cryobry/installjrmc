@@ -1,6 +1,6 @@
 # installJRMC
 
-This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on Fedora, CentOS, Ubuntu, Debian, Linux Mint, and SUSE.
+This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on most major distros.
 
 ## README
 
@@ -21,7 +21,7 @@ You can always find the latest supported options by running `installJRMC --help`
 --install, -i repo|rpm|deb
     repo: Install MC from repository, future updates will be handled by the system package manager
     rpm: Build and install MC locally (RPM-based OSes only)
-    deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
+    deb: Download and install official MC package locally (useful with --compat flag for older distros)
 --build
     Build RPM from source DEB but do not install
 --target opensuse|fedora|centos
@@ -37,7 +37,7 @@ You can always find the latest supported options by running `installJRMC --help`
 --service, -s SERVICE
     See SERVICES section below for the list of services to deploy
   --service-type user|system
-      Starts services at boot (system) or at user login (user) (Default: system)
+      Starts services at boot (system) or user login (user) (Default: system)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
 --createrepo
@@ -60,7 +60,7 @@ You can always find the latest supported options by running `installJRMC --help`
 
 ### services
 
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. Typically this is your normal user account but for some installations (e.g. containers, servers) it may be necessary to run as root.
+When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. MC services are installed as system-level services running in the current user namespace
 
 ```text
 jriver-mediaserver
@@ -75,7 +75,7 @@ jriver-xvnc
     --vncpass PASSWORD
         Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
     --display DISPLAY
-        Manually specify display to use for x11vnc/Xvnc (ex. )
+        Manually specify display to use for x11vnc/Xvnc (ex. ':1')
 jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
 ```
@@ -102,39 +102,39 @@ It is possible to install multiple services at one time using multiple `--servic
 
 * `installJRMC`
 
-    Installs the latest version of JRiver Media Center from the repository.
+    Install the latest version of JRiver Media Center from the repository.
 
 * `installJRMC --install repo --service jriver-mediaserver`
 
-    Installs JRiver Media Center from the repository and starts/enables the /MediaServer service.
+    Install JRiver Media Center from the repository and starts/enables the /MediaServer service.
 
 * `installJRMC --install rpm --restorefile /path/to/license.mjr --mcversion 28.0.87`
 
-    Builds JRiver Media Center version 28.0.87 RPM from the source DEB, installs it (RPM distros only), and activates it using the specified .mjr license file.
+    Build JRiver Media Center version 28.0.87 RPM from the source DEB, installs it (RPM distros only), and activates it using the specified .mjr license file.
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
-     Builds the RPM, moves it to the webroot, and runs createrepo as `www-user`.
+     Build the RPM, moves it to the webroot, and runs createrepo as `www-user`.
 
 * `installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
-    Installs the jriver-createrepo timer and service to build the RPM, move it to the webroot, and run createrepo as `www-user` hourly.
+    Install the jriver-createrepo timer and service to build the RPM, move it to the webroot, and run createrepo as `www-user` hourly.
 
 * `installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
 
-    Installs services to share the existing local desktop via VNC and automatically run Media Center on startup.
+    Install services to share the existing local desktop via VNC and automatically run Media Center on startup.
 
 * `installJRMC --install repo --service jriver-xvnc --display ":2"`
 
-    Installs an Xvnc server on display ':2' that starts Media Center.
+    Install an Xvnc server on display ':2' that starts Media Center.
 
 * `installJRMC --install deb --compat`
 
-    Installs a more widely-compatible version of MC on deb-based distros
+    Install a more widely-compatible version of MC on deb-based distros
 
 * `installJRMC --uninstall`
 
-    Uninstalls JRiver Media Center and its associated services and firewall rules. This will **not** remove your media, media library/database, or automated library backup folder.
+    Uninstall JRiver Media Center and its associated services and firewall rules. This will **not** remove your media, media library/database, or automated library backup folder.
 
 ## Additional Info
 
