@@ -8,7 +8,7 @@
 #
 # See installJRMC --help or printHelp() below
 #
-# TODO
+# TODO (v2)
 #   1. Raspberry Pi OS support
 #   2. Interactive installation (ncurses?)
 #   3. Additional containerization (createrepo and rpmbuild)
@@ -22,8 +22,8 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0b6"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
-declare -g USER && USER="${USER:-$(id -un)}"
-declare -g USER_HOME && USER_HOME=$(grep "$USER" < /etc/passwd | cut -d":" -f6)
+declare -g USER; USER="${USER:-$(id -un)}"
+declare -g USER_HOME; USER_HOME=$(grep "$USER" < /etc/passwd | cut -d":" -f6)
 
 # MC version
 # MCVERSION="28.0.87" # to set manually, if unset use automatic latest check
@@ -913,12 +913,16 @@ setServiceVars() {
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
         systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
+        systemctl_is_enabled_cmd(){ sudo systemctl is-enabled -q "$@"; }
+        systemctl_is_enabled_cmd(){ sudo systemctl is-active -q "$@"; }
     elif [[ "$SERVICE_TYPE" == "user" ]]; then # i.e. systemd user service
         service_dir="$service_user_dir"
         EXEC_USER="$USER"
         systemctl_reload_cmd(){ systemctl --user daemon-reload; }
         systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
         systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
+        systemctl_is_enabled_cmd(){ systemctl --user is-enabled -q "$@"; }
+        systemctl_is_active(){ sudo systemctl is-active -q "$@"; }
     fi
 
     [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
@@ -967,8 +971,8 @@ service_jriver-mediacenter() {
 		WantedBy=graphical.target
 	EOF"
 
-    systemctl_reload &&
-    systemctl_enable "$SERVICE_NAME" &&
+    systemctl_reload_cmd &&
+    systemctl_enable_cmd "$SERVICE_NAME" &&
     openFirewall "jriver"
 }
 
@@ -1019,8 +1023,8 @@ service_jriver-xvnc() {
 		WantedBy=default.target
 	EOF"
 
-    systemctl_reload &&
-    systemctl_enable "$SERVICE_NAME" &&
+    systemctl_reload_cmd &&
+    systemctl_enable_cmd "$SERVICE_NAME" &&
     echo "Xvnc running on localhost:$port" &&
     openFirewall "jriver-xvnc" &&
     openFirewall "jriver"
@@ -1072,8 +1076,8 @@ service_jriver-x11vnc() {
 		WantedBy=default.target
 	EOF"
 
-    systemctl_reload &&
-    systemctl_enable "$SERVICE_NAME" &&
+    systemctl_reload_cmd &&
+    systemctl_enable_cmd "$SERVICE_NAME" &&
     echo "x11vnc running on localhost:$port" &&
     openFirewall "jriver-x11vnc"
 }
@@ -1112,8 +1116,8 @@ service_jriver-createrepo() {
 		WantedBy=timers.target
 	EOF"
 
-    systemctl_reload &&
-    systemctl_enable "$TIMER_NAME"
+    systemctl_reload_cmd &&
+    systemctl_enable_cmd "$TIMER_NAME"
 }
 
 
@@ -1286,26 +1290,36 @@ uninstall() {
     debug "Stopping and removing all associated Media Center services"
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
-        if ! setServiceVars "$service"; then
-            continue
-        fi
+        SERVICE_TYPE=system setServiceVars "$service"; 
         for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-            if systemctl is-active -q "$unit" &>/dev/null || systemctl is-enabled -q "$unit" &>/dev/null; then
+            if systemctl_is_active_cmd "$unit" &>/dev/null ||
+            systemctl_is_enabled_cmd "$unit" &>/dev/null; then
                 debug "Disabling $unit"
-                systemctl_disable "$unit"
+                systemctl_disable_cmd "$unit"
             fi
         done
         for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
             [[ -f "$f" ]] && debug "Removing $f" && rm_cmd "$f"
         done
-        systemctl_reload
+        SERVICE_TYPE=user setServiceVars "$service";
+        for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
+            if systemctl_is_active_cmd "$unit" &>/dev/null ||
+            systemctl_is_enabled_cmd "$unit" &>/dev/null; then
+                debug "Disabling $unit"
+                systemctl_disable_cmd "$unit"
+            fi
+        done
+        for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
+            [[ -f "$f" ]] && debug "Removing $f" && rm_cmd "$f"
+        done
+        systemctl_reload_cmd
     done
 
     debug "Removing repo files"
-    [[ -f "/etc/yum.repos.d/jriver.repo" ]] \
-        && rm_cmd "/etc/yum.repos.d/jriver.repo"
-    [[ -f "/etc/apt/sources.list.d/jriver.list" ]] \
-        && rm_cmd "/etc/apt/sources.list.d/jriver.list"
+    [[ -f "/etc/yum.repos.d/jriver.repo" ]] &&
+        rm_cmd "/etc/yum.repos.d/jriver.repo"
+    [[ -f "/etc/apt/sources.list.d/jriver.list" ]] &&
+        rm_cmd "/etc/apt/sources.list.d/jriver.list"
     if [[ "$ID" =~ ^opensuse.* ]]; then
         sudo zypper rr jriver &>/dev/null
     fi
@@ -1328,8 +1342,8 @@ uninstall() {
         firewall_cmd="firewall_cmd delete allow jriver"
         debug "$firewall_cmd" || firewall_cmd+=" &>/dev/null"
         eval "$firewall_cmd"
-        [[ -f "/etc/ufw/applications.d/jriver" ]] \
-            && rm_cmd /etc/ufw/applications.d/jriver
+        [[ -f "/etc/ufw/applications.d/jriver" ]] &&
+            rm_cmd /etc/ufw/applications.d/jriver
     fi
 
     debug "Uninstalling Media Center package"
