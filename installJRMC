@@ -1299,7 +1299,7 @@ uninstall() {
             fi
         done
         for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-            [[ -f "$f" ]] && debug "Removing $f" && rm_cmd "$f"
+            [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
         done
         SERVICE_TYPE=user setServiceVars "$service";
         for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
@@ -1310,16 +1310,16 @@ uninstall() {
             fi
         done
         for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-            [[ -f "$f" ]] && debug "Removing $f" && rm_cmd "$f"
+            [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
         done
         systemctl_reload_cmd
     done
 
     debug "Removing repo files"
     [[ -f "/etc/yum.repos.d/jriver.repo" ]] &&
-        rm_cmd "/etc/yum.repos.d/jriver.repo"
+        sudo rm -f "/etc/yum.repos.d/jriver.repo"
     [[ -f "/etc/apt/sources.list.d/jriver.list" ]] &&
-        rm_cmd "/etc/apt/sources.list.d/jriver.list"
+        sudo rm -f "/etc/apt/sources.list.d/jriver.list"
     if [[ "$ID" =~ ^opensuse.* ]]; then
         sudo zypper rr jriver &>/dev/null
     fi
@@ -1343,7 +1343,7 @@ uninstall() {
         debug "$firewall_cmd" || firewall_cmd+=" &>/dev/null"
         eval "$firewall_cmd"
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
-            rm_cmd /etc/ufw/applications.d/jriver
+            sudo rm -f /etc/ufw/applications.d/jriver
     fi
 
     debug "Uninstalling Media Center package"
