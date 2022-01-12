@@ -103,80 +103,6 @@ printHelp() {
 	EOF
 }
 
-
-init() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    declare version_source
-    declare -g MCVERSION MVERSION MCRPM
-    declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
-
-    getOS
-
-    # Make sure universe repo is installed on Ubuntu
-    if [[ "$ID" == "ubuntu|neon" ]]; then
-        if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
-            sudo add-apt-repository universe
-        fi
-    fi
-   
-    # Agnostic commands
-    bash_cmd(){ sudo bash -c "$@"; }
-    cp_cmd(){ sudo cp -nf "$@"; }
-    mkdir_cmd(){ sudo mkdir -p "$@"; }
-    chown_cmd(){ sudo chown "$1":"$1" -R "${@:2}"; }
-    ln_cmd(){ sudo ln -s "$@"; }
-
-    # OS-specific commands
-    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_install(){ sudo dnf install -y "$@"; }
-        pkg_remove(){ sudo dnf remove -y "$@"; }
-        pkg_update(){ sudo dnf makecache; }
-        pkg_query(){ rpm -q "$@"; }
-        firewall_cmd(){ sudo firewall-cmd "$@"; }
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        pkg_install(){ sudo apt-get install -y -q0 "$@"; }
-        pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
-        pkg_update(){ sudo apt-get update -y -q0; }
-        pkg_query(){ dpkg -s "$@"; }
-        firewall_cmd(){ sudo ufw "$@"; }
-    elif [[ "$ID" =~ ^opensuse.* ]]; then
-        pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
-        pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
-        pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
-        pkg_query(){ rpm -q "$@"; }
-        firewall_cmd(){ sudo firewall-cmd "$@"; }
-    fi
-
-    parseInput "$@"
-
-    # Select MC version to work with
-    if [[ -v MCVERSION ]]; then
-        version_source="user input"
-    else
-        getLatestVersion
-    fi
-    [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
-
-    echo "Using MC version $MCVERSION determined by $version_source"
-    [[ "$version_source" != "user input" ]] && echo "To override, use --mcversion"
-
-    # Extract major version number
-    MVERSION="${MCVERSION%%.*}"
-
-    # Set target package name
-    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        MCRPM="MediaCenter"
-        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM-$MCVERSION"
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        MCRPM="mediacenter$MVERSION"
-        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM=$MCVERSION"
-    fi
-
-    # Minor version (not needed)
-    # _variation="${MCVERSION##*.}"
-}
-
 # Helpers
 debug() { (( DEBUG )) && [[ $# -gt 0 ]] && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
@@ -240,6 +166,7 @@ parseInput() {
                     case "$1" in
                         rpm)
                             RPM_BUILD_SWITCH=1
+                            RPM_INSTALL_SWITCH=1
                             ;;
                         deb)
                             DEB_INSTALL_SWITCH=1
@@ -361,10 +288,10 @@ getLatestVersion() {
     installPackage wget
     if MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
         version_source="webscrape"
-    fi
-
-    if ! [[ -v MCVERSION ]]; then
-        err "MC version could not be determined. Please check the boardurl: $BOARDURL or specify a version manually using --MCVERSION"
+    else
+        err "$BOARDURL could not be parsed"
+        err "MC version could not be determined"
+        err "Specify a version manually using --mcversion"
         exit 1
     fi
 }
@@ -429,7 +356,6 @@ installPackage() {
     fi
 
     for pkg in "$@"; do
-        # Check for alias
         if [[ ! -v nocheck && -v PKG_ALIASES[$pkg] ]]; then
             pkg=${PKG_ALIASES[$pkg]}
         fi
@@ -459,7 +385,7 @@ addRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        bash_cmd 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
+        sudo bash -c 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
 			[jriver]
 			name=JRiver Media Center repo by BryanC
 			baseurl=https://repos.bryanroessler.com/jriver
@@ -736,10 +662,6 @@ runCreaterepo() {
 
     installPackage createrepo_c
 
-    # if [[ "$CREATEREPO_USER" != "$USER" ]]
-
-
-
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
         #cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
@@ -870,7 +792,7 @@ openFirewall() {
         # Debian ufw package state is broken on fresh installations
         installPackage ufw
         if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
-            bash_cmd "cat <<- EOF > /etc/ufw/applications.d/$1
+            sudo bash -c "cat <<- EOF > /etc/ufw/applications.d/$1
 				[$1]
 				title=$1
 				description=$1 installed by installJRMC
@@ -974,8 +896,7 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING
-
+    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING EXEC_USER
     declare service_system_dir="/usr/lib/systemd/system"
     declare service_user_dir="$USER_HOME/.config/systemd/user"
 
@@ -989,11 +910,13 @@ setServiceVars() {
 
     if [[ "$SERVICE_TYPE" == "system" ]]; then # i.e. systemd system service
         service_dir="$service_system_dir"
+        EXEC_USER="root"
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
         systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
     elif [[ "$SERVICE_TYPE" == "user" ]]; then # i.e. systemd user service
         service_dir="$service_user_dir"
+        EXEC_USER="$USER"
         systemctl_reload_cmd(){ systemctl --user daemon-reload; }
         systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
         systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
@@ -1025,7 +948,7 @@ setServiceVars() {
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
 
-    bash_cmd "cat <<- EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=JRiver Media Center $MVERSION
 		After=graphical.target
@@ -1080,7 +1003,7 @@ service_jriver-xvnc() {
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
 
-    bash_cmd "cat <<- EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Remote desktop service (VNC)
 		After=syslog.target network.target
@@ -1133,7 +1056,7 @@ service_jriver-x11vnc() {
         start_cmd="/usr/bin/x11vnc -display $DISPLAY -noscr -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
     fi
 
-    bash_cmd "cat <<-EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=x11vnc
 		After=multi.service
@@ -1166,7 +1089,7 @@ service_jriver-createrepo() {
 
     declare id="${TARGET:-$ID}"
 
-    bash_cmd "cat <<-EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
 
@@ -1178,7 +1101,7 @@ service_jriver-createrepo() {
 		WantedBy=default.target
 	EOF"
 
-    bash_cmd "cat <<-EOF > $TIMER_FNAME
+    sudo -u "$EXEC_USER" -c "cat <<-EOF > $TIMER_FNAME
 		[Unit]
 		Description=Run JRiver MC rpmbuild hourly
 
@@ -1432,21 +1355,81 @@ tests() {
 
 main() {
     debug "Running: ${FUNCNAME[0]}"
+    
+    declare version_source
+    declare -g MCVERSION MVERSION MCRPM
+    declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
-    declare service
+    getOS
 
-    init "$@"
+    # Some distros need external repos installed for MC libraries
+    if [[ "$ID" == "ubuntu|neon" ]]; then
+        echo "Adding universe repository"
+        if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
+            sudo add-apt-repository universe
+        fi 
+    elif [[ "$ID" == "centos" ]]; then
+        echo "Adding EPEL repository"
+        installPackage epel-release
+    fi
+   
+    # Agnostic commands
+    bash_cmd(){ sudo bash -c "$@"; }
+    cp_cmd(){ sudo cp -nf "$@"; }
+    mkdir_cmd(){ sudo mkdir -p "$@"; }
+    chown_cmd(){ sudo chown "$1":"$1" -R "${@:2}"; }
+    ln_cmd(){ sudo ln -s "$@"; }
 
-    # Uninstall and exit
+    # OS-specific commands
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+        pkg_install(){ sudo dnf install -y "$@"; }
+        pkg_remove(){ sudo dnf remove -y "$@"; }
+        pkg_update(){ sudo dnf makecache; }
+        pkg_query(){ rpm -q "$@"; }
+        firewall_cmd(){ sudo firewall-cmd "$@"; }
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+        pkg_install(){ sudo apt-get install -y -q0 "$@"; }
+        pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
+        pkg_update(){ sudo apt-get update -y -q0; }
+        pkg_query(){ dpkg -s "$@"; }
+        firewall_cmd(){ sudo ufw "$@"; }
+    elif [[ "$ID" =~ ^opensuse.* ]]; then
+        pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
+        pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
+        pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
+        pkg_query(){ rpm -q "$@"; }
+        firewall_cmd(){ sudo firewall-cmd "$@"; }
+    fi
+
+    parseInput "$@"
+
+    # Select MC version to work with
+    if [[ -v MCVERSION ]]; then
+        version_source="user input"
+    else
+        getLatestVersion
+    fi
+    [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
+    echo "Using MC version $MCVERSION determined by $version_source"
+    [[ "$version_source" != "user input" ]] && echo "To override, use --mcversion"
+
+    # Extract major version number
+    MVERSION="${MCVERSION%%.*}"
+
+    # Set target package name
+    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
+        MCRPM="MediaCenter"
+        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM-$MCVERSION"
+    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+        MCRPM="mediacenter$MVERSION"
+        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM=$MCVERSION"
+    fi
+
     if (( UNINSTALL_SWITCH )); then
         uninstall
         exit $?
     fi
 
-    # Install dependency dependencies :-)
-    [[ "$ID" == "centos" ]] && installPackage epel-release
-
-    # Install MC using package manager
     if (( REPO_INSTALL_SWITCH )); then
         if [[ "$ID" =~ ^opensuse.*$ ]]; then
             echo "A SUSE repository is not yet available."
@@ -1466,36 +1449,32 @@ main() {
 
     if (( DEB_INSTALL_SWITCH )); then
         acquireDeb
-        declare extract_dir && extract_dir="$(mktemp -d)"
-        ar x --output "$extract_dir" "$MCDEB"
-        tar -xJf "$extract_dir/control.tar.xz" -C "$extract_dir"
-        # Remove minimum version specifiers from control file
-        sed -i 's/ ([^)]*)//g' "$extract_dir/control"
-        tar -C "$extract_dir" \
-            --ignore-failed-read \
-            -cvJf "control.tar.xz" "control" "postinst"
-        ar rcs "$MCDEB.compat" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
-        pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCDEB.compat"
+        if (( COMPAT_SWITCH )); then
+            declare extract_dir && extract_dir="$(mktemp -d)"
+            MCDEB="$MCDEB.compat"
+            ar x --output "$extract_dir" "$MCDEB"
+            tar -xJf "$extract_dir/control.tar.xz" -C "$extract_dir"
+            # Remove minimum version specifiers from control file
+            sed -i 's/ ([^)]*)//g' "$extract_dir/control"
+            tar -C "$extract_dir" \
+                --ignore-failed-read \
+                -cvJf "control.tar.xz" "control" "postinst"
+            ar rcs "$MCDEB" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
+            rm -rf "$extract_dir"
+        fi
+        pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCDEB"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         eval "$pkg_install_cmd"
-        rm -rf "$extract_dir"
+        
     fi
 
-    # Build RPM from source deb package
     if (( RPM_BUILD_SWITCH )); then
         installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
         buildRPM
     fi
 
-    # Run createrepo
-    if (( CREATEREPO_SWITCH )); then
-        runCreaterepo
-        exit $?
-    fi
-
-    # Install RPM
-    if (( REPO_INSTALL_SWITCH )); then
+    if (( RPM_INSTALL_SWITCH )); then
 
         #rpm --upgrade "$MCRPM"        
 
@@ -1510,8 +1489,13 @@ main() {
         openFirewall "jriver"
     fi
 
-    # Install services
+    if (( CREATEREPO_SWITCH )); then
+        runCreaterepo
+        exit $?
+    fi
+
     if [[ "${#SERVICES[@]}" -gt 0 ]]; then
+        declare service
         setDisplay
         for service in "${SERVICES[@]}"; do
             if ! setServiceVars "$service"; then
@@ -1527,7 +1511,6 @@ main() {
         done
     fi
 
-    # Install containers
     # for _container in "${CONTAINERS[@]}"; do
     #     if ! "_container_$_container"; then
     #         if [[ $? -eq 127 ]]; then
