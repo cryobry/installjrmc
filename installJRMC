@@ -951,6 +951,8 @@ setServiceVars() {
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
 
+    [[ $(type -t systemctl_reload_cmd) == function ]] && echo "systemctl_reload_cmd is a function in service_jriver-mediacenter"
+
     sudo -u "$EXEC_USER" -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=JRiver Media Center $MVERSION
@@ -1505,6 +1507,8 @@ main() {
             if ! setServiceVars "$service"; then
                 continue
             fi
+                [[ $(type -t systemctl_reload_cmd) == function ]] && echo "systemctl_reload_cmd is a function in main"
+
             if ! "service_$service"; then
                 if [[ $? -eq 127 ]]; then
                     err "Service $service does not exist, check your service name"
