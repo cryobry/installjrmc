@@ -425,7 +425,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCRPM"
+    pkg_install_cmd="installPackage --nocheck --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     eval "$pkg_install_cmd"
 }
@@ -898,24 +898,23 @@ setServiceVars() {
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING EXEC_USER
     declare service_system_dir="/usr/lib/systemd/system"
     declare service_user_dir="$USER_HOME/.config/systemd/user"
+    declare service_type="${SERVICE_TYPE:-'system'}"
 
-    SERVICE_TYPE="${SERVICE_TYPE:-'system'}"
-
-    if [[ "$USER" == "root" && "$SERVICE_TYPE" == "user" ]]; then
+    if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
         err "Trying to install user service as root"
         err "Use --service-type service and/or execute installJRMC as non-root user"
         return 1
     fi
 
-    if [[ "$SERVICE_TYPE" == "system" ]]; then # i.e. systemd system service
+    if [[ "$SERVICE_TYPE" == "system" ]]; then
         service_dir="$service_system_dir"
         EXEC_USER="root"
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
         systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
         systemctl_is_enabled_cmd(){ sudo systemctl is-enabled -q "$@"; }
-        systemctl_is_enabled_cmd(){ sudo systemctl is-active -q "$@"; }
-    elif [[ "$SERVICE_TYPE" == "user" ]]; then # i.e. systemd user service
+        systemctl_is_active_cmd(){ sudo systemctl is-active -q "$@"; }
+    elif [[ "$SERVICE_TYPE" == "user" ]]; then
         service_dir="$service_user_dir"
         EXEC_USER="$USER"
         systemctl_reload_cmd(){ systemctl --user daemon-reload; }
@@ -927,7 +926,7 @@ setServiceVars() {
 
     [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
 
-    if [[ "$USER" == "root" || "$SERVICE_TYPE" == "user" ]]; then
+    if [[ "$USER" == "root" || "$service_type" == "user" ]]; then
         SERVICE_NAME="${1}.service"
         TIMER_NAME="${1}.timer"
         SERVICE_FNAME="$service_dir/${SERVICE_NAME}"
@@ -950,8 +949,6 @@ setServiceVars() {
 #######################################
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
-
-    [[ $(type -t systemctl_reload_cmd) == function ]] && echo "systemctl_reload_cmd is a function in service_jriver-mediacenter"
 
     sudo -u "$EXEC_USER" -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
@@ -1349,7 +1346,7 @@ uninstall() {
     fi
 
     debug "Uninstalling Media Center package"
-    mc_pkg_rm_cmd="pkg_remove $MCRPM"
+    mc_pkg_rm_cmd="pkg_remove $MCPKG"
     debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
     if eval "$mc_pkg_rm_cmd"; then 
         echo "JRiver Media Center has been completely uninstalled."
@@ -1372,7 +1369,7 @@ main() {
     debug "Running: ${FUNCNAME[0]}"
     
     declare version_source
-    declare -g MCVERSION MVERSION MCRPM
+    declare -g MCVERSION MVERSION MCPKG
 
     getOS
 
@@ -1425,11 +1422,11 @@ main() {
 
     # Set target package name
     if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
-        MCRPM="MediaCenter"
-        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM-$MCVERSION"
+        MCPKG="MediaCenter"
+        [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        MCRPM="mediacenter$MVERSION"
-        [[ "$version_source" == "user input" ]] && MCRPM="$MCRPM=$MCVERSION"
+        MCPKG="mediacenter$MVERSION"
+        [[ "$version_source" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
     fi
 
     if (( UNINSTALL_SWITCH )); then
@@ -1507,7 +1504,8 @@ main() {
             if ! setServiceVars "$service"; then
                 continue
             fi
-                [[ $(type -t systemctl_reload_cmd) == function ]] && echo "systemctl_reload_cmd is a function in main"
+            
+            systemctl_reload_cmd
 
             if ! "service_$service"; then
                 if [[ $? -eq 127 ]]; then
