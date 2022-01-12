@@ -906,6 +906,8 @@ setServiceVars() {
         return 1
     fi
 
+    echo "$SERVICE_TYPE"
+
     if [[ "$SERVICE_TYPE" == "system" ]]; then
         service_dir="$service_system_dir"
         EXEC_USER="root"
@@ -1504,8 +1506,6 @@ main() {
             if ! setServiceVars "$service"; then
                 continue
             fi
-            
-            systemctl_reload_cmd && echo "yes!"
 
             if ! "service_$service"; then
                 if [[ $? -eq 127 ]]; then
