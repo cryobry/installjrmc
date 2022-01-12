@@ -950,7 +950,7 @@ setServiceVars() {
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
 
-    sudo -u "$EXEC_USER" -c "cat <<- EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=JRiver Media Center $MVERSION
 		After=graphical.target
@@ -1005,7 +1005,7 @@ service_jriver-xvnc() {
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
 
-    sudo -u "$EXEC_USER" -c "cat <<- EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Remote desktop service (VNC)
 		After=syslog.target network.target
@@ -1058,7 +1058,7 @@ service_jriver-x11vnc() {
         start_cmd="/usr/bin/x11vnc -display $DISPLAY -noscr -auth guess -forever -bg -rfbauth $HOME/.vnc/jrmc_passwd"
     fi
 
-    sudo -u "$EXEC_USER" -c "cat <<-EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=x11vnc
 		After=multi.service
@@ -1091,7 +1091,7 @@ service_jriver-createrepo() {
 
     declare id="${TARGET:-$ID}"
 
-    sudo -u "$EXEC_USER" -c "cat <<-EOF > $SERVICE_FNAME
+    sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
 
@@ -1103,7 +1103,7 @@ service_jriver-createrepo() {
 		WantedBy=default.target
 	EOF"
 
-    sudo -u "$EXEC_USER" -c "cat <<-EOF > $TIMER_FNAME
+    sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $TIMER_FNAME
 		[Unit]
 		Description=Run JRiver MC rpmbuild hourly
 
