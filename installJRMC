@@ -898,7 +898,7 @@ setServiceVars() {
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING EXEC_USER
     declare service_system_dir="/usr/lib/systemd/system"
     declare service_user_dir="$USER_HOME/.config/systemd/user"
-    declare service_type="${SERVICE_TYPE:-'system'}"
+    declare service_type="${SERVICE_TYPE:-system}"
 
     if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
         err "Trying to install user service as root"
@@ -907,7 +907,6 @@ setServiceVars() {
     fi
 
     if [[ "$service_type" == "system" ]]; then
-        echo "HERERERER: service_type: $service_type"
         service_dir="$service_system_dir"
         EXEC_USER="root"
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
