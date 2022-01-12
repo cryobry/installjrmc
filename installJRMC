@@ -344,30 +344,30 @@ getLatestVersion() {
     # disable version checks for createrepo or rpmbuild (servers)
     # if [[ -v INSTALL_TYPE ]]; then
     #     if [[ "$ID" == "ubuntu" ]]; then
-    #         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] && \
+    #         # [[ "$VERSION_CODENAME" =~ ^(focal|groovy|hirsute|impish)$ ]] &&
     #         #     BASE="bullseye"
-    #         [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] && \
+    #         [[ "$VERSION_CODENAME" =~ ^(cosmic|disco|eoan)$ ]] &&
     #             BASE="buster"
-    #         [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] && \
+    #         [[ "$VERSION_CODENAME" =~ ^(xenial|yakkety|zesty|artful|bionic)$ ]] &&
     #             MCVERSION="26.0.107"
-    #         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] && \
+    #         [[ "$VERSION_CODENAME" =~ ^(trusty|utopic|vivid|wily)$ ]] &&
     #             MCVERSION="26.0.107" 
     #     elif [[ "$ID" == "debian" ]]; then
     #         BASE="$VERSION_CODENAME"
-    #         [[ $VERSION_ID -eq 10 ]] && \
+    #         [[ $VERSION_ID -eq 10 ]] &&
     #             BASE="buster"
-    #         [[ $VERSION_ID -le 9 ]] && \
+    #         [[ $VERSION_ID -le 9 ]] &&
     #             MCVERSION="26.0.107" # For 9 and 8
     #     elif [[ "$ID" == "centos" ]]; then
-    #         [[ "$VERSION_ID" -eq "8" ]] && \
+    #         [[ "$VERSION_ID" -eq "8" ]] &&
     #             BASE="buster"
-    #         [[ "$VERSION_ID" -lt "8" ]] && \
+    #         [[ "$VERSION_ID" -lt "8" ]] &&
     #             MCVERSION="26.0.107" # Doubtful
     #     fi
 
-    #     [[ -v MCVERSION ]] && \
-    #         version_source="compatibility lookup" && \
-    #         debug "To override, use --MCVERSION" && \
+    #     [[ -v MCVERSION ]] &&
+    #         version_source="compatibility lookup" &&
+    #         debug "To override, use --MCVERSION" &&
     #         return 0
     # fi
 
@@ -831,7 +831,7 @@ runCreaterepo() {
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if [[ ! -f /etc/ssl/certs/ca-certificates.crt && \
+    if [[ ! -f /etc/ssl/certs/ca-certificates.crt &&
     -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
         if ! ln_cmd /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt; then
             err "Symlinking certificates failed"
@@ -1078,8 +1078,8 @@ service_jriver-mediacenter() {
 		WantedBy=graphical.target
 	EOF"
 
-    systemctl_reload && \
-    systemctl_enable "$SERVICE_NAME" && \
+    systemctl_reload &&
+    systemctl_enable "$SERVICE_NAME" &&
     openFirewall "jriver"
 }
 
@@ -1130,10 +1130,10 @@ service_jriver-xvnc() {
 		WantedBy=default.target
 	EOF"
 
-    systemctl_reload && \
-    systemctl_enable "$SERVICE_NAME" && \
-    echo "Xvnc running on localhost:$port" && \
-    openFirewall "jriver-xvnc" && \
+    systemctl_reload &&
+    systemctl_enable "$SERVICE_NAME" &&
+    echo "Xvnc running on localhost:$port" &&
+    openFirewall "jriver-xvnc" &&
     openFirewall "jriver"
 }
 
@@ -1183,9 +1183,9 @@ service_jriver-x11vnc() {
 		WantedBy=default.target
 	EOF"
 
-    systemctl_reload && \
-    systemctl_enable "$SERVICE_NAME" && \
-    echo "x11vnc running on localhost:$port" && \
+    systemctl_reload &&
+    systemctl_enable "$SERVICE_NAME" &&
+    echo "x11vnc running on localhost:$port" &&
     openFirewall "jriver-x11vnc"
 }
 
@@ -1223,7 +1223,7 @@ service_jriver-createrepo() {
 		WantedBy=timers.target
 	EOF"
 
-    systemctl_reload && \
+    systemctl_reload &&
     systemctl_enable "$TIMER_NAME"
 }
 
@@ -1282,22 +1282,22 @@ service_jriver-createrepo() {
 
 #     # Install JRiver
 #     RUN \
-#         add-pkg --virtual build-dependencies wget && \
+#         add-pkg --virtual build-dependencies wget &&
 #         # Install from Repository
 #         if [ "${deb_url}" = "repository" ]; then \
-#             echo "Installing JRiver from repository ${jriver_release}:${jriver_tag}" && \
-#             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - && \
-#             wget http://dist.jriver.com/${jriver_tag}/mediacenter/mediacenter${jriver_release}.list -O /etc/apt/sources.list.d/mediacenter${jriver_release}.list && \
-#             apt-get update && \
+#             echo "Installing JRiver from repository ${jriver_release}:${jriver_tag}" &&
+#             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - &&
+#             wget http://dist.jriver.com/${jriver_tag}/mediacenter/mediacenter${jriver_release}.list -O /etc/apt/sources.list.d/mediacenter${jriver_release}.list &&
+#             apt-get update &&
 #             add-pkg mediacenter${jriver_release}; \
 #         # Install from .deb URL
 #         else \
-#             echo "Installing JRiver from URL: ${deb_url}" && \
-#             wget -q -O "jrivermc.deb" ${deb_url} && \
+#             echo "Installing JRiver from URL: ${deb_url}" &&
+#             wget -q -O "jrivermc.deb" ${deb_url} &&
 #             add-pkg "./jrivermc.deb"; \
-#         fi && \
+#         fi &&
 #         # Cleanup
-#         del-pkg build-dependencies && \
+#         del-pkg build-dependencies &&
 #         rm -rf /tmp/* /tmp/.[!.]*
 
 #     # Add rootfs
@@ -1307,7 +1307,7 @@ service_jriver-createrepo() {
 
 #     # Application Icon
 #     RUN \
-#         APP_ICON_URL=https://gitlab.com/shiomax/jrivermc-docker/raw/master/assets/Application.png && \
+#         APP_ICON_URL=https://gitlab.com/shiomax/jrivermc-docker/raw/master/assets/Application.png &&
 #         install_app_icon.sh "$APP_ICON_URL"
 
 #     # Various configuration vars
@@ -1320,7 +1320,7 @@ service_jriver-createrepo() {
 
 #     # Modify startapp.sh and rc.xml with JRiver version
 #     RUN sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
-#             /startapp.sh && \
+#             /startapp.sh &&
 #         sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
 #             /etc/xdg/openbox/rc.xml
 
