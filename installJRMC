@@ -896,17 +896,17 @@ setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING EXEC_USER
+    declare -g SERVICE_TYPE"${SERVICE_TYPE:-system}"
     declare service_system_dir="/usr/lib/systemd/system"
     declare service_user_dir="$USER_HOME/.config/systemd/user"
-    declare service_type="${SERVICE_TYPE:-system}"
 
-    if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
+    if [[ "$USER" == "root" && "$SERVICE_TYPE" == "user" ]]; then
         err "Trying to install user service as root"
         err "Use --service-type service and/or execute installJRMC as non-root user"
         return 1
     fi
 
-    if [[ "$service_type" == "system" ]]; then
+    if [[ "$SERVICE_TYPE" == "system" ]]; then
         service_dir="$service_system_dir"
         EXEC_USER="root"
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
@@ -914,7 +914,7 @@ setServiceVars() {
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
         systemctl_is_enabled_cmd(){ sudo systemctl is-enabled -q "$@"; }
         systemctl_is_active_cmd(){ sudo systemctl is-active -q "$@"; }
-    elif [[ "$service_type" == "user" ]]; then
+    elif [[ "$SERVICE_TYPE" == "user" ]]; then
         service_dir="$service_user_dir"
         EXEC_USER="$USER"
         systemctl_reload_cmd(){ systemctl --user daemon-reload; }
@@ -926,7 +926,7 @@ setServiceVars() {
 
     [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
 
-    if [[ "$USER" == "root" || "$service_type" == "user" ]]; then
+    if [[ "$USER" == "root" || "$SERVICE_TYPE" == "user" ]]; then
         SERVICE_NAME="${1}.service"
         TIMER_NAME="${1}.timer"
         SERVICE_FNAME="$service_dir/${SERVICE_NAME}"
@@ -949,6 +949,8 @@ setServiceVars() {
 #######################################
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
+
+    setServiceVars
 
     sudo -u "$EXEC_USER" bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
@@ -982,6 +984,8 @@ service_jriver-mediacenter() {
 service_jriver-mediaserver() {
     debug "Running: ${FUNCNAME[0]}"
 
+    setServiceVars
+
     service_jriver-mediacenter "/MediaServer"
 }
 
@@ -992,6 +996,8 @@ service_jriver-mediaserver() {
 service_jriver-xvnc() {
     debug "Running: ${FUNCNAME[0]}"
 
+    setServiceVars
+    setDisplay
     declare start_cmd
     declare port=$(( NEXT_DISPLAYNUM + 5900 ))
 
@@ -1035,6 +1041,9 @@ service_jriver-xvnc() {
 #######################################
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
+
+    setServiceVars
+    setDisplay
 
     declare start_cmd
     declare port=$(( DISPLAYNUM + 5900 ))
@@ -1090,6 +1099,8 @@ service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare id="${TARGET:-$ID}"
+
+    USER="root" setServiceVars
 
     sudo -u "$EXEC_USER" bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
@@ -1499,11 +1510,7 @@ main() {
 
     if [[ "${#SERVICES[@]}" -gt 0 ]]; then
         declare service
-        setDisplay
         for service in "${SERVICES[@]}"; do
-            if ! setServiceVars "$service"; then
-                continue
-            fi
             if ! "service_$service"; then
                 if [[ $? -eq 127 ]]; then
                     err "Service $service does not exist, check your service name"

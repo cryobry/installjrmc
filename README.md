@@ -37,7 +37,7 @@ You can always find the latest supported options by running `installJRMC --help`
 --service, -s SERVICE
     See SERVICES section below for the list of services to deploy
   --service-type user|system
-      Starts services at boot (system) or at user login (user) (Default: boot)
+      Starts services at boot (system) or at user login (user) (Default: system)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
 --createrepo
