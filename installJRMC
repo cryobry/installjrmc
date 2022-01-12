@@ -659,7 +659,7 @@ runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
-    declare cr_user="${CREATEREPO_USER:-$USER}"
+    declare cr_user="${CREATEREPO_USER:-'www-data'}"
 
     installPackage createrepo_c
 
@@ -923,6 +923,8 @@ setServiceVars() {
         systemctl_is_enabled_cmd(){ systemctl --user is-enabled -q "$@"; }
         systemctl_is_active(){ sudo systemctl is-active -q "$@"; }
     fi
+
+    systemctl_reload_cmd && echo "YES!!!!"
 
     [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
 
