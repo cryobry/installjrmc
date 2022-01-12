@@ -900,6 +900,8 @@ setServiceVars() {
     declare service_user_dir="$USER_HOME/.config/systemd/user"
     declare service_type="${SERVICE_TYPE:-'system'}"
 
+    echo "service_type: $service_type, SERVICE_TYPE: $SERVICE_TYPE"
+
     if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
         err "Trying to install user service as root"
         err "Use --service-type service and/or execute installJRMC as non-root user"
@@ -923,8 +925,6 @@ setServiceVars() {
         systemctl_is_enabled_cmd(){ systemctl --user is-enabled -q "$@"; }
         systemctl_is_active(){ sudo systemctl is-active -q "$@"; }
     fi
-
-    systemctl_reload_cmd && echo "YES!!!!"
 
     [[ ! -d "$service_dir" ]] && sudo -u "$EXEC_USER" mkdir -p "$service_dir"
 
