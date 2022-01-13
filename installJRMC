@@ -764,7 +764,7 @@ openFirewall() {
 				ports=$u_ports
 			EOF"
         fi
-        firewall_cmd app update "$1"
+        firewall_cmd app update "$1" &>/dev/null
         firewall_cmd allow "$1" &>/dev/null
     fi
 
