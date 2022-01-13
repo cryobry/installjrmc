@@ -230,6 +230,8 @@ parseInput() {
         err "Incorrect options provided"
         printHelp && exit 1
     fi
+
+    ! debug && echo "Use --debug for verbose output."
 }
 
 
@@ -377,14 +379,6 @@ addRepo() {
 #######################################
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
-
-    echo "Installing JRiver Media Center $MCVERSION from repository."
-    echo "Future updates will be handled by your package manager."
-
-    if ! debug; then
-        echo "This may take a few minutes to complete."
-        echo "Use --debug for verbose output."
-    fi
 
     addRepo
 
