@@ -272,6 +272,7 @@ getLatestVersion() {
 # Options:
 #   --skip-check-installed: Do not check if package is already installed
 #   --nogpgcheck: Disable GPG checks for RPM based distros
+#   --allow-downgrades: Useful for installing compatability versions on DEB based distros
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
 installPackage() {
@@ -280,12 +281,15 @@ installPackage() {
     declare -a pkg_array install_flags
     declare pkg skip_check_installed silent _return pkg_install_cmd
 
-    if _input=$(getopt -o +s -l skip-check-installed,nogpgcheck,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
                 --skip-check-installed)
                     skip_check_installed=1
+                    ;;
+                --allow-downgrades)
+                    [[ "$ID" =~ (debian|ubuntu|neon) ]] && install_flags+=(--allow-downgrades)
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
