@@ -290,9 +290,9 @@ installPackage() {
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        install_flags+=("--nogpgcheck")
+                        install_flags+=(--nogpgcheck)
                     elif [[ "$ID" =~ ^opensuse.* ]]; then
-                        install_flags+=("--allow-unsigned-rpm")
+                        install_flags+=(--allow-unsigned-rpm)
                     fi
                     ;;
                 --silent|-s)
@@ -536,8 +536,8 @@ buildRPM() {
             for i in "${!requires[@]}"; do
                 [[ "${requires[$i]}" == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
             done
-            recommends+=("libvulkan_intel")
-            recommends+=("libvulkan_radeon")
+            recommends+=(libvulkan_intel)
+            recommends+=(libvulkan_radeon)
             ;;
     esac
 
@@ -738,10 +738,10 @@ openFirewall() {
     declare -a f_ports # for firewall-cmd
     declare u_ports # for ufw
     if [[ "$1" == "jriver" ]]; then
-        f_ports=("52100-52200/tcp" "1900/udp")
+        f_ports=(52100-52200/tcp 1900/udp)
         u_ports="52100:52200/tcp|1900/udp"
     elif [[ "$1" =~ ^(jriver-x11vnc|jriver-xvnc)$ ]]; then
-        f_ports=("$PORT/tcp" "1900/udp")
+        f_ports=("$PORT"/tcp 1900/udp)
         u_ports="$PORT/tcp|1900/udp"
     fi
 
@@ -1210,13 +1210,13 @@ service_jriver-createrepo() {
 
 #     installPackage buildah podman
 #     cnt=$(buildah from docker.io/jlesage/baseimage-gui:debian-10)
-#     podman_create_cmd=("podman" "create" "--name" "$CNAME")
-#     buildah_config_cmd=("buildah" "config" \
-#         "--author" "bryanroessler@gmail.com" \
-#         "--label" "maintainer=$MAINTAINER" \
-#         "--env" "TZ=$TZ" \
-#         "--workingdir" "/app" \
-#         "--cmd" "mediacenter$MVERSION")
+#     podman_create_cmd=(podman create --name "$CNAME")
+#     buildah_config_cmd=(buildah config \
+#         --author bryanroessler@gmail.com \
+#         --label maintainer="$MAINTAINER" \
+#         --env TZ="$TZ" \
+#         --workingdir /app \
+#         --cmd mediacenter"$MVERSION")
 
 #     mkcdirs() {
 #         declare dir
@@ -1234,10 +1234,10 @@ service_jriver-createrepo() {
 
 #     mkcdirs "$HOME/.jriver"
 
-#     podman_create_cmd+=("-v" "$HOME/.jriver:/root/.jriver")
-#     podman_create_cmd+=("-v" "$DOWNLOAD_ROOT:/downloads:z")
-#     podman_create_cmd+=("-v" "$MONITOR_ROOT/nzbs:/nzbs")
-#     podman_create_cmd+=("-p" "${CONTAINER[HOST_PORT]}:${CONTAINER[CONTAINER_PORT]}")
+#     podman_create_cmd+=(-v "$HOME/.jriver:/root/.jriver")
+#     podman_create_cmd+=(-v "$DOWNLOAD_ROOT:/downloads:z")
+#     podman_create_cmd+=(-v "$MONITOR_ROOT/nzbs:/nzbs")
+#     podman_create_cmd+=(-p "${CONTAINER[HOST_PORT]}:${CONTAINER[CONTAINER_PORT]}")
 
 #     brc() { buildah run "$1" "${@:2}" || return 1; }
 
