@@ -24,9 +24,6 @@ declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER; USER="${USER:-$(id -un)}"
 
-# MC version
-# MCVERSION="28.0.87" # to set manually, if unset use automatic latest check
-
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1444,7 +1441,7 @@ main() {
             sed -i 's/([^)]*)//g' "control" # TODO email bob, MC DEB package error
             tar -cJf "control.tar.xz" "control" "postinst"
             ar rcs "$mcdeb_compat" "debian-binary" "control.tar.xz" "data.tar.xz"
-            popd || return $?
+            popd &>/dev/null || return $?
             rm -rf "$extract_dir"
         fi
         pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $mcdeb_compat"
