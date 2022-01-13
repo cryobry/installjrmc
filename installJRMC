@@ -228,7 +228,7 @@ parseInput() {
         printHelp && exit 1
     fi
 
-    ! debug && echo "Use --debug for verbose output."
+    ! debug && echo "Use --debug for verbose output"
 }
 
 
@@ -337,7 +337,7 @@ installPackage() {
         pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         if ! eval "$pkg_install_cmd"; then       
-            (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue..."
+            (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue"
             return 1
         fi
     fi
@@ -467,12 +467,12 @@ acquireDeb() {
     "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     else
-        err "Cannot find DEB file."
+        err "Cannot find DEB file"
         exit 1
     fi
 
     if [[ ! -f "$MCDEB" ]]; then
-        err "Downloaded DEB file missing or corrupted."
+        err "Downloaded DEB file missing or corrupted"
         exit 1
     fi
 }
@@ -491,7 +491,7 @@ buildRPM() {
 
     # skip rebuilding the rpm if it already exists
     if [[ -f "$MCRPM" ]]; then
-        echo "$MCRPM already exists. Skipping build step."
+        echo "$MCRPM already exists. Skipping build step"
         return 0
     fi
 
@@ -647,13 +647,13 @@ buildRPM() {
 	EOF
 
     # Run rpmbuild
-    echo "Building version $MCVERSION, please wait..."
+    echo "Building RPM for MC $MCVERSION, this may take awhile"
     rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb $OUTPUTDIR/SPECS/mediacenter.spec"
     debug "$rpmbuild_cmd" || rpmbuild_cmd+=" &>/dev/null"
     if eval "$rpmbuild_cmd" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
-        err "Build failed."
+        err "Build failed"
         # For automation, let's remove the source DEB and reaquire it on next run 
         # after failure in case it is corrupted or buggy
         [[ -f "$MCDEB" ]] && echo "Removing source DEB" && rm -f "$MCDEB"
@@ -1242,7 +1242,7 @@ service_jriver-createrepo() {
 #     # Metadata.
 #     LABEL \
 #         org.label-schema.name="jrivermc${jriver_release}" \
-#         org.label-schema.description="Docker image for JRiver Media Center ${jriver_release}." \
+#         org.label-schema.description="Docker image for JRiver Media Center ${jriver_release}" \
 #         org.label-schema.version="${image_version}" \
 #         org.label-schema.vcs-url="https://gitlab.com/shiomax/jrivermc-docker" \
 #         org.label-schema.schema-version="1.0"
@@ -1369,7 +1369,7 @@ uninstall() {
     mc_pkg_rm_cmd="pkg_remove $MCPKG"
     debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
     if eval "$mc_pkg_rm_cmd"; then 
-        echo "JRiver Media Center has been completely uninstalled."
+        echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
         echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
         exit 0
@@ -1455,8 +1455,8 @@ main() {
 
     if (( REPO_INSTALL_SWITCH )); then
         if [[ "$ID" =~ ^opensuse.*$ ]]; then
-            echo "A SUSE repository is not yet available."
-            echo "Use --install rpm to build and install a SUSE RPM instead."
+            echo "A SUSE repository is not yet available"
+            echo "Use --install rpm to build and install a SUSE RPM instead""
             exit 1
         fi
         if installMCFromRepo; then
