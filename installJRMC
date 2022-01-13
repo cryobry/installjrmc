@@ -346,6 +346,44 @@ installPackage() {
 
 
 #######################################
+# Installs a package using the system package manager
+# Arguments:
+#   One or more package names
+# Options:
+#   --skip-check-installed: Do not check if package is already installed
+#   --nogpgcheck: Disable GPG checks for RPM based distros
+#   --allow-downgrades: Useful for installing compatability versions on DEB based distros
+#   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
+#######################################
+installMCDEB() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    aquireDeb
+
+    declare mcdeb="$MCDEB"
+    declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
+    if (( COMPAT_SWITCH )); then
+        declare extract_dir && extract_dir="$(mktemp -d)"
+        mcdeb="${MCDEB/.deb/.compat.deb}"
+        pushd "$extract_dir" &>/dev/null || return $?
+        ar x "$MCDEB"
+        tar -xJf "control.tar.xz"
+        # Remove minimum version specifiers from control file
+        sed -i 's/ ([^)]*)//g' "control"
+        sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
+        tar -cJf "control.tar.xz" "control" "postinst"
+        ar rcs "$mcdeb" "debian-binary" "control.tar.xz" "data.tar.xz"
+        popd &>/dev/null || return $?
+        rm -rf "$extract_dir"
+        pkg_install_cmd+=" --allow-downgrades"
+    fi
+    pkg_install_cmd+=" $mcdeb"
+    debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
+    eval "$pkg_install_cmd"
+}
+
+
+#######################################
 # Add the JRiver repository files
 #######################################
 addRepo() {
@@ -1422,9 +1460,9 @@ main() {
             exit 1
         fi
         if installMCFromRepo; then
-            echo "JRiver Media Center installed successfully"
+            echo "JRiver Media Center installed successfully from repo"
         else
-            err "JRiver Media Center installation failed"
+            err "JRiver Media Center installation from repo failed"
             exit 1
         fi
         symlinkCerts
@@ -1433,24 +1471,15 @@ main() {
     fi
 
     if (( DEB_INSTALL_SWITCH )); then
-        acquireDeb
-        if (( COMPAT_SWITCH )); then
-            declare extract_dir && extract_dir="$(mktemp -d)"
-            declare mcdeb_compat="${MCDEB/.deb/.compat.deb}"
-            pushd "$extract_dir" &>/dev/null || return $?
-            ar x "$MCDEB"
-            tar -xJf "control.tar.xz"
-            # Remove minimum version specifiers from control file
-            sed -i 's/ ([^)]*)//g' "control"
-            sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
-            tar -cJf "control.tar.xz" "control" "postinst"
-            ar rcs "$mcdeb_compat" "debian-binary" "control.tar.xz" "data.tar.xz"
-            popd &>/dev/null || return $?
-            rm -rf "$extract_dir"
+        if installMCDEB; then
+            echo "JRiver Media Center installed successfully from local deb"
+        else
+            err "JRiver Media Center installation from local deb failed"
+            exit 1
         fi
-        pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $mcdeb_compat"
-        debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-        eval "$pkg_install_cmd"
+        symlinkCerts
+        restoreLicense
+        openFirewall "jriver"
     fi
 
     if (( RPM_BUILD_SWITCH )); then
@@ -1460,13 +1489,11 @@ main() {
     fi
 
     if (( RPM_INSTALL_SWITCH )); then
-
         #rpm --upgrade "$MCRPM" # TODO, maybe universalize for RPM distros       
-
         if installPackage --skip-check-installed --nogpgcheck "$MCRPM"; then
-            echo "JRiver Media Center installed successfully"
+            echo "JRiver Media Center installed successfully from local RPM"
         else
-            err "JRiver Media Center installation failed"
+            err "JRiver Media Center installation from local RPM failed"
             exit 1
         fi
         symlinkCerts
