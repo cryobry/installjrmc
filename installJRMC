@@ -390,7 +390,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    echo "Installing JRiver Media Center $MCVERSION using package manager" 
+    echo "Installing JRiver Media Center using your package manager" 
     pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     eval "$pkg_install_cmd"
