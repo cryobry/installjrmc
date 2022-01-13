@@ -1435,18 +1435,19 @@ main() {
         acquireDeb
         if (( COMPAT_SWITCH )); then
             declare extract_dir && extract_dir="$(mktemp -d)"
-            ar x --output "$extract_dir" "$MCDEB"
-            tar -xJf "$extract_dir/control.tar.xz" -C "$extract_dir"
+            declare mcdeb_compat="$MCDEB.compat"
+            pushd "$extract_dir" &>/dev/null || return $?
+            ar x "$MCDEB"
+            tar -xJf "control.tar.xz"
             # Remove minimum version specifiers from control file
-            sed -i 's/ ([^)]*)//g' "$extract_dir/control"
-            sed -i 's/([^)]*)//g' "$extract_dir/control" # MC DEB package error
-            tar -cJf "$extract_dir/control.tar.xz" \
-                -C "$extract_dir" "control" "postinst"
-            declare mcdeb="$MCDEB.compat"
-            ar rcs "$mcdeb" "$extract_dir/debian-binary" "$extract_dir/control.tar.xz" "$extract_dir/data.tar.xz"
+            sed -i 's/ ([^)]*)//g' "control"
+            sed -i 's/([^)]*)//g' "control" # TODO email bob, MC DEB package error
+            tar -cJf "control.tar.xz" "control" "postinst"
+            ar rcs "$mcdeb_compat" "debian-binary" "control.tar.xz" "data.tar.xz"
+            popd || return $?
             rm -rf "$extract_dir"
         fi
-        pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck ${mcdeb:-$MCDEB}"
+        pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $mcdeb_compat"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         eval "$pkg_install_cmd"
     fi
