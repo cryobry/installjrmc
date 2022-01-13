@@ -407,7 +407,7 @@ acquireDeb() {
 
     # If deb file already exists, skip download
     if [[ -f "$MCDEB" ]]; then
-        echo "Using local DEB file: $MCDEB"
+        echo "Using local source DEB: $MCDEB"
         return 0
     fi
 
@@ -1432,13 +1432,13 @@ main() {
         acquireDeb
         if (( COMPAT_SWITCH )); then
             declare extract_dir && extract_dir="$(mktemp -d)"
-            declare mcdeb_compat="$MCDEB.compat"
+            declare mcdeb_compat="${MCDEB/.deb/compat.deb}"
             pushd "$extract_dir" &>/dev/null || return $?
             ar x "$MCDEB"
             tar -xJf "control.tar.xz"
             # Remove minimum version specifiers from control file
             sed -i 's/ ([^)]*)//g' "control"
-            sed -i 's/([^)]*)//g' "control" # TODO email bob, MC DEB package error
+            sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
             tar -cJf "control.tar.xz" "control" "postinst"
             ar rcs "$mcdeb_compat" "debian-binary" "control.tar.xz" "data.tar.xz"
             popd &>/dev/null || return $?
