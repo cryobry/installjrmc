@@ -245,8 +245,8 @@ getLatestVersion() {
 
     # Containerized package manager
     # TODO but how to determine build distro ($BASE=buster)?
-    installPackage --silent buildah
-    if cnt=$(buildah from debian:$BASE) &>/dev/null &&
+    if installPackage --silent buildah &&
+    cnt=$(buildah from debian:$BASE) &>/dev/null &&
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1" &&
     buildah run "$cnt" -- bash  -c \
@@ -261,7 +261,7 @@ getLatestVersion() {
     else
         MCVERSION="28.0.100"
         VERSION_SOURCE="hardcoded version"
-        echo "Warning! Using hardcoded version number, this is probably not the latest"
+        err "Warning! Using hardcoded version number"
     fi
 }
 
@@ -358,7 +358,7 @@ addRepo() {
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         # MVERSION depends on $BASE unless --mcversion is passed
-        installPackage wget
+        installPackage --silent wget
         declare sources_dir="/etc/apt/sources.list.d"
         [[ ! -d "$sources_dir" ]] && sudo mkdir -p "$sources_dir"
         sudo bash -c "cat <<- EOF > $sources_dir/mediacenter$MVERSION.list
@@ -390,6 +390,7 @@ installMCFromRepo() {
     addRepo
 
     # Update package list
+    pkg_update_cmd="pkg_update"
     debug "$pkg_update_cmd" || pkg_update_cmd+=" &>/dev/null"
     if ! eval "$pkg_update_cmd"; then
         err "Package update failed!"
