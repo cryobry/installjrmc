@@ -348,24 +348,23 @@ installPackage() {
 addRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    echo "Adding JRiver repository"
+    echo "Adding JRiver repository to package manager"
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        sudo bash -c 'cat <<- EOF > /etc/yum.repos.d/jriver.repo
+        declare sources_dir="/etc/yum.repos.d/"
+        sudo bash -c "cat <<- EOF > $sources_dir/jriver.repo
 			[jriver]
 			name=JRiver Media Center repo by BryanC
 			baseurl=https://repos.bryanroessler.com/jriver
 			gpgcheck=0
-		EOF'
+		EOF"
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
-        # MVERSION depends on $BASE unless --mcversion is passed
         installPackage wget
         declare sources_dir="/etc/apt/sources.list.d"
-        [[ ! -d "$sources_dir" ]] && sudo mkdir -p "$sources_dir"
-        sudo bash -c "cat <<- EOF > $sources_dir/mediacenter$MVERSION.list
+        [[ ! -d $sources_dir ]] && sudo mkdir -p "$sources_dir"
+        sudo rm -rf "$sources_dir"/mediacenter*.list
+        sudo bash -c "cat <<- EOF > $sources_dir/jriver.list
 			deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main
 		EOF"
-        #echo "deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main" > "$sources_dir/mediacenter$MVERSION.list" 2>&1
-        #sudo wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list" &>/dev/null
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
     elif [[ "$ID" =~ ^opensuse.* ]]; then
         sudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
@@ -1269,7 +1268,7 @@ uninstall() {
         exit 0
     fi
 
-    debug "Stopping and removing all associated Media Center services"
+    echo "Stopping and removing all Media Center services"
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
         SERVICE_TYPE=system setServiceVars "$service"; 
@@ -1297,16 +1296,15 @@ uninstall() {
         systemctl_reload_cmd
     done
 
-    debug "Removing repo files"
-    [[ -f "/etc/yum.repos.d/jriver.repo" ]] &&
-        sudo rm -f "/etc/yum.repos.d/jriver.repo"
-    [[ -f "/etc/apt/sources.list.d/jriver.list" ]] &&
-        sudo rm -f "/etc/apt/sources.list.d/jriver.list"
+    echo "Removing repo files"
+    sudo rm -rf \
+        "/etc/yum.repos.d/jriver.repo" \
+        /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
     if [[ "$ID" =~ ^opensuse.* ]]; then
         sudo zypper rr jriver &>/dev/null
     fi
 
-    debug "Removing firewall rules"
+    echo "Removing firewall rules"
     if hash firewall-cmd 2>/dev/null; then
         if [[ -v debug ]]; then
             debug "firewall_cmd --permanent --remove-service=jriver"
@@ -1328,7 +1326,7 @@ uninstall() {
             sudo rm -f /etc/ufw/applications.d/jriver
     fi
 
-    debug "Uninstalling Media Center package"
+    echo "Uninstalling Media Center package"
     mc_pkg_rm_cmd="pkg_remove $MCPKG"
     debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
     if eval "$mc_pkg_rm_cmd"; then 
