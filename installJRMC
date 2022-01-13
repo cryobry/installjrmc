@@ -333,8 +333,8 @@ installPackage() {
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
         pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-        if ! eval "$pkg_install_cmd" && ! (( silent )); then       
-            err "Failed to install ${pkg_array[*]}. Attempting to continue..."
+        if ! eval "$pkg_install_cmd"; then       
+            (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue..."
             return 1
         fi
     fi
@@ -358,7 +358,7 @@ addRepo() {
 		EOF'
     elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
         # MVERSION depends on $BASE unless --mcversion is passed
-        installPackage --silent wget
+        installPackage wget
         declare sources_dir="/etc/apt/sources.list.d"
         [[ ! -d "$sources_dir" ]] && sudo mkdir -p "$sources_dir"
         sudo bash -c "cat <<- EOF > $sources_dir/mediacenter$MVERSION.list
@@ -1265,7 +1265,7 @@ uninstall() {
     declare service unit f
 
     if ! askOk "Do you really want to uninstall JRiver Media Center"; then
-        echo "Cancelling uninstall..."
+        echo "Uninstall canceled"
         exit 0
     fi
 
@@ -1461,7 +1461,7 @@ main() {
 
     if (( RPM_INSTALL_SWITCH )); then
 
-        #rpm --upgrade "$MCRPM"        
+        #rpm --upgrade "$MCRPM" # TODO, maybe universalize for RPM distros       
 
         if installPackage --skip-check-installed --nogpgcheck "$MCRPM"; then
             echo "JRiver Media Center installed successfully"
