@@ -390,7 +390,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    echo "Installing JRiver Media Center using your package manager" 
+    echo "Installing JRiver Media Center using your package manager"
     pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     eval "$pkg_install_cmd"
@@ -415,16 +415,16 @@ acquireDeb() {
     fi
 
     if [[ -v BETAPASS ]]; then
-        echo "Checking beta repo..."
+        echo "Checking beta repo for DEB package"
         if wget -q -O "$MCDEB" \
         "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
             echo "Found!"
         fi
-    elif echo "Checking test repo..." && wget -q -O "$MCDEB" \
+    elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
     "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     # Else check latest repo
-    elif echo "Checking latest repo..." && wget -q -O "$MCDEB" \
+    elif echo "Checking latest repo for DEB package" && wget -q -O "$MCDEB" \
     "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     else
@@ -460,6 +460,11 @@ buildRPM() {
     
     # Use --target parameter override
     id="${TARGET:-$ID}"
+    if [[ ! "$id" =~ (fedora|centos|opensuse.*) ]]; then
+        err "The current RPM build target $id is not supported, manually specify with --target"
+        err "The DEB file is located at $MCDEB"
+        return 1
+    fi
 
     # Load deb dependencies into array
     IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
