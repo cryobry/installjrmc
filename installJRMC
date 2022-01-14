@@ -1440,9 +1440,9 @@ main() {
     getOS
 
     # Some distros need external repos installed for MC libraries
-    if [[ "$ID" =~ (ubuntu) ]]; then
-        echo "Adding universe repository"
+    if [[ "$ID" == "ubuntu" ]]; then
         if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
+            echo "Adding universe repository"
             sudo add-apt-repository universe
         fi 
     elif [[ "$ID" == "centos" ]]; then
