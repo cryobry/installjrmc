@@ -74,7 +74,9 @@ jriver-createrepo
     By default installs as root service to handle www permissions more gracefully
 ```
 
-MC helper services are installed as system-level services (`--service-type=system`) by default and are manipulable as admin: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the unprivileged user: `systemctl --user stop jriver-mediacenter`.
+### `--service-type`
+
+MC helper services are installed as system-level services (`--service-type system`) by default and are manipulable as admin: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type user` that can be manipulated by the unprivileged user: `systemctl --user stop jriver-mediacenter`.
 
 Multiple services (but not `--service-types`) can be installed at one time using multiple `--service` blocks: `installJRMC --repo --service jriver-x11vnc --service jriver-mediacenter`
 
@@ -90,7 +92,7 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
 ## Firewall
 
-`installJRMC` will automatically add port forwarding firewall rules enabling remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on Fedora/CentOS/SUSE and `ufw` on Ubuntu/Debian.
+`installJRMC` will automatically add port forwarding firewall rules enabling remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on EL distros and `ufw` on Debian/Ubuntu.
 
 **Note:** `ufw` is not installed by default on Debian but will be installed by `installJRMC`. To prevent user lock-out (i.e. SSH), Debian users that have not already enabled `ufw` will need to `sudo ufw enable` after running `installJRMC` and inspecting their configuration.
 
@@ -102,7 +104,7 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
 * `installJRMC --install local --compat`
 
-    Install a more widely-compatible version of that latest MC (for older distros).
+    Install a more widely-compatible version of the latest MC (for older distros).
 
 * `installJRMC --install repo --service jriver-mediacenter --service-type user`
 
