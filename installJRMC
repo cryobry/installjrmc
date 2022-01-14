@@ -776,9 +776,9 @@ symlinkCerts() {
 
     if [[ ! -f /etc/ssl/certs/ca-certificates.crt &&
     -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        ln_cmd="ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt"
+        ln_cmd="sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt"
         debug "$ln_cmd" || ln_cmd+=" &>/dev/null"
-        if ! sudo exec "$ln_cmd"; then
+        if ! exec "$ln_cmd"; then
             err "Symlinking certificates failed"
             return 1
         fi
