@@ -1558,8 +1558,11 @@ main() {
     fi
 
     if (( CREATEREPO_SWITCH )); then
+        if [[ "$ID" == "suse" ]]; then
+            err "createrepo is not available on SUSE"
+            exit 1
+        fi
         runCreaterepo
-        exit $?
     fi
 
     if [[ "${#SERVICES[@]}" -gt 0 ]]; then
