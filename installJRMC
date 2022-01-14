@@ -496,7 +496,6 @@ buildRPM() {
     declare id i rpmbuild_cmd
     declare -a requires recommends
     declare -A dupes
-    declare -g MCRPM="$OUTPUTDIR/RPMS/x86_64/MediaCenter-$MCVERSION.x86_64.rpm"
 
     # skip rebuilding the rpm if it already exists
     if [[ -f "$MCRPM" ]]; then
@@ -1461,6 +1460,8 @@ main() {
         MCPKG="mediacenter$MVERSION"
         [[ "$VERSION_SOURCE" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
     fi
+
+    declare -g MCRPM="$OUTPUTDIR/RPMS/x86_64/MediaCenter-$MCVERSION.x86_64.rpm"
 
     if (( UNINSTALL_SWITCH )); then
         uninstall
