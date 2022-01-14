@@ -1421,6 +1421,7 @@ uninstall() {
         echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
     elif [[ $? -eq 100 ]]; then
         err "JRiver Media Center package '$MCPKG' is not present"
+        err "and was not uninstalled"
     else
         err "Could not remove Media Center package"
     fi
@@ -1453,9 +1454,14 @@ main() {
 
     # Distro-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_install(){ sudo dnf install -y "$@"; }
-        pkg_remove(){ sudo dnf remove -y "$@"; }
-        pkg_update(){ sudo dnf makecache; }
+        if hash dnf &>/dev/null; then
+            declare mgr="dnf"
+        elif hash yum &>/dev/null; then
+            declare mgr="yum"
+        fi
+        pkg_install(){ sudo "$mgr" install -y "$@"; }
+        pkg_remove(){ sudo "$mgr" remove -y "$@"; }
+        pkg_update(){ sudo "$mgr" makecache; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
