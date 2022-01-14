@@ -6,7 +6,7 @@ This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) 
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method will need to be specified using `--install`. This makes it possible to install services and containers independent of Media Center.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method (i.e. `--install repo` or `--install local`) will need to be explicitly specified. This makes it possible to install services and containers independent of Media Center.
 
 **Note**: `installJRMC` does not perform library migrations. Before moving to a new major version (i.e. v27->v28), you should first [perform a library backup](https://wiki.jriver.com/index.php/Library_Backup), install the new major version, and then [restore the library](https://wiki.jriver.com/index.php/Restore_a_library).
 
@@ -100,9 +100,9 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
     Install the latest version of MC from the best available repository.
 
-* `installJRMC --install deb --compat`
+* `installJRMC --install local --compat`
 
-    Install a more widely-compatible version of that latest MC on deb-based distros.
+    Install a more widely-compatible version of that latest MC (for older distros).
 
 * `installJRMC --install repo --service jriver-mediacenter --service-type user`
 
