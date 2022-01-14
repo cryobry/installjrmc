@@ -1458,9 +1458,9 @@ main() {
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
-        pkg_install(){ sudo apt install -y -q0 "$@"; }
-        pkg_remove(){ sudo apt remove --auto-remove -y -q0 "$@"; }
-        pkg_update(){ sudo apt update -y -q0; }
+        pkg_install(){ sudo apt-get install -y -q0 "$@"; }
+        pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
+        pkg_update(){ sudo apt-get update -y -q0; }
         pkg_query(){ dpkg -s "$@"; }
         firewall_cmd(){ sudo ufw "$@"; }
     elif [[ "$ID" == "suse" ]]; then
