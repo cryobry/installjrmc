@@ -1,6 +1,6 @@
 # installJRMC
 
-This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) and associated helper services on most major Linux distros.
+This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) and associated services on most major Linux distros.
 
 ## Executing
 
@@ -12,9 +12,8 @@ Running `installJRMC` without any options will install the latest version of JRi
 
 ## Options
 
-You can always find the latest supported options by running `installJRMC --help`.
-
 ```text
+$ installJRMC --help
 --install, -i repo|local
     repo: Install MC from repository, future updates will be handled by the system package manager
     local: Build and install MC package locally
@@ -56,7 +55,7 @@ You can always find the latest supported options by running `installJRMC --help`
 
 ### services
 
-MC helper services are installed as system-level services (`--service-type=system`) by default and manipulatable by the root user: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the current unprivileged user: `systemctl --user stop jriver-mediacenter`.
+MC helper services are installed as system-level services (`--service-type=system`) by default and manipulable by the root user: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the current unprivileged user: `systemctl --user stop jriver-mediacenter`.
 
 ```text
 jriver-mediaserver
