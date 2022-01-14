@@ -154,17 +154,18 @@ getOS() {
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
+    declare -g TARGET=${TARGET:-$ID}
+    declare -g CREATEREPO_USER="${CREATEREPO_USER:$USER}"
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH 
     declare -g CREATEREPO_SWITCH UNINSTALL_SWITCH DEB_INSTALL_SWITCH
-    declare -g TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE 
-    declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
+    declare -g OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE 
+    declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts
 
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 && "$1" =~ ^(--compat)$ ]]; then
-        TARGET="$ID"
         BUILD_SWITCH=1
         # separate ordering is probably more reliable
         if [[ "$ID" =~ (ubuntu|debian) ]]; then
@@ -532,7 +533,7 @@ acquireDeb() {
 buildRPM() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare id i rpmbuild_cmd
+    declare i rpmbuild_cmd
     declare -a requires recommends
     declare -A dupes
 
@@ -544,8 +545,8 @@ buildRPM() {
 
     [[ ! -d "$OUTPUTDIR/SPECS" ]] && mkdir -p "$OUTPUTDIR/SPECS"
 
-    if [[ ! "$id" =~ (fedora|centos|suse) ]]; then
-        err "The current RPM build target $id is not supported, manually specify with --target"
+    if [[ ! "$TARGET" =~ (fedora|centos|suse) ]]; then
+        err "The current RPM build target $TARGET is not supported, manually specify with --target"
         err "The DEB file is located at $MCDEB"
         return 1
     fi
@@ -569,7 +570,7 @@ buildRPM() {
     recommends=("${recommends[@]//)/}")
 
     # Translate package names
-    case "$id" in
+    case "$TARGET" in
         fedora|centos)
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
@@ -715,22 +716,21 @@ runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
-    declare cr_user="${CREATEREPO_USER:$USER}"
 
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        cr_mkdir_cmd="sudo -u $cr_user mkdir -p $CREATEREPO_WEBROOT"
+        cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
         debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
         if ! eval "$cr_mkdir_cmd"; then
             cr_mkdir_cmd="sudo mkdir -p $CREATEREPO_WEBROOT"
             debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-            cr_chown_cmd="sudo chown -R $cr_user:$cr_user $CREATEREPO_WEBROOT"
+            cr_chown_cmd="sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
             debug "$cr_chown_cmd" || cr_chown_cmd+=" &>/dev/null"
             if ! ( eval "$cr_mkdir_cmd" && eval "$cr_chown_cmd" ); then
                 err "Could not create the createrepo-webroot path!"
-                err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $cr_user"
+                err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $CREATEREPO_USER"
                 err "Or change the repo ownership with --createrepo-user"
                 return 1
             fi
@@ -739,7 +739,7 @@ runCreaterepo() {
 
     # Copy built rpms to webroot
     cr_cp_cmd="sudo cp -nf $MCRPM $CREATEREPO_WEBROOT"
-    cr_chown_cmd="sudo chown -R $cr_user:$cr_user $CREATEREPO_WEBROOT"
+    cr_chown_cmd="sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
     debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
     debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
     if ! ( eval "$cr_cp_cmd" && eval "$cr_chown_cmd" ); then
@@ -748,13 +748,13 @@ runCreaterepo() {
     fi
 
     # Run createrepo
-    cr_cmd="sudo -u $cr_user createrepo -q $CREATEREPO_WEBROOT"
+    cr_cmd="sudo -u $CREATEREPO_USER createrepo -q $CREATEREPO_WEBROOT"
     [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
     debug "$cr_cmd" || cr_cmd+=" &>/dev/null"
     if ! eval "$cr_cmd"; then
         cr_cmd="sudo createrepo -q $CREATEREPO_WEBROOT"
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
-        cr_chown_cmd="sudo chown -R $cr_user:$cr_user $CREATEREPO_WEBROOT"
+        cr_chown_cmd="sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
         debug "$cr_cmd" || cr_cmd+=" &>/dev/null"
         debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
         if ! ( eval "$cr_cmd" && eval "$cr_chown_cmd"); then
@@ -1153,10 +1153,7 @@ service_jriver-x11vnc() {
 service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare id="${TARGET:-$ID}"
-    declare cr_user="${CREATEREPO_USER:$USER}"
-
-    if [[ "$USER" != "$cr_user" ]]; then
+    if [[ "$USER" != "$CREATEREPO_USER" ]]; then
         USER="root" SERVICE_TYPE="system" setServiceVars "${FUNCNAME[0]##*_}"
     else
         setServiceVars "${FUNCNAME[0]##*_}"
@@ -1168,7 +1165,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$PWD/installJRMC --target $id --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $cr_user
+		ExecStart=$PWD/installJRMC --target $TARGET --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
 
 		[Install]
 		WantedBy=multi-user.target
@@ -1524,10 +1521,7 @@ main() {
     if (( BUILD_SWITCH )); then
         installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
-        TARGET="${TARGET:-$ID}"
-        if [[ "$TARGET" =~ ^(fedora|centos|suse) ]]; then
-            buildRPM
-        fi
+        buildRPM
     fi
 
     if (( DEB_INSTALL_SWITCH )); then
