@@ -34,15 +34,14 @@ printHelp() {
 		    If no options (besides -d) are provided, the script will default to '--install repo'.
 
 		OPTIONS
-		    --install, -i repo|rpm|deb
+		    --install, -i repo|local
 		        repo: Install MC from repository, updates are handled by the system package manager
-		        rpm: Build and install RPM locally (RPM-based distros only)
-		            deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
+		        local: Build and install MC package locally
 		    --build=[suse|fedora|centos]
 		        Build RPM from source DEB but do not install
-		        Optionally specify cross-build target, note the '=' (ex. --build=suse)
+		        Optionally specify cross-build target (ex. --build=suse, note the '=')
 		    --compat
-		        Build/install MC without minimum library specifiers
+		        Build/install MC locally without minimum library specifiers
 		    --mcversion VERSION
 		        Specify the MC version, ex. "28.0.94" (Default: latest)
 		    --outputdir PATH
@@ -110,7 +109,7 @@ askOk() {
 
 
 #######################################
-# Parse /etc/os-release and provide a compatability layer for unrecognzied distros
+# Parses /etc/os-release and provide a compatability layer for unrecognzied distros
 #######################################
 getOS() {
     debug "Running: ${FUNCNAME[0]}"
@@ -138,7 +137,7 @@ getOS() {
             ID="suse"
             ;;
         *)
-            echo "Attempting to autodetect RPM/DEB distro, this may be unreliable"
+            echo "Autodetecting distro, this may be unreliable and --compat may also be required"
             if hash dnf &>/dev/null || hash yum &>/dev/null; then
                 ID="fedora"
             elif hash apt &>/dev/null; then
@@ -151,28 +150,26 @@ getOS() {
 }
 
 
+#######################################
+# Parses user input and sets sensible defaults
+#######################################
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g TARGET=${TARGET:-$ID}
-    declare -g CREATEREPO_USER="${CREATEREPO_USER:$USER}"
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH 
-    declare -g CREATEREPO_SWITCH UNINSTALL_SWITCH DEB_INSTALL_SWITCH
-    declare -g OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE 
-    declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts
+
+    # Allow some environment variables to override and set sane fallbacks
+    declare -g TARGET=${TARGET:-$ID}
+    declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 && "$1" =~ ^(--compat)$ ]]; then
         BUILD_SWITCH=1
-        # separate ordering is probably more reliable
-        if [[ "$ID" =~ (ubuntu|debian) ]]; then
-            DEB_INSTALL_SWITCH=1
-        elif [[ "$ID" =~ (fedora|centos|suse) ]]; then
-            RPM_INSTALL_SWITCH=1
-        fi
+        LOCAL_INSTALL_SWITCH=1
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
@@ -187,13 +184,9 @@ parseInput() {
                 --install|-i)
                     shift
                     case "$1" in
-                        rpm)
+                        local|rpm)
                             BUILD_SWITCH=1
-                            RPM_INSTALL_SWITCH=1
-                            ;;
-                        deb)
-                            BUILD_SWITCH=1
-                            DEB_INSTALL_SWITCH=1
+                            LOCAL_INSTALL_SWITCH=1
                             ;;
                         repo)
                             REPO_INSTALL_SWITCH=1
@@ -280,18 +273,21 @@ parseInput() {
 
 
 #######################################
-# Use several methods to determine the latest JRiver MC version
+# Uses several methods to determine the latest JRiver MC version
+# TODO but how to determine build distro `$BASE=buster`?
 #######################################
-getLatestVersion() {
+getVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCVERSION BASE="buster" # For container method
+    declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG BASE="buster" # For container method
     #declare -g BASE_NEXT="bullseye" # TODO possibly use for fallback to smooth upgrades
     declare boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
 
+    # User input
+    if [[ -v MCVERSION && "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        VERSION_SOURCE="user input"
     # Containerized package manager
-    # TODO but how to determine build distro ($BASE=buster)?
-    if installPackage --silent buildah &&
+    elif installPackage --silent buildah &&
     cnt=$(buildah from debian:$BASE) &>/dev/null &&
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1" &&
@@ -302,13 +298,21 @@ getLatestVersion() {
     VERSION_SOURCE="containerized package manager"; then
         buildah rm "$cnt" &>/dev/null
     # Webscrape
-    elif installPackage wget && MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1); then
+    elif installPackage wget && MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
+    [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         VERSION_SOURCE="webscrape"
+    # Hardcoded
     else
         MCVERSION="28.0.100"
         VERSION_SOURCE="hardcoded version"
         err "Warning! Using hardcoded version number"
     fi
+    
+    echo "Using MC version $MCVERSION determined by $VERSION_SOURCE"
+    [[ "$VERSION_SOURCE" != "user input" ]] && echo "To override, use --mcversion"
+
+    # Extract major version number
+    MVERSION="${MCVERSION%%.*}"
 }
 
 
@@ -393,43 +397,16 @@ installPackage() {
 
 
 #######################################
-# Installs Media Center DEB package and optional compatability fixes
-#######################################
-installMCDEB() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    acquireDeb
-
-    declare mcdeb="$MCDEB"
-    declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
-    if (( COMPAT_SWITCH )); then
-        declare extract_dir && extract_dir="$(mktemp -d)"
-        mcdeb="${MCDEB/.deb/.compat.deb}"
-        pushd "$extract_dir" &>/dev/null || return
-        ar x "$MCDEB"
-        tar -xJf "control.tar.xz"
-        # Remove minimum version specifiers from control file
-        sed -i 's/ ([^)]*)//g' "control"
-        sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
-        [[ "$ID" == "ubuntu" && "${VERSION_ID%.*}" -le 16 ]] &&
-            sed -i 's/libva2/libva1/g' "control"
-        tar -cJf "control.tar.xz" "control" "postinst"
-        ar rcs "$mcdeb" "debian-binary" "control.tar.xz" "data.tar.xz"
-        popd &>/dev/null || return
-        rm -rf "$extract_dir"
-        pkg_install_cmd+=" --allow-downgrades"
-    fi
-    pkg_install_cmd+=" $mcdeb"
-    debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-    eval "$pkg_install_cmd"
-}
-
-
-#######################################
-# Add the JRiver repository files
+# Adds the JRiver repository files
 #######################################
 addRepo() {
     debug "Running: ${FUNCNAME[0]}"
+
+    if [[ "$ID" == "suse" ]]; then
+        echo "A SUSE repository is not yet available"
+        echo "Use --install local to locally install a SUSE RPM"
+        exit 1
+    fi
 
     echo "Adding JRiver repository to package manager"
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -441,10 +418,10 @@ addRepo() {
 			gpgcheck=0
 		EOF"
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
-        installPackage wget
         declare sources_dir="/etc/apt/sources.list.d"
         [[ ! -d $sources_dir ]] && sudo mkdir -p "$sources_dir"
         sudo rm -rf "$sources_dir"/mediacenter*.list
+        installPackage wget
         sudo bash -c "cat <<- EOF > $sources_dir/jriver.list
 			deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main
 		EOF"
@@ -479,7 +456,7 @@ installMCFromRepo() {
 
 
 #######################################
-# Acquire the source DEB package from JRiver's servers
+# Acquires the source DEB package from JRiver's servers
 #######################################
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
@@ -501,12 +478,11 @@ acquireDeb() {
         "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
             echo "Found!"
         fi
-    elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
-    "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
-        echo "Found!"
-    # Else check latest repo
     elif echo "Checking latest repo for DEB package" && wget -q -O "$MCDEB" \
     "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
+        echo "Found!"
+    elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
+    "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
         echo "Found!"
     else
         err "Cannot find DEB file"
@@ -514,11 +490,43 @@ acquireDeb() {
     fi
 
     if [[ -f "$MCDEB" ]]; then
-        echo "Downloaded MC $MCVERSION DEB to: $MCDEB"
+        echo "Downloaded MC $MCVERSION DEB to $MCDEB"
     else
         err "Downloaded DEB file missing or corrupted"
         exit 1
     fi
+}
+
+
+#######################################
+# Installs Media Center DEB package and optional compatability fixes
+#######################################
+installMCDEB() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    acquireDeb
+
+    declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
+    if (( COMPAT_SWITCH )); then
+        declare extract_dir && extract_dir="$(mktemp -d)"
+        pushd "$extract_dir" &>/dev/null || return
+        ar x "$MCDEB"
+        tar -xJf "control.tar.xz"
+        # Remove minimum version specifiers from control file
+        sed -i 's/ ([^)]*)//g' "control"
+        sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
+        [[ "$ID" == "ubuntu" && "${VERSION_ID%.*}" -le 16 ]] &&
+            sed -i 's/libva2/libva1/g' "control"
+        tar -cJf "control.tar.xz" "control" "postinst"
+        declare -g MCDEB="${MCDEB/.deb/.compat.deb}"
+        ar rcs "$MCDEB" "debian-binary" "control.tar.xz" "data.tar.xz"
+        popd &>/dev/null || return
+        rm -rf "$extract_dir"
+        pkg_install_cmd+=" --allow-downgrades"
+    fi
+    pkg_install_cmd+=" $MCDEB"
+    debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
+    eval "$pkg_install_cmd"
 }
 
 
@@ -539,12 +547,6 @@ buildRPM() {
     fi
 
     [[ ! -d "$OUTPUTDIR/SPECS" ]] && mkdir -p "$OUTPUTDIR/SPECS"
-
-    if [[ ! "$TARGET" =~ (fedora|centos|suse) ]]; then
-        err "The current RPM build target $TARGET is not supported, manually specify with --target"
-        err "The DEB file is located at $MCDEB"
-        return 1
-    fi
 
     # Load deb dependencies into array
     IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
@@ -1431,8 +1433,6 @@ tests() {
 
 main() {
     debug "Running: ${FUNCNAME[0]}"
-    
-    declare -g VERSION_SOURCE MCVERSION MVERSION MCPKG
 
     getOS
 
@@ -1448,6 +1448,7 @@ main() {
         pkg_update(){ sudo "$mgr" makecache; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
+        unset mgr
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         pkg_install(){ sudo apt-get install -y -q0 "$@"; }
         pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
@@ -1464,18 +1465,7 @@ main() {
 
     parseInput "$@"
 
-    # Select MC version to work with
-    if [[ -v MCVERSION ]]; then
-        VERSION_SOURCE="user input"
-    else
-        getLatestVersion
-    fi
-    [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] && err "Invalid version number" && exit 1
-    echo "Using MC version $MCVERSION determined by $VERSION_SOURCE"
-    [[ "$VERSION_SOURCE" != "user input" ]] && echo "To override, use --mcversion"
-
-    # Extract major version number
-    MVERSION="${MCVERSION%%.*}"
+    getVersion
 
     # Set target package name
     if [[ "$ID" =~ ^(fedora|centos|suse)$ ]]; then
@@ -1505,11 +1495,7 @@ main() {
     fi
 
     if (( REPO_INSTALL_SWITCH )); then
-        if [[ "$ID" == "suse" ]]; then
-            echo "A SUSE repository is not yet available"
-            echo "Use --install rpm to build and install a SUSE RPM instead"
-            exit 1
-        elif installMCFromRepo; then
+        if installMCFromRepo; then
             echo "JRiver Media Center installed successfully from repo"
             symlinkCerts
             restoreLicense
@@ -1521,29 +1507,21 @@ main() {
     fi
 
     if (( BUILD_SWITCH )); then
-        installPackage "wget" "dpkg" "rpm-build"
+        installPackage "wget"
         acquireDeb
-        [[ "$TARGET" =~ (centos|fedora|suse) ]] && buildRPM
-    fi
-
-    if (( DEB_INSTALL_SWITCH )); then
-        if installMCDEB; then
-            echo "JRiver Media Center installed successfully from local deb"
-        else
-            err "JRiver Media Center installation from local deb failed"
-            exit 1
+        if [[ "$TARGET" =~ (centos|fedora|suse) ]]; then
+            installPackage "dpkg" "rpm-build"
+            buildRPM
         fi
-        symlinkCerts
-        restoreLicense
-        openFirewall "jriver"
     fi
 
-    if (( RPM_INSTALL_SWITCH )); then
-        #rpm --upgrade "$MCRPM" # TODO, maybe universalize for RPM distros       
-        if installPackage --skip-check-installed --nogpgcheck "$MCRPM"; then
+    if (( LOCAL_INSTALL_SWITCH )); then
+        if ([[ "$TARGET" =~ (debian|ubuntu) ]] && installMCDEB) ||
+        ([[ "$TARGET" =~ (fedora|centos|suse) ]] && 
+        installPackage --skip-check-installed --nogpgcheck "$MCRPM"); then
             echo "JRiver Media Center installed successfully from local RPM"
         else
-            err "JRiver Media Center installation from local RPM failed"
+            err "JRiver Media Center local installation failed"
             exit 1
         fi
         symlinkCerts

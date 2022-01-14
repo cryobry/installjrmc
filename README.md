@@ -11,20 +11,19 @@ This program will install [JRiver Media Center](https://www.jriver.com/) and ass
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. SUSE users will need to use the `--install rpm` install method until a SUSE repo becomes available. If any other option is specified, then the default install method will need to be specified using `--install`. This makes it possible to install services and containers independent of Media Center.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method will need to be specified using `--install`. This makes it possible to install services and containers independent of Media Center.
 
 ## Options
 
 You can always find the latest supported options by running `installJRMC --help`.
 
 ```text
---install, -i repo|rpm|deb
+--install, -i repo|local
     repo: Install MC from repository, future updates will be handled by the system package manager
-    rpm: Build and install MC locally (RPM-based OSes only)
-    deb: Download and install official MC package locally (useful with --compat flag for older distros)
+    local: Build and install MC package locally
 --build=[suse|fedora|centos]
     Build RPM from source DEB but do not install
-    Optionally specify cross-build target, note the '=' (ex. --build=suse)
+    Optionally specify cross-build target (ex. --build=suse, note the '=')
 --compat
     Build/install MC without minimum library specifiers
 --mcversion VERSION
