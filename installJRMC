@@ -1520,9 +1520,9 @@ main() {
         if ([[ "$TARGET" =~ (debian|ubuntu) ]] && installMCDEB) ||
         ([[ "$TARGET" =~ (fedora|centos|suse) ]] && 
         installPackage --skip-check-installed --nogpgcheck "$MCRPM"); then
-            echo "JRiver Media Center installed successfully from local RPM"
+            echo "JRiver Media Center installed successfully from local package"
         else
-            err "JRiver Media Center local installation failed"
+            err "JRiver Media Center local package installation failed"
             exit 1
         fi
         symlinkCerts
