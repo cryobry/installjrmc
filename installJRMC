@@ -599,6 +599,7 @@ buildRPM() {
             requires=("${requires[@]/liblcms2-2/lcms2}")
             requires=("${requires[@]/libvulkan1/vulkan-loader}")
             requires=("${requires[@]/libepoxy0/libepoxy}")
+            requires=("${requires[@]/python/python3}")
             ;;
         suse)
             requires=("${requires[@]/libc6/glibc}")
