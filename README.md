@@ -1,17 +1,15 @@
 # installJRMC
 
-This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) and associated helper services on most major distros.
+This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) and associated helper services on most major Linux distros.
 
-## README
-
-1. This script will not point major upgrades to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
-2. Typically, `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`) so services can be installed for the current user. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
 
 ## Executing
 
 `installJRMC [--option [ARGUMENT]]`
 
 Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method will need to be specified using `--install`. This makes it possible to install services and containers independent of Media Center.
+
+**Note**: `installJRMC` does not perform library migrations. Before moving to a new major version (i.e. v27->v28), you should first [make a library backup](https://wiki.jriver.com/index.php/Library_Backup), install the new major version, and then [restore the library](https://wiki.jriver.com/index.php/Restore_a_library).
 
 ## Options
 
@@ -59,7 +57,7 @@ You can always find the latest supported options by running `installJRMC --help`
 
 ### services
 
-When installing systemd services it is important to execute `installJRMC` as the user you wish to run the services. MC services are installed as system-level services (`--service-type=system`) by default. They can be manipulated by the root user: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the current user: `systemctl --user stop jriver-mediacenter`.
+MC helper services are installed as system-level services (`--service-type=system`) by default and manipulatable by the root user: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the current unprivileged user: `systemctl --user stop jriver-mediacenter`.
 
 ```text
 jriver-mediaserver
@@ -68,15 +66,16 @@ jriver-mediacenter
     Enable and start a mediacenter systemd service (requires an existing X server)
 jriver-x11vnc
     Enable and start x11vnc for the local desktop (requires an existing X server, does NOT support Wayland)
-    --vncpass and --display are also valid options (see below)
+  --vncpass and --display are also valid options (see below)
 jriver-xvnc
     Enable and start a new Xvnc session running JRiver Media Center
-    --vncpass PASSWORD
-        Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
-    --display DISPLAY
-        Manually specify display to use for x11vnc/Xvnc (ex. ':1')
+  --vncpass PASSWORD
+    Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+  --display DISPLAY
+    Manually specify display to use for x11vnc/Xvnc (ex. ':1')
 jriver-createrepo
     Install hourly service to build latest MC RPM and run createrepo
+    By default installs as root service to handle www permissions more gracefully
 ```
 
 It is possible to install multiple services at one time using multiple `--service` blocks: `installJRMC --repo --service jriver-x11vnc --service jriver-mediacenter`
@@ -103,17 +102,21 @@ It is possible to install multiple services at one time using multiple `--servic
 
     Install the latest version of MC from the best available repository.
 
+* `installJRMC --install deb --compat`
+
+    Install a more widely-compatible version of that latest MC on deb-based distros.
+
 * `installJRMC --install repo --service jriver-mediacenter --service-type user`
 
     Install MC from the repository and start/enable `jriver-mediacenter.service` as a user service.
 
 * `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 28.0.100`
 
-    Build and install a MC version 28.0.100 comptability RPM locally and activate it using the `/path/to/license`.mjr
+    Build and install an MC 28.0.100 comptability RPM locally and activate it using the `/path/to/license.mjr`
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
-     Build the RPM locally (specify cross-build target), move it to the webroot, and run createrepo as `www-user`.
+     Build an RPM locally for the current distro, move it to the webroot, and run createrepo as `www-user`.
 
 * `installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
@@ -126,10 +129,6 @@ It is possible to install multiple services at one time using multiple `--servic
 * `installJRMC --install repo --service jriver-xvnc --display ":2"`
 
     Install an Xvnc server on display ':2' that starts MC.
-
-* `installJRMC --install deb --compat`
-
-    Install a more widely-compatible version of that latest MC on deb-based distros.
 
 * `installJRMC --uninstall`
 
