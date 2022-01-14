@@ -2,14 +2,13 @@
 
 This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) and associated helper services on most major Linux distros.
 
-
 ## Executing
 
 `installJRMC [--option [ARGUMENT]]`
 
 Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method will need to be specified using `--install`. This makes it possible to install services and containers independent of Media Center.
 
-**Note**: `installJRMC` does not perform library migrations. Before moving to a new major version (i.e. v27->v28), you should first [make a library backup](https://wiki.jriver.com/index.php/Library_Backup), install the new major version, and then [restore the library](https://wiki.jriver.com/index.php/Restore_a_library).
+**Note**: `installJRMC` does not perform library migrations. Before moving to a new major version (i.e. v27->v28), you should first [perform a library backup](https://wiki.jriver.com/index.php/Library_Backup), install the new major version, and then [restore the library](https://wiki.jriver.com/index.php/Restore_a_library).
 
 ## Options
 
