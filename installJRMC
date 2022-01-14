@@ -1170,7 +1170,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$PWD/installJRMC --build=$TARGET --outputdir $OUTPUTDIR --createrepo --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
+		ExecStart=$PWD/installJRMC --outputdir $OUTPUTDIR --createrepo=$TARGET --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
 
 		[Install]
 		WantedBy=multi-user.target
