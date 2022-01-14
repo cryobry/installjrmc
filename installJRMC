@@ -916,7 +916,7 @@ setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING
-    declare -g SERVICE_TYPE"${SERVICE_TYPE:-system}"
+    declare -g SERVICE_TYPE="${SERVICE_TYPE:-system}"
     declare service_dir="/usr/lib/systemd/$SERVICE_TYPE"
 
     if [[ "$USER" == "root" && "$SERVICE_TYPE" == "user" ]]; then
