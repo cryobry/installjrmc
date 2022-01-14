@@ -1,11 +1,11 @@
 # installJRMC
 
-This program will install [JRiver Media Center](https://www.jriver.com/) and associated helper services on most major distros.
+This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) and associated helper services on most major distros.
 
 ## README
 
 1. This script will not point major upgrades to your old library. You should **first perform a library backup**, install the new major version, and then restore the library backup in the new version.
-2. Typically `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`). Services are installed for the user that executes the script so do not execute as root unless you want to install system-level services. Doing so may lead to permissions issues. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
+2. Typically, `installJRMC` should be **executed as your normal user** (i.e. don't run it with `sudo`) so services can be installed for the current user. `installJRMC` will prompt you for your `sudo` password as necessary to install dependencies and services.
 
 ## Executing
 
@@ -21,13 +21,13 @@ You can always find the latest supported options by running `installJRMC --help`
 --install, -i repo|local
     repo: Install MC from repository, future updates will be handled by the system package manager
     local: Build and install MC package locally
---build=[suse|fedora|centos]
+--build[=suse|fedora|centos]
     Build RPM from source DEB but do not install
-    Optionally specify cross-build target (ex. --build=suse, note the '=')
+    Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
 --compat
     Build/install MC without minimum library specifiers
 --mcversion VERSION
-    Build or install a specific MC version, ex. "28.0.25"
+    Build or install a specific MC version, ex. "28.0.100"
 --outputdir PATH
     Generate rpmbuild output in this PATH (Default: ./output)
 --restorefile RESTOREFILE
@@ -40,8 +40,9 @@ You can always find the latest supported options by running `installJRMC --help`
       Starts services at boot (system) or user login (user) (Default: system)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
---createrepo
+--createrepo[=suse|fedora|centos]
     Build rpm, copy to webroot, and run createrepo.
+    Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
   --createrepo-webroot PATH
       The webroot directory to install the repo (Default: /var/www/jriver/)
   --createrepo-user USER
@@ -100,19 +101,19 @@ It is possible to install multiple services at one time using multiple `--servic
 
 * `installJRMC`
 
-    Install the latest version of JRiver Media Center from the repository.
+    Install the latest version of MC from the best available repository.
 
-* `installJRMC --install repo --service jriver-mediaserver`
+* `installJRMC --install repo --service jriver-mediacenter --service-type user`
 
-    Install JRiver Media Center from the repository and starts/enables the /MediaServer service.
+    Install MC from the repository and start/enable `jriver-mediacenter.service` as a user service.
 
-* `installJRMC --install rpm --restorefile /path/to/license.mjr --mcversion 28.0.87`
+* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 28.0.100`
 
-    Build JRiver Media Center version 28.0.87 RPM from the source DEB, installs it (RPM distros only), and activates it using the specified .mjr license file.
+    Build and install a MC version 28.0.100 comptability RPM locally and activate it using the `/path/to/license`.mjr
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
-     Build the RPM, moves it to the webroot, and runs createrepo as `www-user`.
+     Build the RPM locally (specify cross-build target), move it to the webroot, and run createrepo as `www-user`.
 
 * `installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
@@ -120,19 +121,19 @@ It is possible to install multiple services at one time using multiple `--servic
 
 * `installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"`
 
-    Install services to share the existing local desktop via VNC and automatically run Media Center on startup.
+    Install services to share the existing local desktop via VNC and automatically run MC on startup.
 
 * `installJRMC --install repo --service jriver-xvnc --display ":2"`
 
-    Install an Xvnc server on display ':2' that starts Media Center.
+    Install an Xvnc server on display ':2' that starts MC.
 
 * `installJRMC --install deb --compat`
 
-    Install a more widely-compatible version of MC on deb-based distros.
+    Install a more widely-compatible version of that latest MC on deb-based distros.
 
 * `installJRMC --uninstall`
 
-    Uninstall JRiver Media Center and its associated services and firewall rules. This will **not** remove your media, media library/database, or automated library backup folder.
+    Uninstall MC and its associated services and firewall rules. This will **not** remove your media, media library/database, or automated library backup folder.
 
 ## Additional Info
 

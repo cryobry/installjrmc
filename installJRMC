@@ -22,7 +22,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0b6"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
-declare -g USER; USER="${USER:-$(id -un)}"
+declare -g USER="${SUDO_USER:-$USER}"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -37,13 +37,13 @@ printHelp() {
 		    --install, -i repo|local
 		        repo: Install MC from repository, updates are handled by the system package manager
 		        local: Build and install MC package locally
-		    --build=[suse|fedora|centos]
+		    --build[=suse|fedora|centos]
 		        Build RPM from source DEB but do not install
-		        Optionally specify cross-build target (ex. --build=suse, note the '=')
+		        Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
 		    --compat
 		        Build/install MC locally without minimum library specifiers
 		    --mcversion VERSION
-		        Specify the MC version, ex. "28.0.94" (Default: latest)
+		        Specify the MC version, ex. "28.0.100" (Default: latest)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: ./output)
 		    --restorefile RESTOREFILE
@@ -56,8 +56,9 @@ printHelp() {
 		          Starts services at boot (system) or at user login (user) (Default: boot)
 		    --container, -c CONTAINER (TODO: Under construction)
 		        See CONTAINERS section below for a list of possible services to install
-		    --createrepo
+		    --createrepo[=suse|fedora|centos]
 		        Build rpm, copy to webroot, and run createrepo. Use in conjunction with --build=TARGET for crossbuilding repos
+		        Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
 		        --createrepo-webroot PATH
 		            Specify the webroot directory to install the repo (Default: /var/www/jriver)
 		        --createrepo-user USER
@@ -173,7 +174,7 @@ parseInput() {
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
-    long_opts+="service-type:,service:,version,debug,help,uninstall,createrepo,"
+    long_opts+="service-type:,service:,version,debug,help,uninstall,createrepo::,"
     long_opts+="createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat"
     short_opts="+i:vb::dhus:c:"
 
@@ -218,6 +219,7 @@ parseInput() {
                 --createrepo)
                     BUILD_SWITCH=1
                     CREATEREPO_SWITCH=1
+                    shift && TARGET="$1"
                     ;;
                 --createrepo-webroot)
                     shift && CREATEREPO_WEBROOT="$1"
@@ -448,7 +450,7 @@ installMCFromRepo() {
         exit 1
     fi
 
-    echo "Installing JRiver Media Center using your package manager"
+    echo "Installing JRiver Media Center using package manager"
     pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     eval "$pkg_install_cmd"
@@ -945,7 +947,7 @@ setDisplay() {
 #######################################
 # Create associated service variables based on service name
 # Arguments
-#   Pre-defined service to enable
+#   Pre-defined service name
 #######################################
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1150,7 +1152,7 @@ service_jriver-x11vnc() {
 service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if [[ "$USER" != "$CREATEREPO_USER" ]]; then
+    if [[ "$CREATEREPO_USER" != "$USER" ]]; then
         USER="root" SERVICE_TYPE="system" setServiceVars "${FUNCNAME[0]##*_}"
     else
         setServiceVars "${FUNCNAME[0]##*_}"
@@ -1415,7 +1417,6 @@ uninstall() {
     if eval "$mc_pkg_rm_cmd"; then 
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
-        echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
     elif [[ $? -eq 100 ]]; then
         err "JRiver Media Center package '$MCPKG' is not present"
         err "and was not uninstalled"
