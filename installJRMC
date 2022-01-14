@@ -296,7 +296,7 @@ getLatestVersion() {
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1" &&
     buildah run "$cnt" -- bash  -c \
-        "apt-get update --allow-insecure-repositories &>/dev/null" &&
+        "apt update --allow-insecure-repositories &>/dev/null" &&
     MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &&
     [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] &&
     VERSION_SOURCE="containerized package manager"; then
@@ -1248,7 +1248,7 @@ service_jriver-createrepo() {
 #             echo "Installing JRiver from repository ${jriver_release}:${jriver_tag}" &&
 #             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - &&
 #             wget http://dist.jriver.com/${jriver_tag}/mediacenter/mediacenter${jriver_release}.list -O /etc/apt/sources.list.d/mediacenter${jriver_release}.list &&
-#             apt-get update &&
+#             apt update &&
 #             add-pkg mediacenter${jriver_release}; \
 #         # Install from .deb URL
 #         else \
@@ -1337,7 +1337,7 @@ service_jriver-createrepo() {
 
 #     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list"
 
-#     brc apt-get update -y -q0
+#     brc apt update -y -q0
 
 #     brc add-pkg "mediacenter$MVERSION"
 
@@ -1427,7 +1427,7 @@ uninstall() {
 
 
 tests() {
-    # To test on Mint: sudo apt-get install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
+    # To test on Mint: sudo apt install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
     exit $?
 }
 
@@ -1458,9 +1458,9 @@ main() {
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
-        pkg_install(){ sudo apt-get install -y -q0 "$@"; }
-        pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
-        pkg_update(){ sudo apt-get update -y -q0; }
+        pkg_install(){ sudo apt install -y -q0 "$@"; }
+        pkg_remove(){ sudo apt remove --auto-remove -y -q0 "$@"; }
+        pkg_update(){ sudo apt update -y -q0; }
         pkg_query(){ dpkg -s "$@"; }
         firewall_cmd(){ sudo ufw "$@"; }
     elif [[ "$ID" == "suse" ]]; then
