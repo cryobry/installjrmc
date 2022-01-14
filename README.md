@@ -55,8 +55,6 @@ $ installJRMC --help
 
 ### services
 
-MC helper services are installed as system-level services (`--service-type=system`) by default and manipulable by the root user: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the current unprivileged user: `systemctl --user stop jriver-mediacenter`.
-
 ```text
 jriver-mediaserver
     Enable and start a mediaserver systemd service (requires an existing X server)
@@ -76,7 +74,9 @@ jriver-createrepo
     By default installs as root service to handle www permissions more gracefully
 ```
 
-It is possible to install multiple services at one time using multiple `--service` blocks: `installJRMC --repo --service jriver-x11vnc --service jriver-mediacenter`
+MC helper services are installed as system-level services (`--service-type=system`) by default and are manipulable as admin: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type=user` that can be manipulated by the unprivileged user: `systemctl --user stop jriver-mediacenter`.
+
+Multiple services (but not `--service-types`) at one time using multiple `--service` blocks: `installJRMC --repo --service jriver-x11vnc --service jriver-mediacenter`
 
 #### `jriver-x11vnc` versus `jriver-xvnc`
 
@@ -84,7 +84,7 @@ It is possible to install multiple services at one time using multiple `--servic
 
 **Note**: If `jriver-xvnc` finds an existing display it will attempt to increment the display number by 1. This should work fine in most cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
 
-### Firewall Rules
+### Firewall
 
 `installJRMC` will automatically add port forwarding firewall rules enabling remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on Fedora/CentOS/SUSE and `ufw` on Ubuntu/Debian.
 
