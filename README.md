@@ -6,7 +6,7 @@ This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) 
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method (i.e. `--install repo` or `--install local`) will need to be explicitly specified. This makes it possible to install services and containers independent of Media Center.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method (i.e. `--install repo` or `--install local`) will need to be explicitly specified. This makes it possible to install services and containers independent of MC.
 
 **Note**: `installJRMC` does not perform library migrations. Before moving to a new major version (i.e. v27->v28), you should first [perform a library backup](https://wiki.jriver.com/index.php/Library_Backup), install the new major version, and then [restore the library](https://wiki.jriver.com/index.php/Restore_a_library).
 
@@ -53,7 +53,7 @@ $ installJRMC --help
     Uninstall JRiver MC, cleanup service files, and remove firewall rules (does not remove library or media files)
 ```
 
-### services
+## Services
 
 ```text
 jriver-mediaserver
@@ -78,21 +78,21 @@ MC helper services are installed as system-level services (`--service-type=syste
 
 Multiple services (but not `--service-types`) can be installed at one time using multiple `--service` blocks: `installJRMC --repo --service jriver-x11vnc --service jriver-mediacenter`
 
-#### `jriver-x11vnc` versus `jriver-xvnc`
+### `jriver-x11vnc` versus `jriver-xvnc`
 
 [jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [jriver-xvnc](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display.
 
 **Note**: If `jriver-xvnc` finds an existing display it will attempt to increment the display number by 1. This should work fine in most cases, but if you have multiple running X servers on your host machine you should use the `--display` option to specify a free display.
 
-### Firewall
+## Containers
+
+**Coming soon!**
+
+## Firewall
 
 `installJRMC` will automatically add port forwarding firewall rules enabling remote access to Media Server (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (depends on port selection). `installJRMC` uses `firewall-cmd` on Fedora/CentOS/SUSE and `ufw` on Ubuntu/Debian.
 
 **Note:** `ufw` is not installed by default on Debian but will be installed by `installJRMC`. To prevent user lock-out (i.e. SSH), Debian users that have not already enabled `ufw` will need to `sudo ufw enable` after running `installJRMC` and inspecting their configuration.
-
-### containers
-
-**Coming soon!**
 
 ## Examples
 
