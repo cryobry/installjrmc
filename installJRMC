@@ -504,9 +504,7 @@ acquireDeb() {
 # Installs Media Center DEB package and optional compatability fixes
 #######################################
 installMCDEB() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    acquireDeb
+    debug "Running: ${FUNCNAME[0]}"    
 
     declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
     if (( COMPAT_SWITCH )); then
