@@ -40,7 +40,9 @@ printHelp() {
 		            deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
 		    --build=[opensuse|fedora|centos]
 		        Build RPM from source DEB but do not install
-		        Specify non-native target with optional parameter (ex. 'opensuse', 'fedora', 'centos')
+		        Specify cross-build target with optional argument, note '=' (ex. --build=opensuse)
+		    --compat
+		        Build/install MC without minimum library specifiers
 		    --mcversion VERSION
 		        Specify the MC version, ex. "28.0.94" (Default: latest)
 		    --outputdir PATH
@@ -61,8 +63,6 @@ printHelp() {
 		            Specify the webroot directory to install the repo (Default: /var/www/jriver)
 		        --createrepo-user USER
 		            Specify the web server user if it differs from $USER
-		    --compat
-		        Build/install RPM without minimum library specifiers
 		    --version, -v
 		        Print this script version and exit
 		    --debug, -d
