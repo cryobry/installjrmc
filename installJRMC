@@ -298,7 +298,7 @@ getVersion() {
     VERSION_SOURCE="containerized package manager"; then
         buildah rm "$cnt" &>/dev/null
     # Webscrape
-    elif installPackage wget && MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
+    elif installPackage wget && debug here && MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
     [[ ! "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         VERSION_SOURCE="webscrape"
     # Hardcoded
