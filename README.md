@@ -22,9 +22,9 @@ You can always find the latest supported options by running `installJRMC --help`
     repo: Install MC from repository, future updates will be handled by the system package manager
     rpm: Build and install MC locally (RPM-based OSes only)
     deb: Download and install official MC package locally (useful with --compat flag for older distros)
---build=[opensuse|fedora|centos]
+--build=[suse|fedora|centos]
     Build RPM from source DEB but do not install
-    Specify cross-build target with optional argument, note '=' (ex. --build=opensuse)
+    Specify cross-build target with optional argument, note '=' (ex. --build=suse)
 --compat
     Build/install MC without minimum library specifiers
 --mcversion VERSION

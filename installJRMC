@@ -38,9 +38,9 @@ printHelp() {
 		        repo: Install MC from repository, updates are handled by the system package manager
 		        rpm: Build and install RPM locally (RPM-based distros only)
 		            deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
-		    --build=[opensuse|fedora|centos]
+		    --build=[suse|fedora|centos]
 		        Build RPM from source DEB but do not install
-		        Specify cross-build target with optional argument, note '=' (ex. --build=opensuse)
+		        Specify cross-build target with optional argument, note '=' (ex. --build=suse)
 		    --compat
 		        Build/install MC without minimum library specifiers
 		    --mcversion VERSION
@@ -105,9 +105,18 @@ askOk() {
     declare response
     read -r -p "$* [y/N]: " response
     [[ "${response,,}" =~ ^(yes|y)$ ]]
-    return $?
+    return
 }
+
+
+#######################################
+# Parse /etc/os-release and provide a compatability layer for unrecognzied distros
+#######################################
 getOS() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare -g ID
+
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
     else
@@ -115,7 +124,30 @@ getOS() {
         err "Your OS is unsupported"
         printHelp && exit 1
     fi
+
     debug "Platform: $ID $VERSION_ID"
+
+    case "$ID" in
+        centos|fedora|debian|ubuntu)
+            return 0
+            ;;
+        linuxmint|neon)
+            ID="ubuntu"
+            ;;
+        *suse*)
+            ID="suse"
+            ;;
+        *)
+            echo "Attempting to autodetect RPM/DEB distro, this may be unreliable"
+            if hash dnf &>/dev/null || hash yum &>/dev/null; then
+                ID="fedora"
+            elif hash apt &>/dev/null; then
+                ID="ubuntu"
+            fi
+            ;;
+    esac
+
+    debug "Using compatability platform: $ID"
 }
 
 
@@ -133,6 +165,13 @@ parseInput() {
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 && "$1" =~ ^(--compat)$ ]]; then
         TARGET="$ID"
+        BUILD_SWITCH=1
+        # separate ordering is probably more reliable
+        if [[ "$ID" =~ (ubuntu|debian) ]]; then
+            DEB_INSTALL_SWITCH=1
+        elif [[ "$ID" =~ (fedora|centos|suse) ]]; then
+            RPM_INSTALL_SWITCH=1
+        fi
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
@@ -296,12 +335,12 @@ installPackage() {
                     skip_check_installed=1
                     ;;
                 --allow-downgrades)
-                    [[ "$ID" =~ (debian|ubuntu|linuxmint|neon) ]] && install_flags+=(--allow-downgrades)
+                    [[ "$ID" =~ (debian|ubuntu) ]] && install_flags+=(--allow-downgrades)
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
                         install_flags+=(--nogpgcheck)
-                    elif [[ "$ID" =~ ^opensuse.* ]]; then
+                    elif [[ "$ID" == "suse" ]]; then
                         install_flags+=(--allow-unsigned-rpm)
                     fi
                     ;;
@@ -321,7 +360,7 @@ installPackage() {
     fi
 
     # Aliases
-    if [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+    if [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         declare -A PKG_ALIASES
         PKG_ALIASES["xorg-x11-utils"]="xorg-x11"
         PKG_ALIASES["rpm-build"]="rpm"
@@ -372,7 +411,7 @@ installMCDEB() {
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         mcdeb="${MCDEB/.deb/.compat.deb}"
-        pushd "$extract_dir" &>/dev/null || return $?
+        pushd "$extract_dir" &>/dev/null || return
         ar x "$MCDEB"
         tar -xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
@@ -380,7 +419,7 @@ installMCDEB() {
         sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
         tar -cJf "control.tar.xz" "control" "postinst"
         ar rcs "$mcdeb" "debian-binary" "control.tar.xz" "data.tar.xz"
-        popd &>/dev/null || return $?
+        popd &>/dev/null || return
         rm -rf "$extract_dir"
         pkg_install_cmd+=" --allow-downgrades"
     fi
@@ -405,7 +444,7 @@ addRepo() {
 			baseurl=https://repos.bryanroessler.com/jriver
 			gpgcheck=0
 		EOF"
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         installPackage wget
         declare sources_dir="/etc/apt/sources.list.d"
         [[ ! -d $sources_dir ]] && sudo mkdir -p "$sources_dir"
@@ -414,7 +453,7 @@ addRepo() {
 			deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main
 		EOF"
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
-    elif [[ "$ID" =~ ^opensuse.* ]]; then
+    elif [[ "$ID" == "suse" ]]; then
         sudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
     fi
 }
@@ -504,10 +543,8 @@ buildRPM() {
     fi
 
     [[ ! -d "$OUTPUTDIR/SPECS" ]] && mkdir -p "$OUTPUTDIR/SPECS"
-    
-    # Use --target parameter override
-    id="${TARGET:-$ID}"
-    if [[ ! "$id" =~ (fedora|centos|opensuse.*) ]]; then
+
+    if [[ ! "$id" =~ (fedora|centos|suse) ]]; then
         err "The current RPM build target $id is not supported, manually specify with --target"
         err "The DEB file is located at $MCDEB"
         return 1
@@ -562,7 +599,7 @@ buildRPM() {
             requires=("${requires[@]/libvulkan1/vulkan-loader}")
             requires=("${requires[@]/libepoxy0/libepoxy}")
             ;;
-        opensuse*)
+        suse)
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
             requires=("${requires[@]/libx11-6/libX11-6}")
@@ -794,7 +831,7 @@ openFirewall() {
     fi
 
     # Open the ports
-    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|suse)$ ]]; then
         installPackage firewalld
         if ! firewall_cmd --get-services | grep -q "$1"; then
             firewall_cmd --permanent --new-service="$1" &>/dev/null
@@ -806,7 +843,7 @@ openFirewall() {
             firewall_cmd --add-service "$1" --permanent &>/dev/null
             firewall_cmd --reload &>/dev/null
         fi
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         # Debian ufw package state is broken on fresh installations
         installPackage ufw
         if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
@@ -1352,7 +1389,7 @@ uninstall() {
     sudo rm -rf \
         "/etc/yum.repos.d/jriver.repo" \
         /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
-    if [[ "$ID" =~ ^opensuse.* ]]; then
+    if [[ "$ID" == "suse" ]]; then
         sudo zypper rr jriver &>/dev/null
     fi
 
@@ -1406,7 +1443,7 @@ main() {
     getOS
 
     # Some distros need external repos installed for MC libraries
-    if [[ "$ID" =~ (ubuntu|linuxmint|neon) ]]; then
+    if [[ "$ID" =~ (ubuntu) ]]; then
         echo "Adding universe repository"
         if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
             sudo add-apt-repository universe
@@ -1423,13 +1460,13 @@ main() {
         pkg_update(){ sudo dnf makecache; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         pkg_install(){ sudo apt-get install -y -q0 "$@"; }
         pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
         pkg_update(){ sudo apt-get update -y -q0; }
         pkg_query(){ dpkg -s "$@"; }
         firewall_cmd(){ sudo ufw "$@"; }
-    elif [[ "$ID" =~ ^opensuse.* ]]; then
+    elif [[ "$ID" == "suse" ]]; then
         pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
         pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
         pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
@@ -1453,10 +1490,10 @@ main() {
     MVERSION="${MCVERSION%%.*}"
 
     # Set target package name
-    if [[ "$ID" =~ ^(fedora|centos|opensuse.*)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|suse)$ ]]; then
         MCPKG="MediaCenter"
         [[ "$VERSION_SOURCE" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
-    elif [[ "$ID" =~ ^(debian|ubuntu|linuxmint|neon)$ ]]; then
+    elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         MCPKG="mediacenter$MVERSION"
         [[ "$VERSION_SOURCE" == "user input" ]] && MCPKG="$MCPKG=$MCVERSION"
     fi
@@ -1469,7 +1506,7 @@ main() {
     fi
 
     if (( REPO_INSTALL_SWITCH )); then
-        if [[ "$ID" =~ ^opensuse.*$ ]]; then
+        if [[ "$ID" == "suse" ]]; then
             echo "A SUSE repository is not yet available"
             echo "Use --install rpm to build and install a SUSE RPM instead"
             exit 1
@@ -1487,7 +1524,8 @@ main() {
     if (( BUILD_SWITCH )); then
         installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
-        if [[ "$TARGET" =~ ^(fedora|centos|opensuse.*) ]]; then
+        TARGET="${TARGET:-$ID}"
+        if [[ "$TARGET" =~ ^(fedora|centos|suse) ]]; then
             buildRPM
         fi
     fi
