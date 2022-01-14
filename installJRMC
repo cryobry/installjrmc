@@ -1521,7 +1521,7 @@ main() {
     if (( BUILD_SWITCH )); then
         installPackage "wget" "dpkg" "rpm-build"
         acquireDeb
-        buildRPM
+        [[ "$TARGET" =~ (centos|fedora|suse) ]] && buildRPM
     fi
 
     if (( DEB_INSTALL_SWITCH )); then
