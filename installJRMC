@@ -405,7 +405,7 @@ installPackage() {
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"
 
-    aquireDeb
+    acquireDeb
 
     declare mcdeb="$MCDEB"
     declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
