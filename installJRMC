@@ -777,7 +777,7 @@ restoreLicense() {
 
 #######################################
 # Opens ports using the system firewall tool
-# Arguments
+# Arguments:
 #   Pre-defined service to enable
 #######################################
 openFirewall() {
@@ -911,6 +911,8 @@ setDisplay() {
 
 #######################################
 # Create associated service variables based on service name
+# Arguments
+#   Pre-defined service to enable
 #######################################
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
@@ -965,7 +967,7 @@ setServiceVars() {
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars
+    setServiceVars "${FUNCNAME[0]##*_}"
 
     sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
@@ -999,7 +1001,7 @@ service_jriver-mediacenter() {
 service_jriver-mediaserver() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars
+    setServiceVars "${FUNCNAME[0]##*_}"
 
     service_jriver-mediacenter "/MediaServer"
 }
@@ -1011,7 +1013,7 @@ service_jriver-mediaserver() {
 service_jriver-xvnc() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars
+    setServiceVars "${FUNCNAME[0]##*_}"
     setDisplay
     declare start_cmd
     declare -g PORT=$(( NEXT_DISPLAYNUM + 5900 ))
@@ -1025,8 +1027,6 @@ service_jriver-xvnc() {
     else
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
-
-    debug "SERVICE_FNAME = $SERVICE_FNAME"
 
     sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
@@ -1061,7 +1061,7 @@ service_jriver-xvnc() {
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars
+    setServiceVars "${FUNCNAME[0]##*_}"
     setDisplay
 
     declare start_cmd
@@ -1121,9 +1121,9 @@ service_jriver-createrepo() {
     declare cr_user="${CREATEREPO_USER:$USER}"
 
     if [[ "$USER" != "$cr_user" ]]; then
-        USER="root" SERVICE_TYPE="system" setServiceVars
+        USER="root" SERVICE_TYPE="system" setServiceVars "${FUNCNAME[0]##*_}"
     else
-        setServiceVars
+        setServiceVars "${FUNCNAME[0]##*_}"
     fi
 
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
