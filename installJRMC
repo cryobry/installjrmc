@@ -1412,16 +1412,17 @@ uninstall() {
             sudo rm -f /etc/ufw/applications.d/jriver
     fi
 
-    echo "Uninstalling Media Center package"
+    echo "Uninstalling JRiver Media Center package"
     mc_pkg_rm_cmd="pkg_remove $MCPKG"
     debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
     if eval "$mc_pkg_rm_cmd"; then 
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
         echo "To remove your rpmbuild output files, run: rm -rf $OUTPUTDIR"
-        exit 0
+    elif [[ $? -eq 100 ]]; then
+        err "JRiver Media Center package '$MCPKG' is not present"
     else
-        exit $?
+        err "Could not remove Media Center package"
     fi
 }
 
