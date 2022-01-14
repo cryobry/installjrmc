@@ -1441,17 +1441,6 @@ main() {
 
     getOS
 
-    # Some distros need external repos installed for MC libraries
-    if [[ "$ID" == "ubuntu" ]]; then
-        if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
-            echo "Adding universe repository"
-            sudo add-apt-repository universe
-        fi 
-    elif [[ "$ID" == "centos" ]]; then
-        echo "Adding EPEL repository"
-        installPackage epel-release
-    fi
-
     # Distro-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         if hash dnf &>/dev/null; then
@@ -1476,6 +1465,17 @@ main() {
         pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
+    fi
+
+    # Some distros need external repos installed for MC libraries
+    if [[ "$ID" == "ubuntu" ]]; then
+        if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
+            echo "Adding universe repository"
+            sudo add-apt-repository universe
+        fi 
+    elif [[ "$ID" == "centos" ]]; then
+        echo "Adding EPEL repository"
+        installPackage epel-release
     fi
 
     parseInput "$@"
