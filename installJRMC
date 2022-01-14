@@ -926,7 +926,6 @@ setServiceVars() {
     fi
 
     if [[ "$SERVICE_TYPE" == "system" ]]; then
-        echo HERE
         systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
         systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
