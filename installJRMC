@@ -38,10 +38,9 @@ printHelp() {
 		        repo: Install MC from repository, updates are handled by the system package manager
 		        rpm: Build and install RPM locally (RPM-based distros only)
 		            deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
-		    --build
-		        Build RPM from source DEB but do not install. Optional TARGET parameter enables RPM crossbuilding (ex. 'opensuse', 'fedora', 'centos')
-		    --target opensuse|fedora|centos
-		        Cross-build RPM or createrepo for target distro
+		    --build=[opensuse|fedora|centos]
+		        Build RPM from source DEB but do not install
+		        Specify non-native target with optional parameter (ex. 'opensuse', 'fedora', 'centos')
 		    --mcversion VERSION
 		        Specify the MC version, ex. "28.0.94" (Default: latest)
 		    --outputdir PATH
@@ -123,16 +122,25 @@ getOS() {
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g RPM_BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH DEB_INSTALL_SWITCH
-    declare -g TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH 
+    declare -g CREATEREPO_SWITCH UNINSTALL_SWITCH DEB_INSTALL_SWITCH
+    declare -g TARGET OUTPUTDIR MCVERSION RESTOREFILE BETAPASS SERVICE_TYPE 
+    declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT CREATEREPO_USER
     declare -ga SERVICES CONTAINERS
+    declare long_opts short_opts
 
     if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
-        echo "No options passed, defaulting to repo installation method"
         REPO_INSTALL_SWITCH=1
+    elif [[ $# -eq 1 && "$1" =~ ^(--compat)$ ]]; then
+        TARGET="$ID"
     fi
 
-    if _input=$(getopt -o +i:vdhus:c: -l install:,build,target:,outputdir:,mcversion:,restorefile:,betapass:,service-type:,service:,version,debug,help,uninstall,createrepo,createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat -- "$@"); then
+    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
+    long_opts+="service-type:,service:,version,debug,help,uninstall,createrepo,"
+    long_opts+="createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat"
+    short_opts="+i:vb::dhus:c:"
+
+    if _input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -140,10 +148,11 @@ parseInput() {
                     shift
                     case "$1" in
                         rpm)
-                            RPM_BUILD_SWITCH=1
+                            BUILD_SWITCH=1
                             RPM_INSTALL_SWITCH=1
                             ;;
                         deb)
+                            BUILD_SWITCH=1
                             DEB_INSTALL_SWITCH=1
                             ;;
                         repo)
@@ -151,10 +160,8 @@ parseInput() {
                             ;;
                     esac
                     ;;
-                --build)
-                    RPM_BUILD_SWITCH=1
-                    ;;
-                --target)
+                --build|-b)
+                    BUILD_SWITCH=1
                     shift && TARGET="$1"
                     ;;
                 --outputdir)
@@ -176,7 +183,7 @@ parseInput() {
                     shift && SERVICES+=("$1")
                     ;;
                 --createrepo)
-                    RPM_BUILD_SWITCH=1
+                    BUILD_SWITCH=1
                     CREATEREPO_SWITCH=1
                     ;;
                 --createrepo-webroot)
@@ -289,7 +296,7 @@ installPackage() {
                     skip_check_installed=1
                     ;;
                 --allow-downgrades)
-                    [[ "$ID" =~ (debian|ubuntu|neon) ]] && install_flags+=(--allow-downgrades)
+                    [[ "$ID" =~ (debian|ubuntu|linuxmint|neon) ]] && install_flags+=(--allow-downgrades)
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -471,7 +478,9 @@ acquireDeb() {
         exit 1
     fi
 
-    if [[ ! -f "$MCDEB" ]]; then
+    if [[ -f "$MCDEB" ]]; then
+        echo "Downloaded MC $MCVERSION DEB to: $MCDEB"
+    else
         err "Downloaded DEB file missing or corrupted"
         exit 1
     fi
@@ -648,7 +657,8 @@ buildRPM() {
 
     # Run rpmbuild
     echo "Building RPM for MC $MCVERSION, this may take awhile"
-    rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb $OUTPUTDIR/SPECS/mediacenter.spec"
+    rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb" 
+    rpmbuild_cmd+=" $OUTPUTDIR/SPECS/mediacenter.spec"
     debug "$rpmbuild_cmd" || rpmbuild_cmd+=" &>/dev/null"
     if eval "$rpmbuild_cmd" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
@@ -1393,7 +1403,7 @@ main() {
     getOS
 
     # Some distros need external repos installed for MC libraries
-    if [[ "$ID" == "ubuntu|neon" ]]; then
+    if [[ "$ID" =~ (ubuntu|linuxmint|neon) ]]; then
         echo "Adding universe repository"
         if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
             sudo add-apt-repository universe
@@ -1456,18 +1466,25 @@ main() {
     if (( REPO_INSTALL_SWITCH )); then
         if [[ "$ID" =~ ^opensuse.*$ ]]; then
             echo "A SUSE repository is not yet available"
-            echo "Use --install rpm to build and install a SUSE RPM instead""
+            echo "Use --install rpm to build and install a SUSE RPM instead"
             exit 1
-        fi
-        if installMCFromRepo; then
+        elif installMCFromRepo; then
             echo "JRiver Media Center installed successfully from repo"
+            symlinkCerts
+            restoreLicense
+            openFirewall "jriver"
         else
             err "JRiver Media Center installation from repo failed"
             exit 1
         fi
-        symlinkCerts
-        restoreLicense
-        openFirewall "jriver"
+    fi
+
+    if (( BUILD_SWITCH )); then
+        installPackage "wget" "dpkg" "rpm-build"
+        acquireDeb
+        if [[ "$TARGET" =~ ^(fedora|centos|opensuse.*) ]]; then
+            buildRPM
+        fi
     fi
 
     if (( DEB_INSTALL_SWITCH )); then
@@ -1480,12 +1497,6 @@ main() {
         symlinkCerts
         restoreLicense
         openFirewall "jriver"
-    fi
-
-    if (( RPM_BUILD_SWITCH )); then
-        installPackage "wget" "dpkg" "rpm-build"
-        acquireDeb
-        buildRPM
     fi
 
     if (( RPM_INSTALL_SWITCH )); then
