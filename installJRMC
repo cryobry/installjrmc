@@ -40,7 +40,7 @@ printHelp() {
 		            deb: Download and install offcial MC package locally (useful with --compat flag for older distros)
 		    --build=[suse|fedora|centos]
 		        Build RPM from source DEB but do not install
-		        Specify cross-build target with optional argument, note '=' (ex. --build=suse)
+		        Optionally specify cross-build target, note the '=' (ex. --build=suse)
 		    --compat
 		        Build/install MC without minimum library specifiers
 		    --mcversion VERSION
@@ -393,14 +393,7 @@ installPackage() {
 
 
 #######################################
-# Installs a package using the system package manager
-# Arguments:
-#   One or more package names
-# Options:
-#   --skip-check-installed: Do not check if package is already installed
-#   --nogpgcheck: Disable GPG checks for RPM based distros
-#   --allow-downgrades: Useful for installing compatability versions on DEB based distros
-#   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
+# Installs Media Center DEB package and optional compatability fixes
 #######################################
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"
@@ -418,6 +411,8 @@ installMCDEB() {
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
         sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
+        [[ "$ID" == "ubuntu" && "${VERSION_ID%.*}" -le 16 ]] &&
+            sed -i 's/libva2/libva1/g' "control"
         tar -cJf "control.tar.xz" "control" "postinst"
         ar rcs "$mcdeb" "debian-binary" "control.tar.xz" "data.tar.xz"
         popd &>/dev/null || return
@@ -787,8 +782,7 @@ symlinkCerts() {
 
 
 #######################################
-# Automatically restore the mjr license file if it is found next to 
-# installJRMC or RESTOREFILE is set
+# Rstore the mjr license file if it is next to installJRMC or RESTOREFILE is set
 #######################################
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1430,7 +1424,7 @@ uninstall() {
 
 
 tests() {
-    # To test on Mint: sudo apt install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
+    # To test on Mint/16.04: sudo apt install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
     exit $?
 }
 

@@ -24,7 +24,7 @@ You can always find the latest supported options by running `installJRMC --help`
     deb: Download and install official MC package locally (useful with --compat flag for older distros)
 --build=[suse|fedora|centos]
     Build RPM from source DEB but do not install
-    Specify cross-build target with optional argument, note '=' (ex. --build=suse)
+    Optionally specify cross-build target, note the '=' (ex. --build=suse)
 --compat
     Build/install MC without minimum library specifiers
 --mcversion VERSION
