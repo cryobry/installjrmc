@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # This script will install JRiver Media Center and associated services on most major distros
 #
-# Copyright (c) 2021 Bryan C. Roessler
+# Copyright (c) 2021-2022 Bryan C. Roessler
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
 #
@@ -863,43 +863,15 @@ openFirewall() {
 
 
 #######################################
-# Create the x11vnc password file
-#######################################
-setX11VNCPass() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    declare vncpassfile="$HOME/.vnc/jrmc_passwd"
-
-    [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
-
-    if [[ -f "$vncpassfile" ]]; then
-        if [[ ! -v VNCPASS ]]; then
-            err "Refusing to overwrite existing $vncpassfile with an empty password"
-            err "Remove existing $vncpassfile or set --vncpass to use an empty password"
-            exit 1
-        else
-            rm -f "$vncpassfile"
-        fi
-    fi
-
-    if [[ -v VNCPASS ]]; then
-        if ! x11vnc -storepasswd "$VNCPASS" "$vncpassfile"; then
-            err "Could not create VNC password file"
-            return 1
-        fi
-    else
-        declare -g NOVNCAUTH=1
-    fi
-}
-
-
-#######################################
-# Create the Xvnc password file
+# Create the xvnc or x11vnc password file
+# Arguments:
+#   Service type (xvnc, x11vnc)
 #######################################
 setVNCPass() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare vncpassfile="$HOME/.vnc/jrmc_passwd"
+    declare vnc_pass_cmd
 
     [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
 
@@ -914,7 +886,12 @@ setVNCPass() {
     fi
 
     if [[ -v VNCPASS ]]; then
-        if ! echo "$VNCPASS" | vncpasswd -f > "$vncpassfile"; then
+        if [[ $1 == "xvnc" ]]; then
+            vnc_pass_cmd="echo $VNCPASS | vncpasswd -f > $vncpassfile"
+        elif [[ $1 == "x11vnc" ]]; then
+            vnc_pass_cmd="x11vnc -storepasswd $VNCPASS $vncpassfile"
+        fi
+        if ! eval "$vnc_pass_cmd"; then
             err "Could not create VNC password file"
             return 1
         fi
@@ -1052,7 +1029,7 @@ service_jriver-xvnc() {
 
     installPackage tigervnc-server
 
-    setVNCPass
+    setVNCPass xvnc
 
     if (( NOVNCAUTH )); then
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -name jriver$NEXT_DISPLAY -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$MVERSION"
@@ -1101,7 +1078,7 @@ service_jriver-x11vnc() {
 
     installPackage x11vnc
 
-    setX11VNCPass
+    setVNCPass x11vnc
 
     # Get current desktop resolution
     # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
