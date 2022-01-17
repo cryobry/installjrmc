@@ -78,7 +78,7 @@ jriver-createrepo
 
 MC helper services are installed as system-level services (`--service-type system`) by default and are manipulable as admin: `sudo systemctl stop jriver-servicename@username.service`. It is also possible to create user-level services using `--service-type user` that can be manipulated by the unprivileged user: `systemctl --user stop jriver-mediacenter`.
 
-Multiple services (but not `--service-types`) can be installed at one time using multiple `--service` blocks: `installJRMC --repo --service jriver-x11vnc --service jriver-mediacenter`
+Multiple services (but not `--service-types`) can be installed at one time using multiple `--service` blocks: `installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter`
 
 ### `jriver-x11vnc` versus `jriver-xvnc`
 
