@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# This script will install JRiver Media Center and associated services
-# on Fedora, CentOS, Debian, and Ubuntu
+# This script will install JRiver Media Center and associated services on most major distros
 #
 # Copyright (c) 2021 Bryan C. Roessler
 # This software is released under the Apache License.
@@ -19,7 +18,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b7"
+declare -g SCRIPTVERSION="1.0b8"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -784,7 +783,7 @@ symlinkCerts() {
 
 
 #######################################
-# Rstore the mjr license file if it is next to installJRMC or RESTOREFILE is set
+# Restore the mjr license file if it is next to installJRMC or RESTOREFILE is set
 #######################################
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1380,6 +1379,9 @@ uninstall() {
                 debug "Disabling $unit"
                 systemctl_disable_cmd "$unit"
             fi
+        done
+        for f in /etc/systemd/system/jriver-*; do
+            sudo rm -f "$f"
         done
         for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
             [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
