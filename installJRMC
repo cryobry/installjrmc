@@ -1351,7 +1351,7 @@ service_jriver-createrepo() {
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare service unit f
+    declare service unit f i
 
     if ! askOk "Do you really want to uninstall JRiver Media Center"; then
         echo "Uninstall canceled"
@@ -1361,30 +1361,21 @@ uninstall() {
     echo "Stopping and removing all Media Center services"
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
-        SERVICE_TYPE=system setServiceVars "$service"; 
-        for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-            if systemctl_is_active_cmd "$unit" &>/dev/null ||
-            systemctl_is_enabled_cmd "$unit" &>/dev/null; then
-                debug "Disabling $unit"
-                systemctl_disable_cmd "$unit"
-            fi
-        done
-        for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-            [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
-        done
-        SERVICE_TYPE=user setServiceVars "$service";
-        for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-            if systemctl_is_active_cmd "$unit" &>/dev/null ||
-            systemctl_is_enabled_cmd "$unit" &>/dev/null; then
-                debug "Disabling $unit"
-                systemctl_disable_cmd "$unit"
-            fi
+        for i in user system; do
+            SERVICE_TYPE="$i" setServiceVars "$service"; 
+            for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
+                if systemctl_is_active_cmd "$unit" &>/dev/null ||
+                systemctl_is_enabled_cmd "$unit" &>/dev/null; then
+                    debug "Disabling $unit"
+                    systemctl_disable_cmd "$unit"
+                fi
+            done
+            for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
+                [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
+            done
         done
         for f in /etc/systemd/system/jriver-*; do
             sudo rm -f "$f"
-        done
-        for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-            [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
         done
         systemctl_reload_cmd
     done
