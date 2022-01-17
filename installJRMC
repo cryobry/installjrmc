@@ -1373,11 +1373,11 @@ uninstall() {
             for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
                 [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
             done
+            systemctl_reload_cmd
         done
         for f in /etc/systemd/system/jriver-*; do
             sudo rm -f "$f"
         done
-        systemctl_reload_cmd
     done
 
     echo "Removing repo files"
