@@ -127,7 +127,7 @@ getOS() {
     debug "Platform: $ID $VERSION_ID"
 
     case "$ID" in
-        centos|fedora|debian|ubuntu)
+        centos|fedora|debian|ubuntu|arch)
             return 0
             ;;
         linuxmint|neon)
@@ -429,6 +429,11 @@ addRepo() {
         wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
     elif [[ "$ID" == "suse" ]]; then
         sudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
+    elif [[ "$ID" == "arch" ]]; then
+        sudo bash -c "cat <<- EOF > 
+		
+		EOF"		
+
     fi
 }
 
@@ -818,12 +823,16 @@ openFirewall() {
     # Create OS-specific port rules based on argument (service) name
     declare -a f_ports # for firewall-cmd
     declare u_ports # for ufw
+    declare -a n_ports # for nftables
+    declare port
     if [[ "$1" == "jriver" ]]; then
         f_ports=(52100-52200/tcp 1900/udp)
         u_ports="52100:52200/tcp|1900/udp"
+        n_ports=("tcp dport 52100-52200 accept" "udp dport 1900 accept")
     elif [[ "$1" =~ ^(jriver-x11vnc|jriver-xvnc)$ ]]; then
         f_ports=("$PORT"/tcp 1900/udp)
         u_ports="$PORT/tcp|1900/udp"
+        n_ports=("tcp dport $PORT accept" "udp dport 1900 accept")
     fi
 
     # Open the ports
@@ -833,8 +842,8 @@ openFirewall() {
             firewall_cmd --permanent --new-service="$1" &>/dev/null
             firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" &>/dev/null
             firewall_cmd --permanent --service="$1" --set-short="$1" &>/dev/null
-            for f_port in "${f_ports[@]}"; do
-                firewall_cmd --permanent --service="$1" --add-port="$f_port" &>/dev/null
+            for port in "${f_ports[@]}"; do
+                firewall_cmd --permanent --service="$1" --add-port="$port" &>/dev/null
             done
             firewall_cmd --add-service "$1" --permanent &>/dev/null
             firewall_cmd --reload &>/dev/null
@@ -852,6 +861,13 @@ openFirewall() {
         fi
         firewall_cmd app update "$1" &>/dev/null
         firewall_cmd allow "$1" &>/dev/null
+    elif [[ "$ID" == "arch" ]]; then
+
+        nft add table inet "jriver"
+        nft add chain inet "jriver" "jriver-mediacenter"
+        for port in "${n_ports[@]}"; do
+            firewall_cmd "$port"
+        done
     fi
 
     # shellcheck disable=SC2181 # More concise
@@ -926,7 +942,7 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING
+    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING GRAPHICAL_TARGET
     declare -g SERVICE_TYPE="${SERVICE_TYPE:-system}"
     declare service_dir="/usr/lib/systemd/$SERVICE_TYPE"
 
@@ -942,12 +958,14 @@ setServiceVars() {
         systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
         systemctl_is_enabled_cmd(){ sudo systemctl is-enabled -q "$@"; }
         systemctl_is_active_cmd(){ sudo systemctl is-active -q "$@"; }
+        GRAPHICAL_TARGET="graphical.target"
     elif [[ "$SERVICE_TYPE" == "user" ]]; then
         systemctl_reload_cmd(){ systemctl --user daemon-reload; }
         systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
         systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
         systemctl_is_enabled_cmd(){ systemctl --user is-enabled -q "$@"; }
         systemctl_is_active(){ sudo systemctl is-active -q "$@"; }
+        GRAPHICAL_TARGET="default.target"
     fi
 
     [[ ! -d "$service_dir" ]] && sudo mkdir -p "$service_dir"
@@ -981,7 +999,7 @@ service_jriver-mediacenter() {
     sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=JRiver Media Center $MVERSION
-		After=graphical.target
+		After=$GRAPHICAL_TARGET
 
 		[Service]
 		$USER_STRING
@@ -995,7 +1013,7 @@ service_jriver-mediacenter() {
 		TimeoutStopSec=30
 
 		[Install]
-		WantedBy=graphical.target
+		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
     systemctl_reload_cmd &&
@@ -1106,7 +1124,7 @@ service_jriver-x11vnc() {
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=x11vnc
-		After=graphical.target
+		After=$GRAPHICAL_TARGET
 
 		[Service]
 		$USER_STRING
@@ -1117,7 +1135,7 @@ service_jriver-x11vnc() {
 		RestartSec=10
 
 		[Install]
-		WantedBy=graphical.target
+		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
     systemctl_reload_cmd &&
@@ -1385,6 +1403,8 @@ uninstall() {
         eval "$firewall_cmd"
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
             sudo rm -f /etc/ufw/applications.d/jriver
+    elif hash nft 2>/dev/null; then
+        firewall_cmd=""
     fi
 
     echo "Uninstalling JRiver Media Center package"
@@ -1438,6 +1458,12 @@ main() {
         pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
+    elif [[ "$ID" == "arch" ]]; then
+        pkg_install(){ sudo -S "$@"; }
+        pkg_remove(){ sudo pacman -Rs "$@"; }
+        pkg_update(){ sudo pacman ; }
+        pkg_query(){ sudo pacman -Qs "$@"; }
+        firewall_cmd(){ sudo nft -A INPUT "$@"; }
     fi
 
     parseInput "$@"
