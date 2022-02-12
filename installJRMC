@@ -227,7 +227,7 @@ parseInput() {
         printHelp && exit 1
     fi
 
-    ! debug && echo "Use --debug for verbose output"
+    (( DEBUG )) || echo "Use --debug for verbose output"
 }
 
 
