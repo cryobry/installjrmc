@@ -109,48 +109,6 @@ askOk() {
 
 
 #######################################
-# Parses /etc/os-release and provide a compatability layer for unrecognzied distros
-#######################################
-getOS() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    declare -g ID
-
-    if [[ -e "/etc/os-release" ]]; then
-        source "/etc/os-release"
-    else
-        err "/etc/os-release not found"
-        err "Your OS is unsupported"
-        printHelp && exit 1
-    fi
-
-    debug "Platform: $ID $VERSION_ID"
-
-    case "$ID" in
-        centos|fedora|debian|ubuntu|arch)
-            return 0
-            ;;
-        linuxmint|neon)
-            ID="ubuntu"
-            ;;
-        *suse*)
-            ID="suse"
-            ;;
-        *)
-            echo "Autodetecting distro, this may be unreliable and --compat may also be required"
-            if hash dnf &>/dev/null || hash yum &>/dev/null; then
-                ID="fedora"
-            elif hash apt &>/dev/null; then
-                ID="ubuntu"
-            fi
-            ;;
-    esac
-
-    debug "Using compatability platform: $ID"
-}
-
-
-#######################################
 # Parses user input and sets sensible defaults
 #######################################
 parseInput() {
@@ -341,7 +299,8 @@ installPackage() {
                     skip_check_installed=1
                     ;;
                 --allow-downgrades)
-                    [[ "$ID" =~ (debian|ubuntu) ]] && install_flags+=(--allow-downgrades)
+                    [[ "$ID" =~ ^(debian|ubuntu)$ ]] && 
+                        install_flags+=(--allow-downgrades)
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -711,6 +670,12 @@ buildRPM() {
 }
 
 
+installMCArch() {
+    debug "Running: ${FUNCNAME[0]}"
+    echo "Arch install under construction"
+}
+
+
 #######################################
 # Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
 #######################################
@@ -825,7 +790,7 @@ openFirewall() {
     declare u_ports # for ufw
     declare -a n_ports # for nftables
     declare port
-    if [[ "$1" == "jriver" ]]; then
+    if [[ "$1" == "jriver-mediacenter" ]]; then
         f_ports=(52100-52200/tcp 1900/udp)
         u_ports="52100:52200/tcp|1900/udp"
         n_ports=("tcp dport 52100-52200 accept" "udp dport 1900 accept")
@@ -862,11 +827,11 @@ openFirewall() {
         firewall_cmd app update "$1" &>/dev/null
         firewall_cmd allow "$1" &>/dev/null
     elif [[ "$ID" == "arch" ]]; then
-
-        nft add table inet "jriver"
-        nft add chain inet "jriver" "jriver-mediacenter"
+        sysctl -w net.ipv4.ip_forward = 1
+        sudo nft create table inet "jriver"
+        sudo nft create chain inet "jriver" "$1" '{ type filter hook input priority 0; policy accept; }'
         for port in "${n_ports[@]}"; do
-            firewall_cmd "$port"
+            sudo nft add rule inet jriver "$1" handle tcp dport "$port"
         done
     fi
 
@@ -1018,7 +983,7 @@ service_jriver-mediacenter() {
 
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
-    openFirewall "jriver"
+    openFirewall "jriver-mediacenter"
 }
 
 
@@ -1078,7 +1043,7 @@ service_jriver-xvnc() {
     systemctl_enable_cmd "$SERVICE_NAME" &&
     echo "Xvnc running on localhost:$PORT" &&
     openFirewall "jriver-xvnc" &&
-    openFirewall "jriver"
+    openFirewall "jriver-mediacenter"
 }
 
 
@@ -1404,7 +1369,7 @@ uninstall() {
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
             sudo rm -f /etc/ufw/applications.d/jriver
     elif hash nft 2>/dev/null; then
-        firewall_cmd=""
+        sudo nft delete table inet jriver
     fi
 
     echo "Uninstalling JRiver Media Center package"
@@ -1431,15 +1396,55 @@ tests() {
 main() {
     debug "Running: ${FUNCNAME[0]}"
 
-    getOS
+    declare -g ID
+
+    if [[ -e "/etc/os-release" ]]; then
+        source "/etc/os-release"
+    else
+        err "/etc/os-release not found"
+        err "Your OS is unsupported"
+        printHelp && exit 1
+    fi
+
+    debug "Host platform: $ID $VERSION_ID"
+
+    case "$ID" in
+        centos|fedora)
+            if hash dnf &>/dev/null; then
+                declare mgr="dnf"
+            elif hash yum &>/dev/null; then
+                declare mgr="yum"
+            fi
+            ;;
+        debian|ubuntu|arch)
+            return 0
+            ;;
+        linuxmint|neon)
+            ID="ubuntu"
+            ;;
+        *suse*)
+            ID="suse"
+            ;;
+        *)
+            echo "Autodetecting distro, this may be unreliable and --compat may also be required"
+            if hash dnf &>/dev/null; then
+                ID="fedora"
+                declare mgr="dnf"
+            elif hash yum &>/dev/null; then
+                ID="centos"
+                declare mgr="yum"
+            elif hash apt &>/dev/null; then
+                ID="ubuntu"
+            elif hash pacman &>/dev/null; then
+                ID="arch"
+            fi
+            ;;
+    esac
+
+    debug "Host compatability platform: $ID $VERSION_ID"
 
     # Distro-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        if hash dnf &>/dev/null; then
-            declare mgr="dnf"
-        elif hash yum &>/dev/null; then
-            declare mgr="yum"
-        fi
         pkg_install(){ sudo "$mgr" install -y "$@"; }
         pkg_remove(){ sudo "$mgr" remove -y "$@"; }
         pkg_update(){ sudo "$mgr" makecache; }
@@ -1459,9 +1464,9 @@ main() {
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
     elif [[ "$ID" == "arch" ]]; then
-        pkg_install(){ sudo -S "$@"; }
-        pkg_remove(){ sudo pacman -Rs "$@"; }
-        pkg_update(){ sudo pacman ; }
+        pkg_install(){ sudo pacman -Sy --noconfirm "$@"; }
+        pkg_remove(){ sudo pacman -Rs --noconfirm "$@"; }
+        pkg_update(){ sudo pacman -Syy ; }
         pkg_query(){ sudo pacman -Qs "$@"; }
         firewall_cmd(){ sudo nft -A INPUT "$@"; }
     fi
@@ -1483,7 +1488,7 @@ main() {
 
     if (( UNINSTALL_SWITCH )); then
         uninstall
-        exit $?
+        exit
     fi
 
     # Some distros need external repos installed for MC libraries
@@ -1502,7 +1507,7 @@ main() {
             echo "JRiver Media Center installed successfully from repo"
             symlinkCerts
             restoreLicense
-            openFirewall "jriver"
+            openFirewall "jriver-mediacenter"
         else
             err "JRiver Media Center installation from repo failed"
             exit 1
@@ -1521,7 +1526,8 @@ main() {
     if (( LOCAL_INSTALL_SWITCH )); then
         if ([[ "$TARGET" =~ (debian|ubuntu) ]] && installMCDEB) ||
         ([[ "$TARGET" =~ (fedora|centos|suse) ]] && 
-        installPackage --skip-check-installed --nogpgcheck "$MCRPM"); then
+        installPackage --skip-check-installed --nogpgcheck "$MCRPM") ||
+        ([[ "$TARGET" == "arch" ]] && installMCArch); then
             echo "JRiver Media Center installed successfully from local package"
         else
             err "JRiver Media Center local package installation failed"
@@ -1529,7 +1535,7 @@ main() {
         fi
         symlinkCerts
         restoreLicense
-        openFirewall "jriver"
+        openFirewall "jriver-mediacenter"
     fi
 
     if (( CREATEREPO_SWITCH )); then
