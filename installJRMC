@@ -1396,7 +1396,7 @@ tests() {
 main() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID
+    declare -g ID MGR
 
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
@@ -1411,9 +1411,9 @@ main() {
     case "$ID" in
         centos|fedora)
             if hash dnf &>/dev/null; then
-                declare mgr="dnf"
+                MGR="dnf"
             elif hash yum &>/dev/null; then
-                declare mgr="yum"
+                MGR="yum"
             fi
             ;;
         debian|ubuntu|arch)
@@ -1429,10 +1429,10 @@ main() {
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
             if hash dnf &>/dev/null; then
                 ID="fedora"
-                declare mgr="dnf"
+                MGR="dnf"
             elif hash yum &>/dev/null; then
                 ID="centos"
-                declare mgr="yum"
+                MGR="yum"
             elif hash apt &>/dev/null; then
                 ID="ubuntu"
             elif hash pacman &>/dev/null; then
@@ -1445,12 +1445,11 @@ main() {
 
     # Distro-specific commands
     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-        pkg_install(){ sudo "$mgr" install -y "$@"; }
-        pkg_remove(){ sudo "$mgr" remove -y "$@"; }
-        pkg_update(){ sudo "$mgr" makecache; }
+        pkg_install(){ sudo "$MGR" install -y "$@"; }
+        pkg_remove(){ sudo "$MGR" remove -y "$@"; }
+        pkg_update(){ sudo "$MGR" makecache; }
         pkg_query(){ rpm -q "$@"; }
         firewall_cmd(){ sudo firewall-cmd "$@"; }
-        unset mgr
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         pkg_install(){ sudo apt-get install -y -q0 "$@"; }
         pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
