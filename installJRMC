@@ -22,6 +22,7 @@ declare -g SCRIPTVERSION="1.0b10"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
+declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -84,7 +85,7 @@ printHelp() {
 		        Enable and start a new Xvnc session running JRiver Media Center (system)
 		        --vncpass PASSWORD
 		            Set vnc password for x11vnc/Xvnc access. If no password is set, the script
-		            will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+		            will either use existing password stored in $HOME/.vnc/jrmc_passwd or use no password
 		        --display DISPLAY
 		            Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
 		            current display incremented by 1 (Xvnc))
@@ -1373,6 +1374,29 @@ getOS() {
 }
 
 
+#######################################
+# Detects if MC is installed on btrfs and disables CoW
+#######################################
+disableCoW() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare mc_system_path="/usr/lib/jriver"
+    declare mc_user_path
+    mc_user_path=$(getent passwd "$USER" | cut -d: -f6)
+
+    for dir in "$mc_system_path" "$mc_user_path"; do
+        if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
+        ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
+            echo "Disabling CoW for $dir"
+            sudo chattr -R +C "$dir"
+        fi
+    done
+}
+
+
+#######################################
+# Completely uninstalls MC, services, and firewall rules
+#######################################
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1575,6 +1599,8 @@ main() {
             fi
         done
     fi
+
+    disableCoW
 
     # for _container in "${CONTAINERS[@]}"; do
     #     if ! "_container_$_container"; then
