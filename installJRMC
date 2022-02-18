@@ -263,7 +263,7 @@ getVersion() {
         VERSION_SOURCE="webscrape"
     # Hardcoded
     else
-        MCVERSION="28.0.100"
+        MCVERSION="28.0.106"
         VERSION_SOURCE="hardcoded version"
         err "Warning! Using hardcoded version number"
     fi
@@ -1027,7 +1027,7 @@ service_jriver-xvnc() {
 		After=multi-user.target
 
 		[Service]
-		Type=simple
+		Type=forking
 		$USER_STRING
 		ExecStartPre=/bin/sh -c '/usr/bin/vncserver -kill $NEXT_DISPLAY &>/dev/null || :'
 		ExecStart=$start_cmd
