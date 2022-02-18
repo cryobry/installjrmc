@@ -878,6 +878,7 @@ setVNCPass() {
             return 1
         fi
     else
+        debug "HERE!"
         declare -g NOVNCAUTH=1
     fi
 }
