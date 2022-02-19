@@ -1021,8 +1021,6 @@ service_jriver-xvnc() {
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
 
-    debug "start_cmd: $start_cmd"
-
     sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Remote desktop service (VNC)
