@@ -1015,13 +1015,13 @@ service_jriver-xvnc() {
 
     setVNCPass xvnc
 
-    debug "NOVNCAUTH: $NOVNCAUTH"
-
     if (( NOVNCAUTH )); then
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -name jriver$NEXT_DISPLAY -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     else
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -rfbauth $HOME/.vnc/jrmc_passwd -autokill -xstartup /usr/bin/mediacenter$MVERSION"
     fi
+
+    debug "start_cmd: $start_cmd"
 
     sudo bash -c "cat <<- EOF > $SERVICE_FNAME
 		[Unit]
@@ -1039,8 +1039,6 @@ service_jriver-xvnc() {
 		[Install]
 		WantedBy=multi-user.target
 	EOF"
-
-    debug "DONE"
 
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
