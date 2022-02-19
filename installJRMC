@@ -878,7 +878,6 @@ setVNCPass() {
             return 1
         fi
     else
-        debug "HERE!"
         declare -g NOVNCAUTH=1
     fi
 }
@@ -1015,6 +1014,8 @@ service_jriver-xvnc() {
     installPackage tigervnc-server
 
     setVNCPass xvnc
+
+    debug "NOVNCAUTH: $NOVNCAUTH"
 
     if (( NOVNCAUTH )); then
         start_cmd="/usr/bin/vncserver $NEXT_DISPLAY -geometry 1440x900 -alwaysshared -name jriver$NEXT_DISPLAY -SecurityTypes None -autokill -xstartup /usr/bin/mediacenter$MVERSION"
