@@ -37,7 +37,7 @@ printHelp() {
 		    --install, -i repo|local
 		        repo: Install MC from repository, updates are handled by the system package manager
 		        local: Build and install MC package locally
-		    --build[=suse|fedora|centos|rhel]
+		    --build[=suse|fedora|centos]
 		        Build RPM from source DEB but do not install
 		        Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
 		    --compat
@@ -56,7 +56,7 @@ printHelp() {
 		          Starts services at boot (system) or at user login (user) (Default: boot)
 		    --container, -c CONTAINER (TODO: Under construction)
 		        See CONTAINERS section below for a list of possible services to install
-		    --createrepo[=suse|fedora|centos|rhel]
+		    --createrepo[=suse|fedora|centos]
 		        Build rpm, copy to webroot, and run createrepo. Use in conjunction with --build=TARGET for crossbuilding repos
 		        Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
 		        --createrepo-webroot PATH
@@ -1038,8 +1038,6 @@ service_jriver-xvnc() {
 		WantedBy=multi-user.target
 	EOF"
 
-    debug "DONE"
-
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
     echo "Xvnc running on localhost:$PORT" &&
@@ -1383,12 +1381,13 @@ disableCoW() {
     declare mc_system_path="/usr/lib/jriver"
     declare mc_user_path
     mc_user_path=$(getent passwd "$USER" | cut -d: -f6)
+    mc_user_path="$mc_user_path/.jriver"
 
     for dir in "$mc_system_path" "$mc_user_path"; do
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
             echo "Disabling CoW for $dir"
-            sudo chattr -R +C "$dir"
+            sudo chattr +C "$dir"
         fi
     done
 }
