@@ -304,7 +304,7 @@ installPackage() {
                         install_flags+=(--allow-downgrades)
                     ;;
                 --nogpgcheck)
-                    if [[ "$ID" =~ ^(fedora|centos|rhel)$ ]]; then
+                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
                         install_flags+=(--nogpgcheck)
                     elif [[ "$ID" == "suse" ]]; then
                         install_flags+=(--allow-unsigned-rpm)
@@ -370,7 +370,7 @@ addRepo() {
     fi
 
     echo "Adding JRiver repository to package manager"
-    if [[ "$ID" =~ ^(fedora|centos|rhel)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         declare sources_dir="/etc/yum.repos.d/"
         sudo bash -c "cat <<- EOF > $sources_dir/jriver.repo
 			[jriver]
@@ -533,7 +533,7 @@ buildRPM() {
 
     # Translate package names
     case "$TARGET" in
-        fedora|centos|rhel)
+        fedora|centos)
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
             requires=("${requires[@]/libuuid1/libuuid}")
@@ -803,7 +803,7 @@ openFirewall() {
     fi
 
     # Open the ports
-    if [[ "$ID" =~ ^(fedora|centos|rhel|suse)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|suse)$ ]]; then
         hash firewall-cmd 2>/dev/null || installPackage firewalld
         if ! firewall_cmd --get-services | grep -q "$1"; then
             firewall_cmd --permanent --new-service="$1" &>/dev/null
@@ -1360,7 +1360,7 @@ getOS() {
     
     # Set package manager for RPM distros
     case "$ID" in
-        centos|fedora|rhel)
+        centos|fedora)
             if hash dnf &>/dev/null; then
                 MGR="dnf"
             elif hash yum &>/dev/null; then
@@ -1488,7 +1488,7 @@ main() {
     getOS
 
     # Distro-specific commands
-    if [[ "$ID" =~ ^(fedora|centos|rhel)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
         pkg_install(){ sudo "$MGR" install -y "$@"; }
         pkg_remove(){ sudo "$MGR" remove -y "$@"; }
         pkg_update(){ sudo "$MGR" makecache; }
@@ -1519,7 +1519,7 @@ main() {
     getVersion
 
     # Set target package name
-    if [[ "$ID" =~ ^(fedora|centos|rhel|suse)$ ]]; then
+    if [[ "$ID" =~ ^(fedora|centos|suse)$ ]]; then
         MCPKG="MediaCenter"
         [[ "$VERSION_SOURCE" == "user input" ]] && MCPKG="$MCPKG-$MCVERSION"
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
@@ -1540,10 +1540,8 @@ main() {
             echo "Adding universe repository"
             sudo add-apt-repository universe
         fi 
-    elif [[ "$ID" =~ ^(centos|rhel)$ ]]; then
+    elif [[ "$ID" =~ ^(centos)$ ]] && ! hash dpkg &>/dev/null; then
         echo "Adding EPEL repository"
-        installPackage epel-release
-    elif [[ "$ID" =~ ^(rhel)$ ]] && ! hash dpkg &>/dev/null; then
         installPackage epel-release
     fi
 
@@ -1562,7 +1560,7 @@ main() {
     if (( BUILD_SWITCH )); then
         installPackage "wget"
         acquireDeb
-        if [[ "$TARGET" =~ (centos|fedora|rhel|suse) ]]; then
+        if [[ "$TARGET" =~ (centos|fedora|suse) ]]; then
             installPackage "dpkg" "rpm-build"
             buildRPM
         fi
@@ -1570,7 +1568,7 @@ main() {
 
     if (( LOCAL_INSTALL_SWITCH )); then
         if ([[ "$TARGET" =~ (debian|ubuntu) ]] && installMCDEB) ||
-        ([[ "$TARGET" =~ (fedora|centos|rhel|suse) ]] && 
+        ([[ "$TARGET" =~ (fedora|centos|suse) ]] && 
         installPackage --skip-check-installed --nogpgcheck "$MCRPM") ||
         ([[ "$TARGET" == "arch" ]] && installMCArch); then
             echo "JRiver Media Center installed successfully from local package"
