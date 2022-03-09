@@ -386,7 +386,8 @@ addRepo() {
         sudo bash -c "cat <<- EOF > $sources_dir/jriver.list
 			deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main
 		EOF"
-        wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
+        #wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | sudo apt-key add - &>/dev/null
+        wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | sudo tee /etc/apt/trusted.gpg.d/jriver.asc
     elif [[ "$ID" == "suse" ]]; then
         sudo zypper addrepo --no-gpgcheck "https://repos.bryanroessler.com/jriver" jriver &>/dev/null
     elif [[ "$ID" == "arch" ]]; then
@@ -803,7 +804,7 @@ openFirewall() {
 
     # Open the ports
     if [[ "$ID" =~ ^(fedora|centos|rhel|suse)$ ]]; then
-        installPackage firewalld
+        hash firewall-cmd 2>/dev/null || installPackage firewalld
         if ! firewall_cmd --get-services | grep -q "$1"; then
             firewall_cmd --permanent --new-service="$1" &>/dev/null
             firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" &>/dev/null
@@ -816,7 +817,7 @@ openFirewall() {
         fi
     elif [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
         # Debian ufw package state is broken on fresh installations
-        installPackage ufw
+        hash ufw 2>/dev/null || installPackage ufw
         if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
             sudo bash -c "cat <<- EOF > /etc/ufw/applications.d/$1
 				[$1]
