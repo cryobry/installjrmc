@@ -18,7 +18,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b12"
+declare -g SCRIPTVERSION="1.0b13"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -241,7 +241,7 @@ getVersion() {
 
     declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG BASE="buster" # For container method
     #declare -g BASE_NEXT="bullseye" # TODO possibly use for fallback to smooth upgrades
-    declare boardurl="https://yabb.jriver.com/interact/index.php/board,71.0.html" # MC28 (Buster), for fallback webscrape
+    declare boardurl="https://yabb.jriver.com/interact/index.php/board,74.0.html" # MC28 (Buster), for fallback webscrape
 
     # User input
     if [[ -v MCVERSION && "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
@@ -263,7 +263,7 @@ getVersion() {
         VERSION_SOURCE="webscrape"
     # Hardcoded
     else
-        MCVERSION="28.0.106"
+        MCVERSION="29.0.18"
         VERSION_SOURCE="hardcoded version"
         err "Warning! Using hardcoded version number"
     fi
