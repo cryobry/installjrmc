@@ -1406,7 +1406,8 @@ migrateLibrary() {
 
     if [[ ! -d "$current_config_path" ]] &&
     [[ -d "$previous_config_path" ]]; then
-        rsync -av "$previous_config_path" "$current_config_path"
+        echo "Migrating $previous_config_path to $current_config_path"
+        rsync -a "$previous_config_path" "$current_config_path" &>/dev/null
     fi
 }
 
