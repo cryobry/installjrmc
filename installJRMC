@@ -18,7 +18,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b13"
+declare -g SCRIPTVERSION="1.0b14"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -1384,6 +1384,7 @@ disableCoW() {
     declare mc_user_path="$HOME/.jriver"
 
     for dir in "$mc_system_path" "$mc_user_path"; do
+        ! [[ -d "$dir" ]] && return
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
             echo "Disabling CoW for $dir"
