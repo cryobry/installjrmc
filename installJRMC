@@ -43,7 +43,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum library specifiers
 		    --mcversion VERSION
-		        Specify the MC version, ex. "28.0.100" (Default: latest)
+		        Specify the MC version, ex. "29.0.18" (Default: latest)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: ./output)
 		    --restorefile RESTOREFILE
