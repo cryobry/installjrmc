@@ -1400,14 +1400,14 @@ migrateLibrary() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare mc_user_path="$HOME/.jriver"
-
     declare current_config_path="$mc_user_path/Media Center $MVERSION"
     declare previous_config_path="$mc_user_path/Media Center $(( MVERSION - 1 ))"
 
     if [[ ! -d "$current_config_path" ]] &&
-    [[ -d "$previous_config_path" ]]; then
+    [[ -d "$previous_config_path" ]] &&
+    mkdir -p "$current_config_path"; then
         echo "Migrating $previous_config_path to $current_config_path"
-        rsync -a "$previous_config_path" "$current_config_path" &>/dev/null
+        cp -a "$previous_config_path" "$current_config_path" &>/dev/null
     fi
 }
 
