@@ -1379,10 +1379,9 @@ getOS() {
 disableCoW() {
     debug "Running: ${FUNCNAME[0]}"
 
+    declare dir
     declare mc_system_path="/usr/lib/jriver"
-    declare mc_user_path
-    mc_user_path=$(getent passwd "$USER" | cut -d: -f6)
-    mc_user_path="$mc_user_path/.jriver"
+    declare mc_user_path="$HOME/.jriver"
 
     for dir in "$mc_system_path" "$mc_user_path"; do
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
@@ -1391,6 +1390,24 @@ disableCoW() {
             sudo chattr +C "$dir"
         fi
     done
+}
+
+
+#######################################
+# Migrate major versions
+#######################################
+migrateLibrary() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare mc_user_path="$HOME/.jriver"
+
+    declare current_config_path="$mc_user_path/Media Center $MVERSION"
+    declare previous_config_path="$mc_user_path/Media Center $(( MVERSION - 1 ))"
+
+    if [[ ! -d "$current_config_path" ]] &&
+    [[ -d "$previous_config_path" ]]; then
+        rsync -av "$previous_config_path" "$current_config_path"
+    fi
 }
 
 
@@ -1549,6 +1566,7 @@ main() {
         if installMCFromRepo; then
             echo "JRiver Media Center installed successfully from repo"
             symlinkCerts
+            migrateLibrary
             restoreLicense
             openFirewall "jriver-mediacenter"
         else
@@ -1577,6 +1595,7 @@ main() {
             exit 1
         fi
         symlinkCerts
+        migrateLibrary
         restoreLicense
         openFirewall "jriver-mediacenter"
     fi
