@@ -18,7 +18,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b14"
+declare -g SCRIPTVERSION="1.0b15"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
