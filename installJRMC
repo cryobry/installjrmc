@@ -737,19 +737,28 @@ runCreaterepo() {
 
 
 #######################################
-# Symlink certificates where JRiver Media Center expects them to be on Fedora/CentOS
+# Symlink certificates if they do not exist in default location
 #######################################
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if [[ ! -f /etc/ssl/certs/ca-certificates.crt &&
-    -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        debug "ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt"
-        if ! sudo ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
-        /etc/ssl/certs/ca-certificates.crt; then
-            err "Symlinking certificates failed"
-            return 1
-        fi
+    declare mc_cert_link="/usr/lib/jriver/Media Center $MVERSION/ca-certificates.crt"
+    declare target_cert ln_cmd
+
+    target_cert=$(readlink -f "$mc_cert_link")
+
+    [[ -f $target_cert ]] && return 0
+
+    if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
+        ln_cmd="sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem $mc_cert_link" # For RHEL
+    elif [[ -f /var/lib/ca-certificates/ca-bundle.pem ]]; then
+        ln_cmd="sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem $mc_cert_link" # For SUSE
+    fi
+    
+    debug "$ln_cmd" || cr_cmd+=" &>/dev/null"
+    if ! eval "$ln_cmd"; then
+        err "Symlinking certificates failed"
+        return 1
     fi
 }
 
