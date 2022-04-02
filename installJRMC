@@ -755,7 +755,7 @@ symlinkCerts() {
         ln_cmd="sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem $mc_cert_link" # For SUSE
     fi
     
-    debug "$ln_cmd" || cr_cmd+=" &>/dev/null"
+    debug "$ln_cmd" || ln_cmd+=" &>/dev/null"
     if ! eval "$ln_cmd"; then
         err "Symlinking certificates failed"
         return 1
