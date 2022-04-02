@@ -18,7 +18,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b13"
+declare -g SCRIPTVERSION="1.0b15"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -1393,6 +1393,7 @@ disableCoW() {
     declare mc_user_path="$HOME/.jriver"
 
     for dir in "$mc_system_path" "$mc_user_path"; do
+        ! [[ -d "$dir" ]] && return
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
             echo "Disabling CoW for $dir"
@@ -1409,14 +1410,14 @@ migrateLibrary() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare mc_user_path="$HOME/.jriver"
-
     declare current_config_path="$mc_user_path/Media Center $MVERSION"
     declare previous_config_path="$mc_user_path/Media Center $(( MVERSION - 1 ))"
 
     if [[ ! -d "$current_config_path" ]] &&
-    [[ -d "$previous_config_path" ]]; then
+    [[ -d "$previous_config_path" ]] &&
+    mkdir -p "$current_config_path"; then
         echo "Migrating $previous_config_path to $current_config_path"
-        rsync -a "$previous_config_path" "$current_config_path" &>/dev/null
+        cp -a "$previous_config_path"/* "$current_config_path" &>/dev/null
     fi
 }
 
