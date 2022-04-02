@@ -742,7 +742,7 @@ runCreaterepo() {
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare mc_cert_link="/usr/lib/jriver/Media Center $MVERSION/ca-certificates.crt"
+    declare mc_cert_link="/usr/lib/jriver/Media\ Center\ $MVERSION/ca-certificates.crt"
     declare target_cert ln_cmd
 
     target_cert=$(readlink -f "$mc_cert_link")
