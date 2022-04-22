@@ -1582,6 +1582,7 @@ main() {
             migrateLibrary
             restoreLicense
             openFirewall "jriver-mediacenter"
+            disableCoW
         else
             err "JRiver Media Center installation from repo failed"
             exit 1
@@ -1611,6 +1612,7 @@ main() {
         migrateLibrary
         restoreLicense
         openFirewall "jriver-mediacenter"
+        disableCoW
     fi
 
     if (( CREATEREPO_SWITCH )); then
@@ -1629,8 +1631,6 @@ main() {
             fi
         done
     fi
-
-    disableCoW
 
     # for _container in "${CONTAINERS[@]}"; do
     #     if ! "_container_$_container"; then
