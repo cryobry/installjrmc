@@ -228,12 +228,14 @@ parseInput() {
 
 
 #######################################
-# Perform OS detection and apply compatability overrides
+# Perform OS detection and fallback assignment
+# Generate OS-specific functions
 #######################################
-getOS() {
+init() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID RPM_MGR
+    declare -g ID
+    declare rpm_mgr
 
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
@@ -252,9 +254,9 @@ getOS() {
             ;;
 		centos|fedora)
 		    if hash dnf &>/dev/null; then
-                RPM_MGR="dnf"
+                rpm_mgr="dnf"
             elif hash yum &>/dev/null; then
-                RPM_MGR="yum"
+                rpm_mgr="yum"
             fi
             ;;
         rhel)
@@ -270,10 +272,10 @@ getOS() {
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
             if hash dnf &>/dev/null; then
                 ID="fedora"
-                RPM_MGR="dnf"
+                rpm_mgr="dnf"
             elif hash yum &>/dev/null; then
                 ID="centos"
-                RPM_MGR="yum"
+                rpm_mgr="yum"
                 COMPAT_SWITCH=1
             elif hash apt &>/dev/null; then
                 ID="ubuntu"
@@ -286,6 +288,42 @@ getOS() {
     esac
 
     debug "Using host platform: $ID $VERSION_ID"
+
+    # Set distro-specific functions
+    case "$ID" in
+        fedora|centos)
+            pkg_install(){ sudo "$rpm_mgr" install -y "$@"; }
+            pkg_install_local() { installMCRPM; }
+            pkg_remove(){ sudo "$rpm_mgr" remove -y "$@"; }
+            pkg_update(){ sudo "$rpm_mgr" makecache; }
+            pkg_query(){ rpm -q "$@"; }
+            firewall_cmd(){ sudo firewall-cmd "$@"; }
+            ;;
+        debian|ubuntu)
+            pkg_install(){ sudo apt-get install -y -q0 "$@"; }
+            pkg_install_local() { installMCDEB; }
+            pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
+            pkg_update(){ sudo apt-get update -y -q0; }
+            pkg_query(){ dpkg -s "$@"; }
+            firewall_cmd(){ sudo ufw "$@"; }
+            ;;
+        suse)
+            pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
+            pkg_install_local() { installMCRPM; }
+            pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
+            pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
+            pkg_query(){ rpm -q "$@"; }
+            firewall_cmd(){ sudo firewall-cmd "$@"; }
+            ;;
+        arch)
+            pkg_install(){ sudo pacman -Sy --noconfirm "$@"; }
+            pkg_install_local() { installMCARCH; }
+            pkg_remove(){ sudo pacman -Rs --noconfirm "$@"; }
+            pkg_update(){ sudo pacman -Syy ; }
+            pkg_query(){ sudo pacman -Qs "$@"; }
+            #firewall_cmd(){ sudo nft -A INPUT "$@"; }
+            ;;
+    esac
 }
 
 
@@ -731,7 +769,6 @@ installMCRPM() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
-
 }
 
 
@@ -1501,9 +1538,8 @@ tests() {
 
 
 main() {
-    debug "Running: ${FUNCNAME[0]}"
 
-    getOS
+    init
 
     parseInput "$@"
 
@@ -1511,42 +1547,6 @@ main() {
         echo "Debugging on"
         echo "installJRMC version: $SCRIPTVERSION"
     fi
-
-    # Distro-specific commands
-    case "$ID" in
-        fedora|centos)
-            pkg_install(){ sudo "$RPM_MGR" install -y "$@"; }
-            pkg_install_local() { installMCRPM; }
-            pkg_remove(){ sudo "$RPM_MGR" remove -y "$@"; }
-            pkg_update(){ sudo "$RPM_MGR" makecache; }
-            pkg_query(){ rpm -q "$@"; }
-            firewall_cmd(){ sudo firewall-cmd "$@"; }
-            ;;
-        debian|ubuntu)
-            pkg_install(){ sudo apt-get install -y -q0 "$@"; }
-            pkg_install_local() { installMCDEB; }
-            pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
-            pkg_update(){ sudo apt-get update -y -q0; }
-            pkg_query(){ dpkg -s "$@"; }
-            firewall_cmd(){ sudo ufw "$@"; }
-            ;;
-        suse)
-            pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
-            pkg_install_local() { installMCRPM; }
-            pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
-            pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
-            pkg_query(){ rpm -q "$@"; }
-            firewall_cmd(){ sudo firewall-cmd "$@"; }
-            ;;
-        arch)
-            pkg_install(){ sudo pacman -Sy --noconfirm "$@"; }
-            pkg_install_local() { installMCARCH; }
-            pkg_remove(){ sudo pacman -Rs --noconfirm "$@"; }
-            pkg_update(){ sudo pacman -Syy ; }
-            pkg_query(){ sudo pacman -Qs "$@"; }
-            #firewall_cmd(){ sudo nft -A INPUT "$@"; }
-            ;;
-    esac
 
     if ((TEST_SWITCH)); then 
         echo "Running tests, all other options are skipped"
