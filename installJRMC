@@ -228,7 +228,7 @@ parseInput() {
 
 
 #######################################
-# Perform OS detection and fallback assignment
+# Perform OS detection and fallback
 # Generate OS-specific functions
 #######################################
 init() {
@@ -835,8 +835,7 @@ symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare mc_cert_link="/usr/lib/jriver/Media Center $MVERSION/ca-certificates.crt"
-    declare target_cert
-    declare -a ln_cmd
+    declare target_cert ln_cmd
 
     target_cert=$(readlink -f "$mc_cert_link")
 
@@ -844,13 +843,13 @@ symlinkCerts() {
 
     # Have to use command array instead of eval because of whitespace in $mc_cert_link
     if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        ln_cmd=("sudo" "ln" "-fs" "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" "$mc_cert_link") # For RHEL
+        ln_cmd="sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem $mc_cert_link" # For RHEL
     elif [[ -f /var/lib/ca-certificates/ca-bundle.pem ]]; then
-        ln_cmd=("sudo" "ln" "-fs" "/var/lib/ca-certificates/ca-bundle.pem" "$mc_cert_link") # For SUSE
+        ln_cmd="sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem $mc_cert_link" # For SUSE
     fi
     
-    debug "${ln_cmd[*]}"
-    if ! "${ln_cmd[@]}"; then
+    debug "$ln_cmd" || ln_cmd+=" &>/dev/null"
+    if ! eval "$ln_cmd"; then
         err "Symlinking certificates failed"
         return 1
     fi
