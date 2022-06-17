@@ -1651,5 +1651,7 @@ main() {
     # done
 }
 
+# Quickly turn debugging on (catch for real with getopt in parseInput())
+[[ " $* " =~ ( --debug | -d ) ]] && echo "First Debugging on!" && DEBUG=1
 
 main "$@"
