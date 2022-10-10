@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0"
+declare -g SCRIPTVERSION="1.0b18"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -233,8 +233,7 @@ parseInput() {
 init() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID
-    declare rpm_mgr
+    declare -g ID RPM_MGR
 
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
@@ -253,9 +252,9 @@ init() {
             ;;
 		centos|fedora)
 		    if hash dnf &>/dev/null; then
-                rpm_mgr="dnf"
+                RPM_MGR="dnf"
             elif hash yum &>/dev/null; then
-                rpm_mgr="yum"
+                RPM_MGR="yum"
             fi
             ;;
         rhel)
@@ -271,10 +270,10 @@ init() {
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
             if hash dnf &>/dev/null; then
                 ID="fedora"
-                rpm_mgr="dnf"
+                RPM_MGR="dnf"
             elif hash yum &>/dev/null; then
                 ID="centos"
-                rpm_mgr="yum"
+                RPM_MGR="yum"
                 COMPAT_SWITCH=1
             elif hash apt &>/dev/null; then
                 ID="ubuntu"
@@ -291,10 +290,10 @@ init() {
     # Set distro-specific functions
     case "$ID" in
         fedora|centos)
-            pkg_install(){ sudo "$rpm_mgr" install -y "$@"; }
+            pkg_install(){ sudo "$RPM_MGR" install -y "$@"; }
             pkg_install_local() { installMCRPM; }
-            pkg_remove(){ sudo "$rpm_mgr" remove -y "$@"; }
-            pkg_update(){ sudo "$rpm_mgr" makecache; }
+            pkg_remove(){ sudo "$RPM_MGR" remove -y "$@"; }
+            pkg_update(){ sudo "$RPM_MGR" makecache; }
             pkg_query(){ rpm -q "$@"; }
             firewall_cmd(){ sudo firewall-cmd "$@"; }
             ;;
@@ -356,7 +355,7 @@ getVersion() {
         VERSION_SOURCE="webscrape"
     # Hardcoded
     else
-        MCVERSION="29.0.66"
+        MCVERSION="30.0.17"
         VERSION_SOURCE="hardcoded version"
         err "Warning! Using hardcoded version number"
     fi
@@ -393,7 +392,7 @@ installPackage() {
     declare -a pkg_array install_flags
     declare pkg skip_check_installed silent _return pkg_install_cmd
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-erasing,allow-downgrades,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -403,6 +402,11 @@ installPackage() {
                 --allow-downgrades)
                     [[ "$ID" =~ ^(debian|ubuntu)$ ]] && 
                         install_flags+=(--allow-downgrades)
+                    ;;
+                --allow-erasing)
+                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                        install_flags+=(--allowerasing)
+                    fi
                     ;;
                 --nogpgcheck)
                     if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
@@ -493,7 +497,6 @@ installMCFromRepo() {
             ;;
     esac
 
-    # Update package list
     declare pkg_update_cmd="pkg_update"
     debug "$pkg_update_cmd" || pkg_update_cmd+=" &>/dev/null"
     if ! eval "$pkg_update_cmd"; then
@@ -501,7 +504,7 @@ installMCFromRepo() {
         return 1
     fi
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck $MCPKG"
+    declare pkg_install_cmd="installPackage --skip-check-installed --allow-erasing --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     if ! eval "$pkg_install_cmd"; then
         err "Package install failed!"
@@ -758,7 +761,7 @@ installMCDEB() {
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
-    installPackage --skip-check-installed --nogpgcheck "$MCRPM"
+    installPackage --skip-check-installed --nogpgcheck --allowerasing "$MCRPM"
 }
 
 
