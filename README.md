@@ -23,7 +23,7 @@ $ installJRMC --help
 --compat
     Build/install MC without minimum library specifiers
 --mcversion VERSION
-    Build or install a specific MC version, ex. "29.0.18"
+    Build or install a specific MC version, ex. "30.0.17"
 --outputdir PATH
     Generate rpmbuild output in this PATH (Default: ./output)
 --restorefile RESTOREFILE
@@ -110,9 +110,9 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
     Install MC from the repository and start/enable `jriver-mediacenter.service` as a user service.
 
-* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 29.0.18`
+* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 30.0.17`
 
-    Build and install an MC 29.0.18 comptability RPM locally and activate it using the `/path/to/license.mjr`
+    Build and install an MC 30.0.17 comptability RPM locally and activate it using the `/path/to/license.mjr`
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 

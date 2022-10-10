@@ -41,7 +41,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum library specifiers
 		    --mcversion VERSION
-		        Specify the MC version, ex. "29.0.58" (Default: latest)
+		        Specify the MC version, ex. "30.0.17" (Default: latest)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: ./output)
 		    --restorefile RESTOREFILE
@@ -333,7 +333,7 @@ getVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG MCRPM BASE="buster" #BASE_NEXT="bullseye"
-    declare boardurl="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC29 (Buster)
+    declare boardurl="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
 
     # User input
     if [[ -v MCVERSION && "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
@@ -761,7 +761,7 @@ installMCDEB() {
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
-    installPackage --skip-check-installed --nogpgcheck --allowerasing "$MCRPM"
+    installPackage --skip-check-installed --nogpgcheck --allow-erasing "$MCRPM"
 }
 
 
