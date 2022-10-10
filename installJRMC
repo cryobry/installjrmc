@@ -7,17 +7,16 @@
 # https://www.apache.org/licenses/LICENSE-2.0
 #
 # TODO (v2)
-#   1. Raspberry Pi OS support
-#   2. Interactive installation (ncurses?)
-#   3. Additional containerization (createrepo and rpmbuild)
-#   4. Tests
+#   1. Interactive installation (ncurses?)
+#   2. Additional containerization (createrepo and rpmbuild)
+#   3. Tests
 #
 # BUGS
 #   1. No createrepo on Mint
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b17"
+declare -g SCRIPTVERSION="1.0"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -335,7 +334,7 @@ getVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG MCRPM BASE="buster" #BASE_NEXT="bullseye"
-    declare boardurl="https://yabb.jriver.com/interact/index.php/board,74.0.html" # MC29 (Buster)
+    declare boardurl="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC29 (Buster)
 
     # User input
     if [[ -v MCVERSION && "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
@@ -357,7 +356,7 @@ getVersion() {
         VERSION_SOURCE="webscrape"
     # Hardcoded
     else
-        MCVERSION="29.0.58"
+        MCVERSION="29.0.66"
         VERSION_SOURCE="hardcoded version"
         err "Warning! Using hardcoded version number"
     fi
