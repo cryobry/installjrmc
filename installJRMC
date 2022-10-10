@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0b18"
+declare -g SCRIPTVERSION="1.0-rc1"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -29,7 +29,7 @@ printHelp() {
 		USAGE:
 		    installJRMC [[OPTION] [VALUE]]...
 
-		    If no options (besides -d) are provided, the script will default to '--install repo'.
+		    If no options (excluding -d) are provided, the script will default to '--install repo'.
 
 		OPTIONS
 		    --install, -i repo|local
