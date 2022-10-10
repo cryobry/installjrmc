@@ -138,4 +138,4 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
 Did you find `installJRMC` useful? [Buy me a coffee!](https://paypal.me/bryanroessler?locale.x=en_US)
 
-Did you find a bug? Let me know on [Interact!](https://yabb.jriver.com/interact/index.php/topic,123648.0.html)
+Did you find a bug? Let me know on [Interact!](https://yabb.jriver.com/interact/index.php/topic,134152.0.html)
