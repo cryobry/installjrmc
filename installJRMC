@@ -18,6 +18,11 @@ shopt -s extglob
 
 declare -g SCRIPTVERSION="1.0-rc1"
 declare -g OUTPUTDIR="$PWD/output"
+
+declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
+declare -g DEBIANBASE="buster"
+# declare -g DEBIANBASE_NEXT="bullseye"
+
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
 declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
@@ -241,7 +246,7 @@ init() {
         err "/etc/os-release not found"
         err "Your OS is unsupported"
         printHelp
-		exit 1
+        exit 1
     fi
 
     debug "Detected host platform: $ID $VERSION_ID"
@@ -250,8 +255,8 @@ init() {
     case "$ID" in
         arch|debian)
             ;;
-		centos|fedora)
-		    if hash dnf &>/dev/null; then
+        centos|fedora)
+            if hash dnf &>/dev/null; then
                 RPM_MGR="dnf"
             elif hash yum &>/dev/null; then
                 RPM_MGR="yum"
@@ -327,22 +332,21 @@ init() {
 
 #######################################
 # Uses several methods to determine the latest JRiver MC version
-# TODO but how to determine build distro `$BASE=buster`?
+# TODO but how to determine build distro `$DEBIANBASE=buster`?
 #######################################
 getVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG MCRPM BASE="buster" #BASE_NEXT="bullseye"
-    declare boardurl="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
+    declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG MCRPM
 
     # User input
     if [[ -v MCVERSION && "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         VERSION_SOURCE="user input"
     # Containerized package manager
     elif installPackage --silent buildah &&
-    cnt=$(buildah from --quiet debian:$BASE) &>/dev/null &&
+    cnt=$(buildah from --quiet debian:$DEBIANBASE) &>/dev/null &&
     buildah run "$cnt" -- bash -c \
-        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
+        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
     buildah run "$cnt" -- bash  -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
     MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
@@ -350,7 +354,7 @@ getVersion() {
     VERSION_SOURCE="containerized package manager"; then
         buildah rm "$cnt" &>/dev/null
     # Webscrape
-    elif installPackage wget && MCVERSION=$(wget -qO- "$boardurl" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
+    elif installPackage wget && MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
     [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         VERSION_SOURCE="webscrape"
     # Hardcoded
@@ -383,7 +387,7 @@ getVersion() {
 # Options:
 #   --skip-check-installed: Do not check if package is already installed
 #   --nogpgcheck: Disable GPG checks for RPM based distros
-#   --allow-downgrades: Useful for installing compatability versions on DEB based distros
+#   --allow-downgrades: Useful for installing specific MC versions
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
 installPackage() {
@@ -392,7 +396,7 @@ installPackage() {
     declare -a pkg_array install_flags
     declare pkg skip_check_installed silent _return pkg_install_cmd
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-erasing,allow-downgrades,nogpgcheck,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -400,11 +404,9 @@ installPackage() {
                     skip_check_installed=1
                     ;;
                 --allow-downgrades)
-                    [[ "$ID" =~ ^(debian|ubuntu)$ ]] && 
+                    if [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
                         install_flags+=(--allow-downgrades)
-                    ;;
-                --allow-erasing)
-                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                    elif [[ "$ID" =~ ^(fedora|centos)$ ]]; then
                         install_flags+=(--allowerasing)
                     fi
                     ;;
@@ -486,7 +488,7 @@ installMCFromRepo() {
             sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
-				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE main
+				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main
 			EOF"
             wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | sudo tee /etc/apt/trusted.gpg.d/jriver.asc
             ;;
@@ -504,7 +506,7 @@ installMCFromRepo() {
         return 1
     fi
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --allow-erasing --nogpgcheck $MCPKG"
+    declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --nogpgcheck $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     if ! eval "$pkg_install_cmd"; then
         err "Package install failed!"
@@ -761,7 +763,7 @@ installMCDEB() {
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
-    installPackage --skip-check-installed --nogpgcheck --allow-erasing "$MCRPM"
+    installPackage --skip-check-installed --nogpgcheck --allow-downgrades "$MCRPM"
 }
 
 
@@ -1275,7 +1277,7 @@ service_jriver-createrepo() {
 #     installPackage buildah podman
 
 #     # Eventually try to switch to Debian
-#     # if ! CNT=$(buildah from debian:$BASE); then
+#     # if ! CNT=$(buildah from debian:$DEBIANBASE); then
 #     #     echo "Bad base image for container $CNAME, skipping"
 #     #     continue
 #     # fi
@@ -1424,7 +1426,7 @@ disableCoW() {
     declare mc_system_path="/usr/lib/jriver"
     declare mc_user_path="$HOME/.jriver"
 
-	[[ -d "$mc_user_path" ]] || mkdir -p "$mc_user_path"
+    [[ -d "$mc_user_path" ]] || mkdir -p "$mc_user_path"
 
     for dir in "$mc_system_path" "$mc_user_path"; do
         [[ -d "$dir" ]] || return
