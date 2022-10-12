@@ -21,7 +21,7 @@ declare -g OUTPUTDIR="$PWD/output"
 
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
 declare -g DEBIANBASE="buster"
-# declare -g DEBIANBASE_NEXT="bullseye"
+declare -g MCVERSION_HARDCODE="30.0.17" # Hardcoded fallback
 
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -46,7 +46,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum library specifiers
 		    --mcversion VERSION
-		        Specify the MC version, ex. "30.0.17" (Default: latest)
+		        Specify the MC version, ex. "30.0.17" (Default: latest version)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (Default: ./output)
 		    --restorefile RESTOREFILE
@@ -163,7 +163,7 @@ parseInput() {
                     shift && OUTPUTDIR="$1"
                     ;;
                 --mcversion)
-                    shift && MCVERSION="$1"
+                    shift && declare -g MCVERSION_INPUT="$1"
                     ;;
                 --restorefile)
                     shift && RESTOREFILE="$1"
@@ -334,14 +334,20 @@ init() {
 # Uses several methods to determine the latest JRiver MC version
 # TODO but how to determine build distro `$DEBIANBASE=buster`?
 #######################################
-getVersion() {
+setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCVERSION VERSION_SOURCE MVERSION MCPKG MCRPM
+    declare -g MCVERSION MCVERSION_SOURCE MVERSION MCPKG MCRPM 
+    declare cnt
 
     # User input
-    if [[ -v MCVERSION && "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        VERSION_SOURCE="user input"
+    if [[ -v MCVERSION_INPUT ]]; then
+        if ! [[ "$MCVERSION_INPUT" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+            err "Incorrect --mcversion format provided"
+            printHelp && exit 1
+        fi
+        MCVERSION="$MCVERSION_INPUT"
+        MCVERSION_SOURCE="user input"
     # Containerized package manager
     elif installPackage --silent buildah &&
     cnt=$(buildah from --quiet debian:$DEBIANBASE) &>/dev/null &&
@@ -350,32 +356,31 @@ getVersion() {
     buildah run "$cnt" -- bash  -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
     MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
-    [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]] &&
-    VERSION_SOURCE="containerized package manager"; then
+    [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        MCVERSION_SOURCE="containerized package manager"
         buildah rm "$cnt" &>/dev/null
     # Webscrape
     elif installPackage wget && MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
     [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        VERSION_SOURCE="webscrape"
+        MCVERSION_SOURCE="webscrape"
     # Hardcoded
     else
-        MCVERSION="30.0.17"
-        VERSION_SOURCE="hardcoded version"
-        err "Warning! Using hardcoded version number"
+        MCVERSION="$MCVERSION_HARDCODE"
+        MCVERSION_SOURCE="hardcoded version"
+        err "Warning! Using hardcoded version number."
     fi
     
     MVERSION="${MCVERSION%%.*}"
     MCPKG="mediacenter$MVERSION"
     MCRPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MVERSION-$MCVERSION.x86_64.rpm"
 
-    if [[ "$VERSION_SOURCE" == "user input" ]]; then
+    if [[ "$MCVERSION_SOURCE" == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
         [[ "$ID" =~ ^(fedora|centos|suse)$ ]] && MCPKG+="-$MCVERSION"
         [[ "$ID" =~ ^(debian|ubuntu)$ ]] && MCPKG+="=$MCVERSION"
-    else
-        echo "To override, use --mcversion"
     fi
-    echo "Using MC version $MCVERSION determined by $VERSION_SOURCE"
+    echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE."
+    [[ "$MCVERSION_SOURCE" == "user input" ]] || echo "To override, use --mcversion."
     debug "MVERSION: $MVERSION, MCVERSION: $MCVERSION, MCPKG: $MCPKG, MCRPM: $MCRPM"
 }
 
@@ -1557,7 +1562,7 @@ main() {
         exit
     fi
 
-    getVersion
+    setMCVersion
 
     if (( UNINSTALL_SWITCH )); then
         if askOk "Do you really want to uninstall JRiver Media Center?"; then
