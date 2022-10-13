@@ -28,6 +28,7 @@ declare -g USER="${SUDO_USER:-$USER}"
 declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
 printHelp() {
+    debug "Running: ${FUNCNAME[0]}"
 
     cat <<-'EOF'
 		USAGE:
@@ -115,6 +116,7 @@ askOk() {
 # Parses user input and sets sensible defaults
 #######################################
 parseInput() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH TEST_SWITCH
     declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
@@ -203,7 +205,6 @@ parseInput() {
                     exit 0
                     ;;
                 --debug|-d)
-                    set -x
                     DEBUG=1
                     ;;
                 --help|-h)
@@ -235,6 +236,7 @@ parseInput() {
 # Generate OS-specific functions
 #######################################
 init() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare -g ID RPM_MGR
 
@@ -333,6 +335,7 @@ init() {
 # TODO but how to determine build distro `$DEBIANBASE=buster`?
 #######################################
 setMCVersion() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare -g MCVERSION MCVERSION_SOURCE MVERSION MCPKG MCRPM 
     declare cnt
@@ -393,6 +396,7 @@ setMCVersion() {
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
 installPackage() {
+    debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
     declare pkg skip_check_installed silent _return pkg_install_cmd
@@ -469,6 +473,7 @@ installPackage() {
 # Installs JRiver Media Center from a remote repository
 #######################################
 installMCFromRepo() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare repo_dir
 
@@ -519,6 +524,7 @@ installMCFromRepo() {
 # Acquires the source DEB package from JRiver
 #######################################
 acquireDeb() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-amd64.deb"
 
@@ -561,6 +567,7 @@ acquireDeb() {
 # Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
 #######################################
 buildRPM() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare i rpmbuild_cmd
     declare -a requires recommends
@@ -729,7 +736,8 @@ buildRPM() {
 #######################################
 # Installs local Media Center DEB package and optional compatability fixes
 #######################################
-installMCDEB() {   
+installMCDEB() {
+    debug "Running: ${FUNCNAME[0]}"    
 
     declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
     if (( COMPAT_SWITCH )); then
@@ -759,6 +767,7 @@ installMCDEB() {
 # Installs local Media Center RPM package
 #######################################
 installMCRPM() {
+    debug "Running: ${FUNCNAME[0]}"
     installPackage --skip-check-installed --nogpgcheck --allow-downgrades "$MCRPM"
 }
 
@@ -767,6 +776,7 @@ installMCRPM() {
 # Installs local Media Center PKGBUILD
 #######################################
 installMCARCH() {
+    debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
 }
 
@@ -775,6 +785,7 @@ installMCARCH() {
 # Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
 #######################################
 runCreaterepo() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
 
@@ -830,6 +841,7 @@ runCreaterepo() {
 # Symlink certificates if they do not exist in default location
 #######################################
 symlinkCerts() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare mc_cert_link="/usr/lib/jriver/Media Center $MVERSION/ca-certificates.crt"
     declare target_cert ln_cmd
@@ -857,6 +869,7 @@ symlinkCerts() {
 # Restore the mjr license file if it is next to installJRMC or RESTOREFILE is set
 #######################################
 restoreLicense() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare mjrfile
 
@@ -883,6 +896,7 @@ restoreLicense() {
 #   Pre-defined service to enable
 #######################################
 openFirewall() {
+    debug "Running: ${FUNCNAME[0]}" "$@"
 
     # Create OS-specific port rules based on argument (service) name
     declare -a f_ports # for firewall-cmd
@@ -949,6 +963,7 @@ openFirewall() {
 #   Service type (xvnc, x11vnc)
 #######################################
 setVNCPass() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare vncpassfile="$HOME/.vnc/jrmc_passwd"
     declare vnc_pass_cmd
@@ -985,6 +1000,7 @@ setVNCPass() {
 # Set display and port variables
 #######################################
 setDisplay() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY NEXT_DISPLAYNUM
 
@@ -1003,6 +1019,7 @@ setDisplay() {
 #   Pre-defined service name
 #######################################
 setServiceVars() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING GRAPHICAL_TARGET
     declare -g SERVICE_TYPE="${SERVICE_TYPE:-system}"
@@ -1054,6 +1071,7 @@ setServiceVars() {
 #   Passes arguments as startup options to /usr/bin/mediacenter??
 #######################################
 service_jriver-mediacenter() {
+    debug "Running: ${FUNCNAME[0]}"
 
     setServiceVars "${FUNCNAME[0]##*_}"
 
@@ -1087,6 +1105,7 @@ service_jriver-mediacenter() {
 # Starts and enables (at startup) a JRiver Media Server service
 #######################################
 service_jriver-mediaserver() {
+    debug "Running: ${FUNCNAME[0]}"
 
     setServiceVars "${FUNCNAME[0]##*_}"
 
@@ -1098,6 +1117,7 @@ service_jriver-mediaserver() {
 # Starts and enables (at startup) JRiver Media Center in a new Xvnc session
 #######################################
 service_jriver-xvnc() {
+    debug "Running: ${FUNCNAME[0]}"
 
     setServiceVars "${FUNCNAME[0]##*_}"
     setDisplay
@@ -1143,6 +1163,7 @@ service_jriver-xvnc() {
 # Starts and enables (at startup) x11vnc screen sharing for the local desktop
 #######################################
 service_jriver-x11vnc() {
+    debug "Running: ${FUNCNAME[0]}"
 
     setServiceVars "${FUNCNAME[0]##*_}"
     setDisplay
@@ -1157,6 +1178,7 @@ service_jriver-x11vnc() {
     # Get current desktop resolution
     # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
     # _getResolution() {
+    #     debug "Running: ${FUNCNAME[0]}"
     #     installPackage xorg-x11-utils
     #     _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
     # }
@@ -1205,6 +1227,7 @@ service_jriver-x11vnc() {
 # Center RPM from the source DEB and create/update an RPM repository
 #######################################
 service_jriver-createrepo() {
+    debug "Running: ${FUNCNAME[0]}"
 
     if [[ "$CREATEREPO_USER" != "$USER" ]]; then
         USER="root" SERVICE_TYPE="system" setServiceVars "${FUNCNAME[0]##*_}"
@@ -1402,6 +1425,7 @@ service_jriver-createrepo() {
 # Detects if MC is installed on btrfs and disables CoW
 #######################################
 disableCoW() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare dir
     declare mc_system_path="/usr/lib/jriver"
@@ -1424,6 +1448,7 @@ disableCoW() {
 # Migrate major versions
 #######################################
 migrateLibrary() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare mc_user_path="$HOME/.jriver"
     declare current_config_path="$mc_user_path/Media Center $MVERSION"
@@ -1442,6 +1467,7 @@ migrateLibrary() {
 # Completely uninstalls MC, services, and firewall rules
 #######################################
 uninstall() {
+    debug "Running: ${FUNCNAME[0]}"
 
     declare service unit f i
 
@@ -1634,6 +1660,6 @@ main() {
 }
 
 # Quickly turn debugging on (catch for real with getopt in parseInput())
-[[ " $* " =~ ( --debug | -d ) ]] && echo "First Debugging on!" && set -x DEBUG=1
+[[ " $* " =~ ( --debug | -d ) ]] && echo "First Debugging on!" && DEBUG=1
 
 main "$@"
