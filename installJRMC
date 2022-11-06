@@ -495,7 +495,7 @@ installMCFromRepo() {
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
 				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main
 			EOF"
-            wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | sudo tee /etc/apt/trusted.gpg.d/jriver.asc
+            wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
             ;;
         *)
             err "An MC repository for $ID is not yet available."
