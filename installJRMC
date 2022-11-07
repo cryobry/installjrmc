@@ -1458,7 +1458,7 @@ migrateLibrary() {
     [[ -d "$previous_config_path" ]] &&
     mkdir -p "$current_config_path"; then
         echo "Migrating $previous_config_path to $current_config_path"
-        cp -a "$previous_config_path"/* "$current_config_path" &>/dev/null
+        cp -fa "$previous_config_path"/* "$current_config_path" &>/dev/null
     fi
 }
 
