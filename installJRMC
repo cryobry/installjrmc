@@ -1083,8 +1083,6 @@ service_jriver-mediacenter() {
 		[Service]
 		$USER_STRING
 		Type=simple
-		Environment=DISPLAY=$DISPLAY
-		Environment=XAUTHORITY=$XAUTHORITY
 		ExecStart=/usr/bin/mediacenter$MVERSION $*
 		Restart=always
 		RestartSec=10
