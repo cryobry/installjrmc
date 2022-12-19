@@ -240,6 +240,9 @@ init() {
 
     declare -g ID RPM_MGR
 
+    echo "Initializing installJRMC, this may take a while"
+    debug || "To enable debugging, use --debug or -d"
+
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
     else
