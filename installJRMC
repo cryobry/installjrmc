@@ -401,7 +401,7 @@ installPackage() {
     declare -a pkg_array install_flags
     declare pkg skip_check_installed silent _return pkg_install_cmd
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,refresh,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -420,6 +420,11 @@ installPackage() {
                         install_flags+=(--nogpgcheck)
                     elif [[ "$ID" == "suse" ]]; then
                         install_flags+=(--allow-unsigned-rpm)
+                    fi
+                    ;;
+                --refresh)
+                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
+                        install_flags+=(--refresh)
                     fi
                     ;;
                 --silent|-s)
@@ -451,8 +456,10 @@ installPackage() {
             pkg=${PKG_ALIASES[$pkg]}
         fi
         # Check if already installed
-        if (( skip_check_installed )) || ! (hash $pkg &>/dev/null || pkg_query "$pkg" &>/dev/null); then
+        if (( skip_check_installed )) || ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
             pkg_array+=("$pkg")
+        else
+            debug "$pkg already installed, skipping installation"
         fi
     done
 
@@ -503,6 +510,8 @@ installMCFromRepo() {
             return 1
             ;;
     esac
+
+    installMesa
 
     declare pkg_update_cmd="pkg_update"
     debug "$pkg_update_cmd" || pkg_update_cmd+=" &>/dev/null"
@@ -764,10 +773,37 @@ installMCDEB() {
 
 
 #######################################
+# Installs mesa-va-drivers-freeworld
+#######################################
+installMesa() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare url_pkg
+
+    case "$ID" in
+        fedora)
+            url_pkg="https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+            ;;
+        centos)
+            url_pkg="https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+            ;;
+        *)
+            return
+            ;;
+    esac
+
+    installPackage "$url_pkg"
+    installPackage --refresh mesa-va-drivers-freeworld
+}
+
+#######################################
 # Installs local Media Center RPM package
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
+    
+    installMesa
+    
     installPackage --skip-check-installed --nogpgcheck --allow-downgrades "$MCRPM"
 }
 
@@ -1539,7 +1575,7 @@ uninstall() {
 
 tests() {
     # To test on Mint/16.04: sudo apt install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
-    exit $?
+    exit
 }
 
 
@@ -1585,6 +1621,8 @@ main() {
                 installPackage epel-release
             fi
             ;;
+        fedora)
+
     esac
 
     if (( REPO_INSTALL_SWITCH )); then
