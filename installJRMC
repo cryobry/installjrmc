@@ -240,8 +240,8 @@ init() {
 
     declare -g ID RPM_MGR
 
-    echo "Initializing installJRMC, this may take a while"
-    debug || echo "To enable debugging, use --debug or -d"
+    echo "Running installJRMC, this may take a while"
+    debug || echo "To enable debugging output, use --debug or -d"
 
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
@@ -1597,13 +1597,13 @@ main() {
                 echo "Adding EPEL repository"
                 installPackage epel-release
             fi
-            if ! pkg_query rpmfusion-free-release; then
+            if ! pkg_query rpmfusion-free-release &>/dev/null; then
                 installPackage --skip-check-installed \
                     "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
         fedora)
-            if ! pkg_query rpmfusion-free-release; then
+            if ! pkg_query rpmfusion-free-release &>/dev/null; then
                 installPackage --skip-check-installed \
                     "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
