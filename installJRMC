@@ -402,11 +402,11 @@ installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
-    declare pkg skip_check_installed silent pkg_install_cmd refresh allow_downgrades no_gpg_check
+    declare input pkg skip_check_installed silent pkg_install_cmd refresh allow_downgrades no_gpg_check
     declare -A pkg_aliases
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent -- "$@"); then
-        eval set -- "$_input"
+    if input=$(getopt -o +s -l skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent -- "$@"); then
+        eval set -- "$input"
         while true; do
             case "$1" in
                 --skip-check-installed)
@@ -474,10 +474,9 @@ installPackage() {
             ;;
     esac
 
-    debug "HERE"
-
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
+        echo HERE
         pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         if ! eval "$pkg_install_cmd"; then       
