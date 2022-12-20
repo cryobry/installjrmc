@@ -474,7 +474,6 @@ installPackage() {
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
-        echo HERE
         pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
         debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
         if ! eval "$pkg_install_cmd"; then       
