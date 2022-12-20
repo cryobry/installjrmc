@@ -16,12 +16,12 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc1"
+declare -g SCRIPTVERSION="1.0-rc2"
 declare -g OUTPUTDIR="$PWD/output"
 
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="30.0.17" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="30.0.40" # Hardcoded fallback
 
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -402,9 +402,10 @@ installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
-    declare pkg skip_check_installed silent _return pkg_install_cmd
+    declare pkg skip_check_installed silent pkg_install_cmd refresh allow_downgrades no_gpg_check
+    declare -A pkg_aliases
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,refresh,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,repo,refresh,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -412,23 +413,13 @@ installPackage() {
                     skip_check_installed=1
                     ;;
                 --allow-downgrades)
-                    if [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
-                        install_flags+=(--allow-downgrades)
-                    elif [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        install_flags+=(--allowerasing)
-                    fi
+                    allow_downgrades=1
                     ;;
                 --nogpgcheck)
-                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        install_flags+=(--nogpgcheck)
-                    elif [[ "$ID" == "suse" ]]; then
-                        install_flags+=(--allow-unsigned-rpm)
-                    fi
+                    no_gpg_check=1
                     ;;
                 --refresh)
-                    if [[ "$ID" =~ ^(fedora|centos)$ ]]; then
-                        install_flags+=(--refresh)
-                    fi
+                    refresh=1
                     ;;
                 --silent|-s)
                     silent=1
@@ -446,25 +437,44 @@ installPackage() {
     fi
 
     # Aliases
-    if [[ "$ID" =~ ^(debian|ubuntu)$ ]]; then
-        declare -A PKG_ALIASES
-        PKG_ALIASES["xorg-x11-utils"]="xorg-x11"
-        PKG_ALIASES["rpm-build"]="rpm"
-        PKG_ALIASES["createrepo_c"]="createrepo"
-        PKG_ALIASES["tigervnc-server"]="tigervnc-standalone-server"
+    case "$ID" in
+        debian|ubuntu)
+            pkg_aliases["rpm-build"]="rpm"
+            pkg_aliases["createrepo_c"]="createrepo"
+            pkg_aliases["tigervnc-server"]="tigervnc-standalone-server"
+            ;;
+        fedora|centos)
+            ;;
+    esac
+
+    # Filter installed packages
+    if ! (( skip_check_installed )); then
+        for pkg in "$@"; do
+            if [[ ! -v skip_check_installed && -v pkg_aliases[$pkg] ]]; then
+                pkg=${pkg_aliases[$pkg]}
+            fi
+            if ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
+                pkg_array+=("$pkg")
+            else
+                debug "$pkg already installed, skipping installation"
+            fi
+        done
     fi
 
-    for pkg in "$@"; do
-        if [[ ! -v skip_check_installed && -v PKG_ALIASES[$pkg] ]]; then
-            pkg=${PKG_ALIASES[$pkg]}
-        fi
-        # Check if already installed
-        if (( skip_check_installed )) || ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
-            pkg_array+=("$pkg")
-        else
-            debug "$pkg already installed, skipping installation"
-        fi
-    done
+    # Generate distro-specific install flags
+    case "$ID" in
+        debian|ubuntu)
+            (( allow_downgrades )) && install_flags+=(--allow-downgrades)
+            ;;
+        fedora|centos)
+            (( allow_downgrades )) && install_flags+=(--allowerasing)
+            (( no_gpg_check )) && install_flags+=(--nogpgcheck)
+            (( refresh )) && install_flags+=(--refresh)
+            ;;
+        suse)
+            (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
+    esac
+
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
@@ -513,8 +523,6 @@ installMCFromRepo() {
             return 1
             ;;
     esac
-
-    installMesa
 
     declare pkg_update_cmd="pkg_update"
     debug "$pkg_update_cmd" || pkg_update_cmd+=" &>/dev/null"
@@ -641,6 +649,7 @@ buildRPM() {
             requires=("${requires[@]/libvulkan1/vulkan-loader}")
             requires=("${requires[@]/libepoxy0/libepoxy}")
             requires=("${requires[@]/python/python3}")
+            recommends+=(mesa-va-drivers-freeworld)
             ;;
         suse)
             requires=("${requires[@]/libc6/glibc}")
@@ -776,36 +785,10 @@ installMCDEB() {
 
 
 #######################################
-# Installs mesa-va-drivers-freeworld
-#######################################
-installMesa() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    declare url_pkg
-
-    case "$ID" in
-        fedora)
-            url_pkg="https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-            ;;
-        centos)
-            url_pkg="https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-            ;;
-        *)
-            return
-            ;;
-    esac
-
-    installPackage "$url_pkg"
-    installPackage --refresh mesa-va-drivers-freeworld
-}
-
-#######################################
 # Installs local Media Center RPM package
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
-    
-    installMesa
     
     installPackage --skip-check-installed --nogpgcheck --allow-downgrades "$MCRPM"
 }
@@ -1082,7 +1065,7 @@ setServiceVars() {
         systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
         systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
         systemctl_is_enabled_cmd(){ systemctl --user is-enabled -q "$@"; }
-        systemctl_is_active(){ sudo systemctl is-active -q "$@"; }
+        systemctl_is_active_cmd(){ systemctl --user is-active -q "$@"; }
         GRAPHICAL_TARGET="default.target"
     fi
 
@@ -1211,15 +1194,6 @@ service_jriver-x11vnc() {
     installPackage x11vnc
 
     setVNCPass x11vnc
-
-    # Get current desktop resolution
-    # TODO: may need to break this out into its own function and get smarter at identifying multi-monitors
-    # _getResolution() {
-    #     debug "Running: ${FUNCNAME[0]}"
-    #     installPackage xorg-x11-utils
-    #     _res=$(xdpyinfo | grep dimensions | awk '{print $2}')
-    # }
-    # _getResolution
 
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
     if [[ ! -f "$HOME/.Xauthority" ]]; then
@@ -1578,7 +1552,7 @@ uninstall() {
 
 tests() {
     # To test on Mint/16.04: sudo apt install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
-    exit
+    : # TODO
 }
 
 
@@ -1623,9 +1597,17 @@ main() {
                 echo "Adding EPEL repository"
                 installPackage epel-release
             fi
+            if ! pkg_query rpmfusion-free-release; then
+                installPackage --skip-check-installed \
+                    "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+            fi
             ;;
         fedora)
-
+            if ! pkg_query rpmfusion-free-release; then
+                installPackage --skip-check-installed \
+                    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+            fi
+            ;;
     esac
 
     if (( REPO_INSTALL_SWITCH )); then
