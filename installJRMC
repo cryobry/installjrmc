@@ -474,6 +474,8 @@ installPackage() {
             ;;
     esac
 
+    debug "pkg_array: ${pkg_array[*]}"
+
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
         echo HERE
