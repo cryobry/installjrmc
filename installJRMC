@@ -528,7 +528,7 @@ installMCFromRepo() {
         return 1
     fi
 
-    # Install mesa-va-freeworld separately from the RPM for dnf swap
+    # Install mesa-va-drivers-freeworld separately from the RPM for dnf swap
     installMesa
 
     declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --no-gpg-check $MCPKG"
@@ -797,23 +797,28 @@ installMCRPM() {
 
 
 #######################################
-# Installs mesa-va-freeworld
+# Installs mesa-va-drivers-freeworld
 #######################################
 installMesa() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
-        if pkg_query mesa-va-drivers &>/dev/null; then
-            declare pkg_swap_cmd="pkg_swap mesa-va-drivers mesa-va-drivers-freeworld"
-            debug "$pkg_swap_cmd" || pkg_swap_cmd+=" &>/dev/null"
-            if ! eval "$pkg_swap_cmd"; then
-                err "Package swap failed!"
-                return 1
+    # Currently only necessary in Fedora/CentOS
+    case "$ID" in
+        fedora|centos)
+            if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
+                if pkg_query mesa-va-drivers &>/dev/null; then
+                    declare pkg_swap_cmd="pkg_swap mesa-va-drivers mesa-va-drivers-freeworld"
+                    debug "$pkg_swap_cmd" || pkg_swap_cmd+=" &>/dev/null"
+                    if ! eval "$pkg_swap_cmd"; then
+                        err "Package swap failed!"
+                        return 1
+                    fi
+                else
+                    pkg_install mesa-va-drivers-freeworld
+                fi
             fi
-        else
-            pkg_install mesa-va-drivers-freeworld
-        fi
-    fi
+            ;;
+    esac
 }
 
 
