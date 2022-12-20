@@ -805,7 +805,7 @@ installMesa() {
     if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
         if pkg_query mesa-va-drivers &>/dev/null; then
             declare pkg_swap_cmd="pkg_swap mesa-va-drivers mesa-va-drivers-freeworld"
-            debug "$pkg_swap_cmd" pkg_swap_cmd+=" &>/dev/null"
+            debug "$pkg_swap_cmd" || pkg_swap_cmd+=" &>/dev/null"
             if ! eval "$pkg_swap_cmd"; then
                 err "Package swap failed!"
                 return 1
