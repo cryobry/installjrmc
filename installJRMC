@@ -445,6 +445,8 @@ installPackage() {
             ;;
     esac
 
+    echo "Input: $*"
+
     # Filter installed packages
     if ! (( skip_check_installed )); then
         for pkg in "$@"; do
