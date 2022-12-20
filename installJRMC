@@ -394,7 +394,7 @@ setMCVersion() {
 #   One or more package names
 # Options:
 #   --skip-check-installed: Do not check if package is already installed
-#   --nogpgcheck: Disable GPG checks for RPM based distros
+#   --no-gpg-check: Disable GPG checks for RPM based distros
 #   --allow-downgrades: Useful for installing specific MC versions
 #   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
 #######################################
@@ -405,7 +405,7 @@ installPackage() {
     declare pkg skip_check_installed silent pkg_install_cmd refresh allow_downgrades no_gpg_check
     declare -A pkg_aliases
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,refresh,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -415,7 +415,7 @@ installPackage() {
                 --allow-downgrades)
                     allow_downgrades=1
                     ;;
-                --nogpgcheck)
+                --no-gpg-check)
                     no_gpg_check=1
                     ;;
                 --refresh)
@@ -528,7 +528,7 @@ installMCFromRepo() {
         return 1
     fi
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --nogpgcheck $MCPKG"
+    declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --no-gpg-check $MCPKG"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
     if ! eval "$pkg_install_cmd"; then
         err "Package install failed!"
@@ -757,7 +757,7 @@ buildRPM() {
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"    
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --nogpgcheck"
+    declare pkg_install_cmd="installPackage --skip-check-installed --no-gpg-check"
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
@@ -787,7 +787,7 @@ installMCDEB() {
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
     
-    installPackage --skip-check-installed --nogpgcheck --allow-downgrades "$MCRPM"
+    installPackage --skip-check-installed --no-gpg-check --allow-downgrades "$MCRPM"
 }
 
 
