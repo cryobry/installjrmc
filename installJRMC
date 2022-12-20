@@ -759,7 +759,7 @@ buildRPM() {
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"    
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --no-gpg-check"
+    declare pkg_install_cmd="installPackage --skip-check-installed --no-gpg-check --allow-downgrades"
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
@@ -775,7 +775,6 @@ installMCDEB() {
         ar rcs "$MCDEB" "debian-binary" "control.tar.xz" "data.tar.xz"
         popd &>/dev/null || return
         rm -rf "$extract_dir"
-        pkg_install_cmd+=" --allow-downgrades"
     fi
     pkg_install_cmd+=" $MCDEB"
     debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
