@@ -240,7 +240,7 @@ init() {
 
     declare -g ID RPM_MGR
 
-    echo "Running installJRMC, this may take a while"
+    echo "Starting installJRMC..."
     debug || echo "To enable debugging output, use --debug or -d"
 
     if [[ -e "/etc/os-release" ]]; then
@@ -529,7 +529,7 @@ installMCFromRepo() {
     fi
 
     declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --no-gpg-check $MCPKG"
-    debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
+    debug "$pkg_install_cmd"
     if ! eval "$pkg_install_cmd"; then
         err "Package install failed!"
         return 1
