@@ -445,21 +445,17 @@ installPackage() {
             ;;
     esac
 
-    echo "Input: $*"
-
     # Filter installed packages
-    if ! (( skip_check_installed )); then
-        for pkg in "$@"; do
-            if [[ -v pkg_aliases[$pkg] ]]; then
-                pkg=${pkg_aliases[$pkg]}
-            fi
-            if ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
-                pkg_array+=("$pkg")
-            else
-                debug "$pkg already installed, skipping installation"
-            fi
-        done
-    fi
+    for pkg in "$@"; do
+        if [[ -v pkg_aliases[$pkg] ]]; then
+            pkg=${pkg_aliases[$pkg]}
+        fi
+        if (( skip_check_installed )) || ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
+            pkg_array+=("$pkg")
+        else
+            debug "$pkg already installed, skipping installation"
+        fi
+    done
 
     # Generate distro-specific install flags
     case "$ID" in
@@ -475,8 +471,6 @@ installPackage() {
             (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
             ;;
     esac
-
-    debug "pkg_array: ${pkg_array[*]}"
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
