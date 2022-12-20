@@ -471,6 +471,7 @@ installPackage() {
             ;;
         suse)
             (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
+            ;;
     esac
 
     # Install packages from package array
