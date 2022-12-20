@@ -240,7 +240,7 @@ init() {
 
     declare -g ID RPM_MGR
 
-    echo "Starting installJRMC..."
+    echo "Starting installJRMC"
     debug || echo "To enable debugging output, use --debug or -d"
 
     if [[ -e "/etc/os-release" ]]; then
@@ -302,6 +302,7 @@ init() {
             pkg_install_local() { installMCRPM; }
             pkg_remove(){ sudo "$RPM_MGR" remove -y "$@"; }
             pkg_update(){ sudo "$RPM_MGR" makecache; }
+            pkg_swap() { sudo dnf swap -y "$1" "$2"; }
             pkg_query(){ rpm -q "$@"; }
             firewall_cmd(){ sudo firewall-cmd "$@"; }
             ;;
@@ -436,7 +437,7 @@ installPackage() {
         exit 1
     fi
 
-    # Aliases
+    # Package aliases
     case "$ID" in
         debian|ubuntu)
             pkg_aliases["rpm-build"]="rpm"
@@ -526,6 +527,9 @@ installMCFromRepo() {
         err "Package update failed!"
         return 1
     fi
+
+    # Install mesa-va-freeworld separately from the RPM for dnf swap
+    installMesa
 
     declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --no-gpg-check $MCPKG"
     debug "$pkg_install_cmd"
@@ -734,7 +738,6 @@ buildRPM() {
 
     # Run rpmbuild
     echo "Building MC $MCVERSION RPM, this may take awhile"
-    (( DEBUG )) || echo "Use --debug for verbose output"
     rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb" 
     rpmbuild_cmd+=" $OUTPUTDIR/SPECS/mediacenter.spec"
     debug "$rpmbuild_cmd" || rpmbuild_cmd+=" &>/dev/null"
@@ -785,9 +788,34 @@ installMCDEB() {
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
+
+    # Install mesa-va-freeworld separately from the RPM for dnf swap
+    installMesa
     
     installPackage --skip-check-installed --no-gpg-check --allow-downgrades "$MCRPM"
 }
+
+
+#######################################
+# Installs mesa-va-freeworld
+#######################################
+installMesa() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
+        if pkg_query mesa-va-drivers &>/dev/null; then
+            declare pkg_swap_cmd="pkg_swap mesa-va-drivers mesa-va-drivers-freeworld"
+            debug "$pkg_swap_cmd" pkg_swap_cmd+=" &>/dev/null"
+            if ! eval "$pkg_swap_cmd"; then
+                err "Package swap failed!"
+                return 1
+            fi
+        else
+            pkg_install mesa-va-drivers-freeworld
+        fi
+    fi
+}
+
 
 
 #######################################
@@ -1580,7 +1608,7 @@ main() {
         exit
     fi
 
-    # Install external repos, if required
+    # Install external repos
     case "$ID" in
         ubuntu)
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
