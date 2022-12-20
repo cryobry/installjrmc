@@ -405,7 +405,7 @@ installPackage() {
     declare pkg skip_check_installed silent pkg_install_cmd refresh allow_downgrades no_gpg_check
     declare -A pkg_aliases
 
-    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,repo,refresh,silent -- "$@"); then
+    if _input=$(getopt -o +s -l skip-check-installed,allow-downgrades,nogpgcheck,refresh,silent -- "$@"); then
         eval set -- "$_input"
         while true; do
             case "$1" in
@@ -443,14 +443,12 @@ installPackage() {
             pkg_aliases["createrepo_c"]="createrepo"
             pkg_aliases["tigervnc-server"]="tigervnc-standalone-server"
             ;;
-        fedora|centos)
-            ;;
     esac
 
     # Filter installed packages
     if ! (( skip_check_installed )); then
         for pkg in "$@"; do
-            if [[ ! -v skip_check_installed && -v pkg_aliases[$pkg] ]]; then
+            if [[ -v pkg_aliases[$pkg] ]]; then
                 pkg=${pkg_aliases[$pkg]}
             fi
             if ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
@@ -474,7 +472,6 @@ installPackage() {
         suse)
             (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
     esac
-
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
