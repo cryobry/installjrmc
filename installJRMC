@@ -1617,7 +1617,11 @@ main() {
         ubuntu)
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
-                sudo add-apt-repository -y universe
+                declare add_universe_cmd="sudo add-apt-repository -y universe"
+                debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
+                if ! exec "$add_universe_cmd"; then
+                    err "Adding universe repository failed"
+                fi
             fi
             ;;
         centos)
