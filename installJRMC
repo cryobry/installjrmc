@@ -1071,7 +1071,7 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING GRAPHICAL_TARGET
+    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
     declare -g SERVICE_TYPE="${SERVICE_TYPE:-system}"
     declare service_dir="/usr/lib/systemd/$SERVICE_TYPE"
 
@@ -1098,6 +1098,17 @@ setServiceVars() {
     fi
 
     [[ ! -d "$service_dir" ]] && sudo mkdir -p "$service_dir"
+
+    # TODO Ubuntu needs these in the service file, fedora (and others?) does not
+    case "$ID" in
+        ubuntu|debian)
+            DISPLAY_STRING="Environment=DISPLAY=$DISPLAY"
+            DISPLAY_STRING+=$'\n'"Environment=XAUTHORITY=$XAUTHORITY"
+            ;;
+        *)
+            DISPLAY_STRING=""
+            ;;
+    esac
 
     if [[ "$SERVICE_TYPE" == "system" && "$USER" != "root" ]]; then
         SERVICE_FNAME="$service_dir/${1}@.service"
@@ -1132,7 +1143,10 @@ service_jriver-mediacenter() {
 
 		[Service]
 		$USER_STRING
+        $DISPLAY_STRING
 		Type=simple
+		Environment=DISPLAY=$DISPLAY
+		Environment=XAUTHORITY=$XAUTHORITY
 		ExecStart=/usr/bin/mediacenter$MVERSION $*
 		Restart=always
 		RestartSec=10
