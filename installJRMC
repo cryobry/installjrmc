@@ -108,7 +108,6 @@ askOk() {
     declare response
     read -r -p "$* [y/N]: " response
     [[ "${response,,}" =~ ^(yes|y)$ ]]
-    return
 }
 
 
