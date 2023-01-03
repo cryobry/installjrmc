@@ -16,12 +16,12 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc2"
+declare -g SCRIPTVERSION="1.0-rc3"
 declare -g OUTPUTDIR="$PWD/output"
 
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="30.0.44" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="30.0.45" # Hardcoded fallback
 
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
