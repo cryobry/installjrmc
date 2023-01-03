@@ -379,8 +379,14 @@ setMCVersion() {
 
     if [[ "$MCVERSION_SOURCE" == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
-        [[ "$ID" =~ ^(fedora|centos|suse)$ ]] && MCPKG+="-$MCVERSION"
-        [[ "$ID" =~ ^(debian|ubuntu)$ ]] && MCPKG+="=$MCVERSION"
+        case "$ID" in
+            fedora|centos|suse)
+                MCPKG+="-$MCVERSION"
+                ;;
+            debian|ubuntu)
+                MCPKG+="=$MCVERSION"
+                ;;
+        esac
     fi
     echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE."
     [[ "$MCVERSION_SOURCE" == "user input" ]] || echo "To override, use --mcversion."
