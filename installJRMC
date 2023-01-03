@@ -274,6 +274,9 @@ init() {
         *suse*)
             ID="suse"
             ;;
+        raspbian)
+            ID="debian"
+            ;;
         *)
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
             if hash dnf &>/dev/null; then
