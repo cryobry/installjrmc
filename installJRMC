@@ -839,7 +839,7 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
-    [[ ! -d "$OUTPUTDIR/PKGBUILD/" ]] && mkdir -p "$OUTPUTDIR/PKGBUILD"
+    [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
 		pkgname=mediacenter$MVERSION
 		pkgver=$MCVERSION
@@ -1720,6 +1720,8 @@ main() {
             return 1
         fi
     fi
+
+    debug "BUILD_SWITCH: $BUILD_SWITCH"
 
     if (( BUILD_SWITCH )); then
         installPackage "wget"
