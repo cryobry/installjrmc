@@ -871,12 +871,12 @@ installMCARCH() {
         --force
         --install
         -p mediacenter.pkgbuild"
-    #if ! exec ${makepkg_cmd}; then
-    if ! exec "${makepkg_cmd}"; then
+
+    if ! eval "${makepkg_cmd}"; then
         echo "makepkg failed"
         exit
     fi
-    #fi
+
     popd &>/dev/null || return
 }
 
@@ -1682,8 +1682,8 @@ main() {
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
                 declare add_universe_cmd="sudo add-apt-repository -y universe"
-                #debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
-                if ! exec "$add_universe_cmd"; then
+                debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
+                if ! eval "$add_universe_cmd"; then
                     err "Adding universe repository failed"
                 fi
             fi
