@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc3"
+declare -g SCRIPTVERSION="1.0-rc4"
 declare -g OUTPUTDIR="$PWD/output"
 
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
