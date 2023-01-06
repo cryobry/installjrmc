@@ -865,13 +865,9 @@ installMCARCH() {
 	EOF
     
     pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
-    makepkg_cmd="makepkg 
-        --syncdeps 
-        --clean
-        --cleanbuild
-        --force
-        --install
-        -p mediacenter.pkgbuild"
+    makepkg_cmd="makepkg"
+    makepkg_cmd+=" --syncdeps --clean --cleanbuild --force --install"
+    makepkg_cmd+=" -p mediacenter.pkgbuild"
 
     if ! eval "${makepkg_cmd}"; then
         echo "makepkg failed"
