@@ -875,7 +875,9 @@ installMCARCH() {
         --install
         -p mediacenter.pkgbuild"
     if ! exec ${makepkg_cmd}; then
-        if [[ $? -eq 10 ]]; then
+        output=$?
+        echo $output
+        if [[ $output -eq 10 ]]; then
             su nobody exec "${makepkg_cmd}" # TODO, for testing in root VM
         fi
     fi
