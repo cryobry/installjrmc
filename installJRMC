@@ -874,7 +874,7 @@ installMCARCH() {
         --force \
         --install \
         -p "mediacenter.pkgbuild"
-    popd "$OUTPUTDIR/PKGBUILD" || return
+    popd || return
 }
 
 
