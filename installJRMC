@@ -875,7 +875,7 @@ installMCARCH() {
         --install
         -p mediacenter.pkgbuild"
     #if ! exec ${makepkg_cmd}; then
-        su nobody exec "${makepkg_cmd}" # TODO, for testing in root VM
+        su bryan exec "${makepkg_cmd}" # TODO, for testing in root VM
     #fi
     popd || return
 }
