@@ -255,7 +255,7 @@ init() {
 
     # normalize ID and set distro-specific vars
     case "$ID" in
-        debian)
+        debian|arch)
             ;;
         centos|fedora)
             if hash dnf &>/dev/null; then
@@ -275,9 +275,6 @@ init() {
             ;;
         raspbian)
             ID="debian"
-            ;;
-        arch)
-            BUILD_SWITCH=0 # TODO could be refactored
             ;;
         *)
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
@@ -1721,9 +1718,7 @@ main() {
         fi
     fi
 
-    debug "BUILD_SWITCH: $BUILD_SWITCH"
-
-    if (( BUILD_SWITCH )); then
+    if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
         installPackage "wget"
         acquireDeb
         if [[ "$TARGET" =~ (centos|fedora|suse) ]]; then
