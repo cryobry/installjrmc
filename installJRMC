@@ -836,49 +836,49 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
-    # [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
-    # cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
-	# 	pkgname=mediacenter$MVERSION
-	# 	pkgver=$MCVERSION
-	# 	pkgrel=1
-	# 	pkgdesc="The Most Comprehensive Media Software"
-	# 	arch=('x86_64')
-	# 	url="http://www.jriver.com/"
-	# 	license=('custom')
-	# 	depends=('alsa-lib' 'gcc-libs' 'libx11' 'libxext' 'libxcb' 'libxau' 'libxdmcp' 'util-linux' 'libxext' 'gtk3')
-	# 	optdepends=(
-	# 		'mesa-libgl: nouveau video support' 
-	# 		'nvidia-libgl: nvidia video support' 
-	# 		'nvidia-utils: nvidia vulkan support' 
-	# 		'vulkan-intel: intel vulkan support' 
-	# 		'vulkan-radeon: amd vulkan support' 
-	# 		'vorbis-tools: ogg vorbis support' 
-	# 		'musepack-tools: musepack support'
-	# 	)
-	# 	source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb" 'License.txt')
+    [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
+    cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
+		pkgname=mediacenter$MVERSION
+		pkgver=$MCVERSION
+		pkgrel=1
+		pkgdesc="The Most Comprehensive Media Software"
+		arch=('x86_64')
+		url="http://www.jriver.com/"
+		license=('custom')
+		depends=('alsa-lib' 'gcc-libs' 'libx11' 'libxext' 'libxcb' 'libxau' 'libxdmcp' 'util-linux' 'libxext' 'gtk3')
+		optdepends=(
+			'mesa-libgl: nouveau video support' 
+			'nvidia-libgl: nvidia video support' 
+			'nvidia-utils: nvidia vulkan support' 
+			'vulkan-intel: intel vulkan support' 
+			'vulkan-radeon: amd vulkan support' 
+			'vorbis-tools: ogg vorbis support' 
+			'musepack-tools: musepack support'
+		)
+		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb" 'License.txt')
 
-	# 	package() {
-	# 		cd "\$srcdir"
-	# 		bsdtar xf data.tar.xz -C "\$pkgdir"
-	# 		install -Dm644 "License.txt" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
-	# 	}
-	# EOF
+		package() {
+			cd "\$srcdir"
+			bsdtar xf data.tar.xz -C "\$pkgdir"
+			install -Dm644 "License.txt" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
+		}
+	EOF
     
-    # pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
-    # makepkg_cmd="makepkg 
-    #     --syncdeps 
-    #     --clean
-    #     --cleanbuild
-    #     --force
-    #     --install
-    #     -p mediacenter.pkgbuild"
+    pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
+    makepkg_cmd="makepkg 
+        --syncdeps 
+        --clean
+        --cleanbuild
+        --force
+        --install
+        -p mediacenter.pkgbuild"
 
-    # if ! eval "${makepkg_cmd}"; then
-    #     echo "makepkg failed"
-    #     exit
-    # fi
+    if ! eval "${makepkg_cmd}"; then
+        echo "makepkg failed"
+        exit
+    fi
 
-    # popd &>/dev/null || return
+    popd &>/dev/null || return
 }
 
 
