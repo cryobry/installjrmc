@@ -253,9 +253,9 @@ init() {
 
     debug "Detected host platform: $ID $VERSION_ID"
 
-    # normalize ID
+    # normalize ID and set distro-specific vars
     case "$ID" in
-        arch|debian)
+        debian)
             ;;
         centos|fedora)
             if hash dnf &>/dev/null; then
@@ -275,6 +275,9 @@ init() {
             ;;
         raspbian)
             ID="debian"
+            ;;
+        arch)
+            BUILD_SWITCH=0 # TODO could be refactored
             ;;
         *)
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
