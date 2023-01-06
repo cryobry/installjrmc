@@ -836,8 +836,8 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
-    [[ ! -d "$OUTPUTDIR/PKGBUILD/" ]] && mkdir -p "$OUTPUTDIR/PKGBUILD"
-    cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
+    [[ ! -d "$OUTPUTDIR/PKGBUILD/" ]] && mkdir -p "$OUTPUTDIR/mediacenter.pkgbuild"
+    cat <<-EOF > "$OUTPUTDIR/PKGBUILD/PKGBUILD"
 		pkgname=mediacenter$MVERSION
 		pkgver=$MCVERSION
 		pkgrel=1
@@ -862,6 +862,16 @@ installMCARCH() {
 			install -Dm644 "License.txt" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
 		}
 	EOF
+    
+    pushd "$OUTPUTDIR/PKGBUILD" || return
+    makepkg \
+        --syncdeps \
+        --clean \
+        --cleanbuild \
+        --force \
+        --install \
+        -p "mediacenter.pkgbuild"
+    popd "$OUTPUTDIR/PKGBUILD" || return
 }
 
 
