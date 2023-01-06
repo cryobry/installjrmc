@@ -863,7 +863,7 @@ installMCARCH() {
 		}
 	EOF
     
-    pushd "$OUTPUTDIR/PKGBUILD" || return
+    pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
     makepkg_cmd="makepkg 
         --syncdeps 
         --clean
@@ -877,7 +877,7 @@ installMCARCH() {
         exit
     fi
     #fi
-    popd || return
+    popd &>/dev/null || return
 }
 
 
