@@ -867,13 +867,18 @@ installMCARCH() {
 	EOF
     
     pushd "$OUTPUTDIR/PKGBUILD" || return
-    makepkg \
-        --syncdeps \
-        --clean \
-        --cleanbuild \
-        --force \
-        --install \
-        -p "mediacenter.pkgbuild"
+    makepkg_cmd="makepkg 
+        --syncdeps 
+        --clean
+        --cleanbuild
+        --force
+        --install
+        -p mediacenter.pkgbuild"
+    if ! exec ${makepkg_cmd}; then
+        if [[ $? -eq 10 ]]; then
+            su nobody exec "${makepkg_cmd}" # TODO, for testing in root VM
+        fi
+    fi
     popd || return
 }
 
