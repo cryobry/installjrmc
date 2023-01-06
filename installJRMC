@@ -16,12 +16,12 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc2"
+declare -g SCRIPTVERSION="1.0-rc4"
 declare -g OUTPUTDIR="$PWD/output"
 
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="30.0.44" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="30.0.45" # Hardcoded fallback
 
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -272,6 +272,9 @@ init() {
             ;;
         *suse*)
             ID="suse"
+            ;;
+        raspbian)
+            ID="debian"
             ;;
         *)
             echo "Autodetecting distro, this may be unreliable and --compat may also be required"
@@ -833,6 +836,32 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
+    [[ ! -d "$OUTPUTDIR/PKGBUILD/" ]] && mkdir -p "$OUTPUTDIR/PKGBUILD"
+    cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
+		pkgname=mediacenter$MVERSION
+		pkgver=$MCVERSION
+		pkgrel=1
+		pkgdesc="The Most Comprehensive Media Software"
+		arch=('x86_64')
+		url="http://www.jriver.com/"
+		license=('custom')
+		depends=('alsa-lib' 'gcc-libs' 'libx11' 'libxext' 'libxcb' 'libxau' 'libxdmcp' 'util-linux' 'libxext' 'gtk3')
+		optdepends=('mesa-libgl: nouveau video support' 
+                    'nvidia-libgl: nvidia video support' 
+                    'nvidia-utils: nvidia vulkan support' 
+                    'vulkan-intel: intel vulkan support' 
+                    'vulkan-radeon: amd vulkan support' 
+                    'vorbis-tools: ogg vorbis support' 
+                    'musepack-tools: musepack support'
+                    )
+		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb" 'License.txt')
+
+		package() {
+			cd "\$srcdir"
+			bsdtar xf data.tar.xz -C "\$pkgdir"
+			install -Dm644 "License.txt" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
+		}
+	EOF
 }
 
 
@@ -1637,7 +1666,7 @@ main() {
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
                 declare add_universe_cmd="sudo add-apt-repository -y universe"
-                debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
+                #debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
                 if ! exec "$add_universe_cmd"; then
                     err "Adding universe repository failed"
                 fi
