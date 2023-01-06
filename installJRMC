@@ -108,7 +108,6 @@ askOk() {
     declare response
     read -r -p "$* [y/N]: " response
     [[ "${response,,}" =~ ^(yes|y)$ ]]
-    return
 }
 
 
@@ -254,9 +253,9 @@ init() {
 
     debug "Detected host platform: $ID $VERSION_ID"
 
-    # normalize ID
+    # normalize ID and set distro-specific vars
     case "$ID" in
-        arch|debian)
+        debian|arch)
             ;;
         centos|fedora)
             if hash dnf &>/dev/null; then
@@ -383,8 +382,14 @@ setMCVersion() {
 
     if [[ "$MCVERSION_SOURCE" == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
-        [[ "$ID" =~ ^(fedora|centos|suse)$ ]] && MCPKG+="-$MCVERSION"
-        [[ "$ID" =~ ^(debian|ubuntu)$ ]] && MCPKG+="=$MCVERSION"
+        case "$ID" in
+            fedora|centos|suse)
+                MCPKG+="-$MCVERSION"
+                ;;
+            debian|ubuntu)
+                MCPKG+="=$MCVERSION"
+                ;;
+        esac
     fi
     echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE."
     [[ "$MCVERSION_SOURCE" == "user input" ]] || echo "To override, use --mcversion."
@@ -831,7 +836,7 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
     echo "Arch install under construction"
-    # [[ ! -d "$OUTPUTDIR/PKGBUILD/" ]] && mkdir -p "$OUTPUTDIR/PKGBUILD"
+    # [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
     # cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
 	# 	pkgname=mediacenter$MVERSION
 	# 	pkgver=$MCVERSION
@@ -841,14 +846,15 @@ installMCARCH() {
 	# 	url="http://www.jriver.com/"
 	# 	license=('custom')
 	# 	depends=('alsa-lib' 'gcc-libs' 'libx11' 'libxext' 'libxcb' 'libxau' 'libxdmcp' 'util-linux' 'libxext' 'gtk3')
-	# 	optdepends=('mesa-libgl: nouveau video support' 
-    #                 'nvidia-libgl: nvidia video support' 
-    #                 'nvidia-utils: nvidia vulkan support' 
-    #                 'vulkan-intel: intel vulkan support' 
-    #                 'vulkan-radeon: amd vulkan support' 
-    #                 'vorbis-tools: ogg vorbis support' 
-    #                 'musepack-tools: musepack support'
-    #                 )
+	# 	optdepends=(
+	# 		'mesa-libgl: nouveau video support' 
+	# 		'nvidia-libgl: nvidia video support' 
+	# 		'nvidia-utils: nvidia vulkan support' 
+	# 		'vulkan-intel: intel vulkan support' 
+	# 		'vulkan-radeon: amd vulkan support' 
+	# 		'vorbis-tools: ogg vorbis support' 
+	# 		'musepack-tools: musepack support'
+	# 	)
 	# 	source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb" 'License.txt')
 
 	# 	package() {
@@ -857,6 +863,22 @@ installMCARCH() {
 	# 		install -Dm644 "License.txt" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
 	# 	}
 	# EOF
+    
+    # pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
+    # makepkg_cmd="makepkg 
+    #     --syncdeps 
+    #     --clean
+    #     --cleanbuild
+    #     --force
+    #     --install
+    #     -p mediacenter.pkgbuild"
+
+    # if ! eval "${makepkg_cmd}"; then
+    #     echo "makepkg failed"
+    #     exit
+    # fi
+
+    # popd &>/dev/null || return
 }
 
 
@@ -1661,8 +1683,8 @@ main() {
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
                 declare add_universe_cmd="sudo add-apt-repository -y universe"
-                #debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
-                if ! exec "$add_universe_cmd"; then
+                debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
+                if ! eval "$add_universe_cmd"; then
                     err "Adding universe repository failed"
                 fi
             fi
@@ -1700,7 +1722,7 @@ main() {
         fi
     fi
 
-    if (( BUILD_SWITCH )); then
+    if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
         installPackage "wget"
         acquireDeb
         if [[ "$TARGET" =~ (centos|fedora|suse) ]]; then
