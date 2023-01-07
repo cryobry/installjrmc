@@ -865,7 +865,8 @@ installMCARCH() {
     
     pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
     makepkg_cmd="makepkg"
-    makepkg_cmd+=" --syncdeps --clean --cleanbuild --force --install"
+    # TODO try to acquire checksums from deb
+    makepkg_cmd+=" --syncdeps --clean --cleanbuild --skipinteg --force --install --noconfirm"
     makepkg_cmd+=" -p mediacenter.pkgbuild"
 
     if ! eval "${makepkg_cmd}"; then
