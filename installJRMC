@@ -855,12 +855,11 @@ installMCARCH() {
 			'vorbis-tools: ogg vorbis support' 
 			'musepack-tools: musepack support'
 		)
-		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb" 'License.txt')
+		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb")
 
 		package() {
 			cd "\$srcdir"
 			bsdtar xf data.tar.xz -C "\$pkgdir"
-			install -Dm644 "License.txt" "\$pkgdir/usr/share/licenses/\$pkgname/COPYING"
 		}
 	EOF
     
