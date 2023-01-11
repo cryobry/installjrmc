@@ -1646,6 +1646,7 @@ tests() {
 
 
 main() {
+    debug "Running: ${FUNCNAME[0]} $*"
 
     init
 
@@ -1773,7 +1774,7 @@ main() {
     # done
 }
 
-# Quickly turn debugging on (catch for real with getopt in parseInput())
-[[ " $* " =~ ( --debug | -d ) ]] && echo "First Debugging on!" && DEBUG=1
+# Quickly turn debugging on, also use getopt in parseInput()
+[[ " $* " =~ ( --debug | -d ) ]] && DEBUG=1
 
 main "$@"
