@@ -2,7 +2,7 @@
 # Install JRiver Media Center and associated services
 # See installJRMC --help or printHelp() below
 #
-# Copyright (c) 2021-2022 Bryan C. Roessler
+# Copyright (c) 2021-2023 Bryan C. Roessler
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
 #
@@ -21,7 +21,7 @@ declare -g OUTPUTDIR="$PWD/output"
 
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="30.0.45" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="30.0.48" # Hardcoded fallback
 
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -293,6 +293,7 @@ init() {
                 err "OS detection failed!"
                 exit 1
             fi
+            ;;
     esac
 
     debug "Using host platform: $ID $VERSION_ID"
