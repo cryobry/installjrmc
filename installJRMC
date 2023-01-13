@@ -102,7 +102,7 @@ printHelp() {
 }
 
 # Helpers
-debug() { (( DEBUG )) && [[ $# -gt 0 ]] && echo "Debug: $*"; }
+debug() { (( DEBUG )) && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 askOk() {
     declare response
@@ -293,7 +293,6 @@ init() {
                 err "OS detection failed!"
                 exit 1
             fi
-            ;;
     esac
 
     debug "Using host platform: $ID $VERSION_ID"
