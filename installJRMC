@@ -152,7 +152,7 @@ parseInput() {
                             BUILD_SWITCH=1
                             LOCAL_INSTALL_SWITCH=1
                             ;;
-                        repo)
+                        repo|remote)
                             REPO_INSTALL_SWITCH=1
                             ;;
                     esac
