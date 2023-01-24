@@ -1288,7 +1288,8 @@ service_jriver-xvnc() {
     if ! systemctl_enable_cmd "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY by one and retrying"
-        NEXT_DISPLAY=":$(( NEXT_DISPLAYNUM + 1 ))" 
+        NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
+        NEXT_DISPLAY=":$NEXT_DISPLAYNUM" 
         service_jriver-xvnc
         return
     fi
