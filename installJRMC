@@ -372,7 +372,7 @@ setMCVersion() {
     else
         MCVERSION="$MCVERSION_HARDCODE"
         MCVERSION_SOURCE="hardcoded version"
-        err "Warning! Using hardcoded version number."
+        err "Warning! Using hardcoded version number"
     fi
     
     MVERSION="${MCVERSION%%.*}"
@@ -390,8 +390,8 @@ setMCVersion() {
                 ;;
         esac
     fi
-    echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE."
-    [[ "$MCVERSION_SOURCE" == "user input" ]] || echo "To override, use --mcversion."
+    echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE"
+    [[ "$MCVERSION_SOURCE" == "user input" ]] || echo "To override, use --mcversion"
     debug "MVERSION: $MVERSION, MCVERSION: $MCVERSION, MCPKG: $MCPKG, MCRPM: $MCRPM"
 }
 
@@ -523,8 +523,8 @@ installMCFromRepo() {
             wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
             ;;
         *)
-            err "An MC repository for $ID is not yet available."
-            err "Try using --install local to install MC on $ID."
+            err "An MC repository for $ID is not yet available"
+            err "Try using --install local to install MC on $ID"
             return 1
             ;;
     esac
@@ -1623,7 +1623,7 @@ main() {
         if askOk "Do you really want to uninstall JRiver Media Center?"; then
             uninstall
         else
-            echo "Uninstall canceled."
+            echo "Uninstall canceled"
         fi
         exit
     fi
