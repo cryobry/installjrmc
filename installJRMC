@@ -570,16 +570,13 @@ acquireDeb() {
     fi
 
     if [[ -v BETAPASS ]] && 
-        echo "Checking beta repo for DEB package" &&
-        wget -q -O "$MCDEB" \
+        echo "Checking beta repo for DEB package" && wget -q -O "$MCDEB" \
             "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
                 echo "Found!"
-    elif echo "Checking latest repo for DEB package" && 
-        wget -q -O "$MCDEB" \
+    elif echo "Checking latest repo for DEB package" && wget -q -O "$MCDEB" \
             "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
                 echo "Found!"
-    elif echo "Checking test repo for DEB package" && 
-        wget -q -O "$MCDEB" \
+    elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
             "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
                 echo "Found!"
     else
@@ -963,7 +960,7 @@ runCreaterepo() {
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare mc_cert_link="/usr/lib/jriver/Media Center $MVERSION/ca-certificates.crt"
+    declare mc_cert_link="/usr/lib/jriver/MC30/ca-certificates.crt"
     declare target_cert
     declare -a ln_cmd
 
@@ -971,11 +968,10 @@ symlinkCerts() {
 
     [[ -f $target_cert ]] && return 0
 
-    # Have to use command array instead of eval because of whitespace in $mc_cert_link
     if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        ln_cmd=(sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \""$mc_cert_link"\") # For RHEL
+        ln_cmd=(sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem "$mc_cert_link") # For RHEL/CentOS
     elif [[ -f /var/lib/ca-certificates/ca-bundle.pem ]]; then
-        ln_cmd=(sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem \""$mc_cert_link"\") # For SUSE
+        ln_cmd=(sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem "$mc_cert_link") # For SUSE
     fi
     
     debug "${ln_cmd[*]}" || ln_cmd+=(" &>/dev/null")
