@@ -8,7 +8,7 @@ This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) 
 
 Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method (i.e. `--install repo` or `--install local`) will need to be explicitly specified. This makes it possible to install services and containers independent of MC.
 
-**Note**: As of 1.0b14 major version library migrations are performed if the destination config directory `$HOME/.jriver/Media Center XX` is missing for major release `XX`. However, it is still a good idea to create a manual library backup before migrating major versions.
+**Note**: As of v1.0b14 major version library migrations are performed if the destination config directory `$HOME/.jriver/Media Center XX` is missing for major release `XX`. However, it is still a good idea to create a manual library backup before migrating major versions.
 
 ## Options
 
@@ -16,14 +16,14 @@ Running `installJRMC` without any options will install the latest version of JRi
 $ installJRMC --help
 --install, -i repo|local
     repo: Install MC from repository, future updates will be handled by the system package manager
-    local: Build and install MC package locally
+    local: Build and install MC package locally from official source package
 --build[=suse|fedora|centos]
     Build RPM from source DEB but do not install
     Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
 --compat
-    Build/install MC without minimum library specifiers
+    Build/install MC without minimum dependency version requirements
 --mcversion VERSION
-    Build or install a specific MC version, ex. "30.0.17"
+    Build or install a specific MC version, ex. "30.0.51"
 --outputdir PATH
     Generate rpmbuild output in this PATH (Default: ./output)
 --restorefile RESTOREFILE
@@ -33,7 +33,7 @@ $ installJRMC --help
 --service, -s SERVICE
     See SERVICES section below for the list of services to deploy
   --service-type user|system
-      Starts services at boot (system) or user login (user) (Default: system)
+      Starts services at boot (system) or user login (user) (Default: per-service see SERVICES)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
 --createrepo[=suse|fedora|centos]
@@ -56,20 +56,20 @@ $ installJRMC --help
 ## Services
 
 ```text
-jriver-mediaserver
+jriver-mediaserver (default --service-type=user)
     Enable and start a mediaserver systemd service (requires an existing X server)
-jriver-mediacenter
+jriver-mediacenter (user)
     Enable and start a mediacenter systemd service (requires an existing X server)
-jriver-x11vnc
+jriver-x11vnc (user)
     Enable and start x11vnc for the local desktop (requires an existing X server, does NOT support Wayland)
   --vncpass and --display are also valid options (see below)
-jriver-xvnc
+jriver-xvnc (system)
     Enable and start a new Xvnc session running JRiver Media Center
   --vncpass PASSWORD
     Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
   --display DISPLAY
     Manually specify display to use for x11vnc/Xvnc (ex. ':1')
-jriver-createrepo
+jriver-createrepo (system)
     Install hourly service to build latest MC RPM and run createrepo
     By default installs as root service to handle www permissions more gracefully
 ```

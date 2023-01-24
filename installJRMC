@@ -19,9 +19,10 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0-rc4"
 declare -g OUTPUTDIR="$PWD/output"
 
-declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30 (Buster)
+# MC30 (Buster)
+declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html"
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="30.0.48" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="30.0.51" # Hardcoded fallback
 
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
@@ -34,36 +35,37 @@ printHelp() {
 		USAGE:
 		    installJRMC [[OPTION] [VALUE]]...
 
-		    If no options (excluding -d) are provided, the script will default to '--install repo'.
+		    If no options (excluding -d or --debug) are provided installJRMC defaults to '--install repo'.
 
 		OPTIONS
 		    --install, -i repo|local
 		        repo: Install MC from repository, updates are handled by the system package manager
-		        local: Build and install MC package locally
+		        local: Build and install MC package locally from official source release
 		    --build[=suse|fedora|centos]
 		        Build RPM from source DEB but do not install
 		        Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
 		    --compat
-		        Build/install MC locally without minimum library specifiers
+		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "30.0.17" (Default: latest version)
+		        Specify the MC version, ex. 30.0.51" (default: latest version)
 		    --outputdir PATH
-		        Generate rpmbuild output in this directory (Default: ./output)
+		        Generate rpmbuild output in this directory (default: ./output)
 		    --restorefile RESTOREFILE
-		        Restore file location for automatic license registration (Default: skip registration)
+		        Restore file location for automatic license registration (default: skip registration)
 		    --betapass PASSWORD
 		        Enter beta team password for access to beta builds
 		    --service, -s SERVICE
 		        See SERVICES section below for a list of possible services to install
 		      --service-type user|system
-		          Starts services at boot (system) or at user login (user) (Default: boot)
+		          Starts services at boot (system) or at user login (user) (default: per service, see SERVICES)
 		    --container, -c CONTAINER (TODO: Under construction)
 		        See CONTAINERS section below for a list of possible services to install
 		    --createrepo[=suse|fedora|centos]
-		        Build rpm, copy to webroot, and run createrepo. Use in conjunction with --build=TARGET for crossbuilding repos
+		        Build rpm, copy to webroot, and run createrepo. 
+		        Use in conjunction with --build=TARGET for crossbuilding repos
 		        Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
 		        --createrepo-webroot PATH
-		            Specify the webroot directory to install the repo (Default: /var/www/jriver)
+		            Specify the webroot directory to install the repo (default: /var/www/jriver)
 		        --createrepo-user USER
 		            Specify the web server user if it differs from $USER
 		    --version, -v
@@ -73,27 +75,27 @@ printHelp() {
 		    --help, -h
 		        Print help dialog and exit
 		    --uninstall, -u
-		        Uninstall JRiver MC, remove services, and remove firewall rules (does not remove library files)
+		        Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
 
 		SERVICES
-		    jriver-mediaserver
-		        Enable and start a mediaserver systemd service (requires an existing X server) (user)
-		    jriver-mediacenter
-		        Enable and start a mediacenter systemd service (requires an existing X server) (user)
-		    jriver-x11vnc
-		        Enable and start x11vnc for the local desktop (requires an existing X server) (user)
+		    jriver-mediaserver (default --service-type=user)
+		        Enable and start a mediaserver systemd service (requires an existing X server)
+		    jriver-mediacenter (user)
+		        Enable and start a mediacenter systemd service (requires an existing X server)
+		    jriver-x11vnc (user)
+		        Enable and start x11vnc for the local desktop (requires an existing X server)
 		        Usually combined with jriver-mediaserver or jriver-mediacenter services
 		        --vncpass and --display are optional (see below)
-		    jriver-xvnc
-		        Enable and start a new Xvnc session running JRiver Media Center (system)
+		    jriver-xvnc (system)
+		        Enable and start a new Xvnc session running JRiver Media Center
 		        --vncpass PASSWORD
-		            Set vnc password for x11vnc/Xvnc access. If no password is set, the script
+		            Set the vnc password for x11vnc/Xvnc access. If no password is set, installJRMC
 		            will either use existing password stored in $HOME/.vnc/jrmc_passwd or use no password
 		        --display DISPLAY
-		            Display to start x11vnc/Xvnc (Default: The current display (x11vnc) or the
+		            Display to use for x11vnc/Xvnc (default: The current display (x11vnc) or the
 		            current display incremented by 1 (Xvnc))
-		    jriver-createrepo
-		        Install hourly service to build latest MC RPM and run createrepo (system)
+		    jriver-createrepo (system)
+		        Install hourly service to build latest MC RPM and run createrepo
 
 		CONTAINERS (TODO: Under construction)
 		    mediacenter-xvnc
@@ -117,7 +119,8 @@ askOk() {
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH TEST_SWITCH
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH
+    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH TEST_SWITCH
     declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts input
@@ -277,7 +280,7 @@ init() {
             ID="debian"
             ;;
         *)
-            echo "Autodetecting distro, this may be unreliable and --compat may also be required"
+            err "Autodetecting distro, this is unreliable and --compat may also be required"
             if hash dnf &>/dev/null; then
                 ID="fedora"
                 RPM_MGR="dnf"
@@ -565,18 +568,19 @@ acquireDeb() {
         return 0
     fi
 
-    if [[ -v BETAPASS ]]; then
-        echo "Checking beta repo for DEB package"
-        if wget -q -O "$MCDEB" \
-        "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
-            echo "Found!"
-        fi
-    elif echo "Checking latest repo for DEB package" && wget -q -O "$MCDEB" \
-    "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
-        echo "Found!"
-    elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
-    "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
-        echo "Found!"
+    if [[ -v BETAPASS ]] && 
+        echo "Checking beta repo for DEB package" &&
+        wget -q -O "$MCDEB" \
+            "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
+                echo "Found!"
+    elif echo "Checking latest repo for DEB package" && 
+        wget -q -O "$MCDEB" \
+            "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
+                echo "Found!"
+    elif echo "Checking test repo for DEB package" && 
+        wget -q -O "$MCDEB" \
+            "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
+                echo "Found!"
     else
         err "Cannot find DEB file"
         exit 1
@@ -606,7 +610,7 @@ buildRPM() {
         return 0
     fi
 
-    [[ ! -d "$OUTPUTDIR/SPECS" ]] && mkdir -p "$OUTPUTDIR/SPECS"
+    [[ -d "$OUTPUTDIR/SPECS" ]] || mkdir -p "$OUTPUTDIR/SPECS"
 
     # Load deb dependencies into array
     IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
@@ -753,8 +757,8 @@ buildRPM() {
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
         err "Build failed"
-        # For automation, let's remove the source DEB and reaquire it on next run 
-        # after failure in case it is corrupted or buggy
+        # For automation, let's remove the source DEB and reaquire it on next 
+        # run after failure in case it is corrupted or buggy
         [[ -f "$MCDEB" ]] && echo "Removing source DEB" && rm -f "$MCDEB"
         exit 1
     fi
@@ -1381,131 +1385,62 @@ service_jriver-createrepo() {
 
 #     installPackage buildah podman
 
-#     # Eventually try to switch to Debian
-#     # if ! CNT=$(buildah from debian:$DEBIANBASE); then
-#     #     echo "Bad base image for container $CNAME, skipping"
-#     #     continue
-#     # fi
-
-#     if ! CNT=$(buildah from jlesage/baseimage-gui:debian-10-v3.5.7); then
-#         echo "Bad base image for container $CNAME, skipping"
-#         continue
+#     if ! CNT=$(buildah from debian:$DEBIANBASE-slim); then
+#         echo "Bad base image for container, skipping"
+#         return 1
 #     fi
 
-#     buildah run "$CNT" add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg
+#     brc() { buildah run "$CNT" bash -c "$*"; }
 
-
-#     # #BASEIMAGE=jlesage/baseimage-gui:debian-10-v3.5.7
-#     # JRIVER_RELEASE=28
-#     # JRIVER_TAG=stable
-#     # ARCH=amd64
-#     # REBUILD_MIN=22
-#     # REBUILD_MAX=120
-
-#     # # JRiver Version tag (latest, stable or beta)
-#     # ARG jriver_tag
-
-#     # # JRiver Release Version (25, 26 etc.)
-#     # ARG jriver_release
-
-#     # # Image Version of the build
-#     # ARG image_version
-
-#     # # .deb download URL, if set to "repository" the JRiver repository will be used
-#     # ARG deb_url
-
-#     # RUN add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg
+#     brc "add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg"
 
 #     # Install JRiver
-#     RUN \
-#         add-pkg --virtual build-dependencies wget &&
-#         # Install from Repository
-#         if [ "${deb_url}" = "repository" ]; then \
-#             echo "Installing JRiver from repository ${jriver_release}:${jriver_tag}" &&
-#             wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - &&
-#             wget http://dist.jriver.com/${jriver_tag}/mediacenter/mediacenter${jriver_release}.list -O /etc/apt/sources.list.d/mediacenter${jriver_release}.list &&
-#             apt update &&
-#             add-pkg mediacenter${jriver_release}; \
-#         # Install from .deb URL
-#         else \
-#             echo "Installing JRiver from URL: ${deb_url}" &&
-#             wget -q -O "jrivermc.deb" ${deb_url} &&
-#             add-pkg "./jrivermc.deb"; \
-#         fi &&
-#         # Cleanup
-#         del-pkg build-dependencies &&
-#         rm -rf /tmp/* /tmp/.[!.]*
+#     brc "
+#     add-pkg ca-certificates gnupg &&
+#     add-pkg --virtual build-dependencies wget &&
+#     wget -qO- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | tee /etc/apt/trusted.gpg.d/jriver.asc &&
+#     wget -O /etc/apt/sources.list.d/mediacenter${MVERSION}.list http://dist.jriver.com/latest/mediacenter/mediacenter${MVERSION}.list &&
+#     apt update &&
+#     add-pkg mediacenter${MVERSION} &&
+#     del-pkg build-dependencies
+#     "
 
-#     # Add rootfs
-#     COPY rootfs/ /
-
-#     VOLUME ["/config"]
-
-#     # Application Icon
-#     RUN \
-#         APP_ICON_URL=https://gitlab.com/shiomax/jrivermc-docker/raw/master/assets/Application.png &&
-#         install_app_icon.sh "$APP_ICON_URL"
-
-#     # Various configuration vars
-#     ENV KEEP_APP_RUNNING=1 \
-#         DISPLAY_WIDTH=1280 \
-#         DISPLAY_HEIGHT=768 \
-#         APP_NAME="JRiver MediaCenter ${jriver_release}" \
-#         MAXIMIZE_POPUPS=0 \
-#         S6_KILL_GRACETIME=8000
-
-#     # Modify startapp.sh and rc.xml with JRiver version
-#     RUN sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
-#             /startapp.sh &&
-#         sed-patch s/%%MC_VERSION%%/${jriver_release}/g \
-#             /etc/xdg/openbox/rc.xml
-
-#     EXPOSE 5800 5900 52100 52101 52199 1900/udp
-
-#     # Metadata.
-#     LABEL \
-#         org.label-schema.name="jrivermc${jriver_release}" \
-#         org.label-schema.description="Docker image for JRiver Media Center ${jriver_release}" \
-#         org.label-schema.version="${image_version}" \
-#         org.label-schema.vcs-url="https://gitlab.com/shiomax/jrivermc-docker" \
-#         org.label-schema.schema-version="1.0"
-
-#     installPackage buildah podman
-#     cnt=$(buildah from docker.io/jlesage/baseimage-gui:debian-10)
-#     podman_create_cmd=(podman create --name "$CNAME")
-#     buildah_config_cmd=(buildah config \
-#         --author bryanroessler@gmail.com \
+#     buildah config "$CNT" \
+#         --author "bryanroessler@gmail.com" \
 #         --label maintainer="$MAINTAINER" \
 #         --env TZ="$TZ" \
 #         --workingdir /app \
-#         --cmd mediacenter"$MVERSION")
+#         --cmd "mediacenter$MVERSION"
 
-#     mkcdirs() {
-#         declare dir
-#         for dir in "$@"; do
-#             if [[ ! -d "$dir" ]]; then 
-#                 if ! mkdir -p "$dir"; then
-#                     err "Could not create directory $dir, check your permissions"
-#                 fi
-#             fi
-#             if ! chcon -t container_file_t -R "$dir"; then
-#                 err "Could not set container_file_t attribute for $dir, check your permissions"
-#             fi
-#         done
-#     }
 
-#     mkcdirs "$HOME/.jriver"
+#     # EXPOSE 5800 5900 52100 52101 52199 1900/udp
+
+#     podman_create_cmd=(
+#         podman create 
+#         --name "mediacenter$MVERSION"
+#     )
 
 #     podman_create_cmd+=(-v "$HOME/.jriver:/root/.jriver")
 #     podman_create_cmd+=(-v "$DOWNLOAD_ROOT:/downloads:z")
 #     podman_create_cmd+=(-v "$MONITOR_ROOT/nzbs:/nzbs")
 #     podman_create_cmd+=(-p "${CONTAINER[HOST_PORT]}:${CONTAINER[CONTAINER_PORT]}")
 
-#     brc() { buildah run "$1" "${@:2}" || return 1; }
+#     # mkcdirs() {
+#     #     declare dir
+#     #     for dir in "$@"; do
+#     #         if [[ ! -d "$dir" ]]; then 
+#     #             if ! mkdir -p "$dir"; then
+#     #                 err "Could not create directory $dir, check your permissions"
+#     #             fi
+#     #         fi
+#     #         if ! chcon -t container_file_t -R "$dir"; then
+#     #             err "Could not set container_file_t attribute for $dir, check your permissions"
+#     #         fi
+#     #     done
+#     # }
 
-#     brc add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1
+#     # mkcdirs "$HOME/.jriver"
 
-#     brc add-pkg --virtual .build-deps wget
 
 #     brc sh -s <<-EOF
 # 		wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - &>/dev/null
