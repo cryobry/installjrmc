@@ -111,6 +111,11 @@ askOk() {
     read -r -p "$* [y/N]: " response
     [[ "${response,,}" =~ ^(yes|y)$ ]]
 }
+execute() {
+    declare cmd="$*"
+    debug "$cmd" || cmd+=" &>/dev/null"
+    eval "${cmd[*]}"
+}
 
 
 #######################################
@@ -483,8 +488,7 @@ installPackage() {
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
         pkg_install_cmd=(pkg_install "${install_flags[@]}" "${pkg_array[@]}")
-        debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
-        if ! eval "${pkg_install_cmd[*]}"; then       
+        if ! execute "${pkg_install_cmd[*]}"; then       
             (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue"
             return 1
         fi
@@ -529,9 +533,7 @@ installMCFromRepo() {
             ;;
     esac
 
-    declare -a pkg_update_cmd=( pkg_update  )
-    debug "${pkg_update_cmd[*]}" || pkg_update_cmd+=(" &>/dev/null")
-    if ! eval "${pkg_update_cmd[*]}"; then
+    if ! execute "pkg_update"; then
         err "Package update failed!"
         return 1
     fi
@@ -544,8 +546,7 @@ installMCFromRepo() {
                         --allow-downgrades 
                         --no-gpg-check 
                         "$MCPKG")
-    debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
-    if ! eval "${pkg_install_cmd[*]}"; then
+    if ! execute "${pkg_install_cmd[*]}"; then
         err "Package install failed!"
         return 1
     fi
@@ -753,8 +754,7 @@ buildRPM() {
                     --define=\"%_libdir /usr/lib\" 
                     -bb
                     "$OUTPUTDIR/SPECS/mediacenter.spec")
-    debug "${rpmbuild_cmd[*]}" || rpmbuild_cmd+=(" &>/dev/null")
-    if eval "${rpmbuild_cmd[*]}" && [[ -f "$MCRPM" ]] ; then
+    if execute "${rpmbuild_cmd[*]}" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
         err "Build failed"
@@ -795,7 +795,7 @@ installMCDEB() {
     fi
     pkg_install_cmd+=("$MCDEB")
     debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
-    eval "${pkg_install_cmd[*]}"
+    execute "${pkg_install_cmd[*]}"
 }
 
 
@@ -826,8 +826,7 @@ installMesa() {
             if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
                 if pkg_query mesa-va-drivers &>/dev/null; then
                     pkg_swap_cmd=(pkg_swap mesa-va-drivers mesa-va-drivers-freeworld)
-                    debug "${pkg_swap_cmd[*]}" || pkg_swap_cmd+=(" &>/dev/null")
-                    if ! eval "${pkg_swap_cmd[*]}"; then
+                    if ! execute "${pkg_swap_cmd[*]}"; then
                         err "Package swap failed!"
                         return 1
                     fi
@@ -888,8 +887,7 @@ installMCARCH() {
     
     pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
 
-    debug "${makepkg_cmd[*]}" || makepkg_cmd+=(" &>/dev/null")
-    if ! eval "${makepkg_cmd[*]}"; then
+    if ! execute "${makepkg_cmd[*]}"; then
         echo "makepkg failed"
         exit
     fi
@@ -911,13 +909,10 @@ runCreaterepo() {
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
         cr_mkdir_cmd=(sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT")
-        debug "${cr_mkdir_cmd[*]}" || cr_mkdir_cmd+=(" &>/dev/null")
-        if ! eval "${cr_mkdir_cmd[*]}"; then
+        if ! execute "${cr_mkdir_cmd[*]}"; then
             cr_mkdir_cmd=(sudo mkdir -p "$CREATEREPO_WEBROOT")
-            debug "${cr_mkdir_cmd[*]}" || cr_mkdir_cmd+=(" &>/dev/null")
             cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
-            debug "${cr_chown_cmd[*]}" || cr_chown_cmd+=(" &>/dev/null")
-            if ! ( eval "${cr_mkdir_cmd[*]}" && eval "${cr_chown_cmd[*]}" ); then
+            if ! ( execute "${cr_mkdir_cmd[*]}" && execute "${cr_chown_cmd[*]}" ); then
                 err "Could not create the createrepo-webroot path!"
                 err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $CREATEREPO_USER"
                 err "Or change the repo ownership with --createrepo-user"
@@ -929,9 +924,7 @@ runCreaterepo() {
     # Copy built rpms to webroot
     cr_cp_cmd=(sudo cp -nf "$MCRPM" "$CREATEREPO_WEBROOT")
     cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
-    debug "${cr_cp_cmd[*]}" || cr_cp_cmd+=(" &>/dev/null")
-    debug "${cr_chown_cmd[*]}" || cr_cp_cmd+=(" &>/dev/null")
-    if ! ( eval "${cr_cp_cmd[*]}" && eval "${cr_chown_cmd[*]}" ); then
+    if ! ( execute "${cr_cp_cmd[*]}" && execute "${cr_chown_cmd[*]}" ); then
         err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
         return 1
     fi
@@ -939,14 +932,11 @@ runCreaterepo() {
     # Run createrepo
     cr_cmd=(sudo -u "$CREATEREPO_USER" createrepo -q "$CREATEREPO_WEBROOT")
     [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
-    debug "${cr_cmd[*]}" || cr_cmd+=(" &>/dev/null")
-    if ! eval "${cr_cmd[*]}"; then
+    if ! execute "${cr_cmd[*]}"; then
         cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
         cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
-        debug "${cr_cmd[*]}" || cr_cmd+=(" &>/dev/null")
-        debug "${cr_chown_cmd[*]}" || cr_cp_cmd+=(" &>/dev/null")
-        if ! ( eval "${cr_cmd[*]}" && eval "${cr_chown_cmd[*]}"); then
+        if ! ( execute "${cr_cmd[*]}" && execute "${cr_chown_cmd[*]}"); then
             err "Createrepo failed"
             return 1
         fi
@@ -974,8 +964,7 @@ symlinkCerts() {
         ln_cmd=(sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem "$mc_cert_link") # For SUSE
     fi
     
-    debug "${ln_cmd[*]}" || ln_cmd+=(" &>/dev/null")
-    if ! eval "${ln_cmd[*]}"; then
+    if ! execute "${ln_cmd[*]}"; then
         err "Symlinking certificates failed"
         return 1
     fi
@@ -1103,6 +1092,7 @@ setVNCPass() {
         elif [[ $1 == "x11vnc" ]]; then
             vnc_pass_cmd=(x11vnc -storepasswd "$VNCPASS" "$vncpassfile")
         fi
+        # Don't use execute, need to pipe stdout
         if ! eval "${vnc_pass_cmd[*]}"; then
             err "Could not create VNC password file"
             return 1
@@ -1557,18 +1547,14 @@ uninstall() {
     echo "Removing firewall rules"
     if hash firewall-cmd 2>/dev/null; then
         firewall_cmd=(sudo firewall-cmd --permanent --remove-service=jriver)
-        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
-        eval "${firewall_cmd[*]}"
+        execute "${firewall_cmd[*]}"
         firewall_cmd=(sudo firewall-cmd --permanent --delete-service=jriver)
-        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
-        eval "${firewall_cmd[*]}"
+        execute "${firewall_cmd[*]}"
         firewall_cmd=(sudo firewall-cmd --reload)
-        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
-        eval "${firewall_cmd[*]}"
+        execute "${firewall_cmd[*]}"
     elif hash ufw 2>/dev/null; then
         firewall_cmd=(sudo ufw delete allow jriver)
-        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
-        eval "${firewall_cmd[*]}"
+        execute "${firewall_cmd[*]}"
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
             sudo rm -f /etc/ufw/applications.d/jriver
     # elif hash nft 2>/dev/null; then
@@ -1577,8 +1563,7 @@ uninstall() {
 
     echo "Uninstalling JRiver Media Center package"
     mc_pkg_rm_cmd=(pkg_remove "$MCPKG")
-    debug "${mc_pkg_rm_cmd[*]}" || mc_pkg_rm_cmd+=(" &>/dev/null")
-    if eval "${mc_pkg_rm_cmd[*]}"; then 
+    if execute "${mc_pkg_rm_cmd[*]}"; then
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
     elif [[ $? -eq 100 ]]; then
@@ -1630,8 +1615,7 @@ main() {
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
                 declare -a add_universe_cmd=(sudo add-apt-repository -y universe)
-                debug "${add_universe_cmd[*]}" || add_universe_cmd+=(" &>/dev/null")
-                if ! eval "${add_universe_cmd[*]}"; then
+                if ! execute "${add_universe_cmd[*]}"; then
                     err "Adding universe repository failed"
                 fi
             fi
