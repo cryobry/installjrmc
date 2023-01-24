@@ -1248,6 +1248,12 @@ service_jriver-xvnc() {
 
     setVNCPass xvnc
 
+    if [[ $# -eq 1 && $1 == "increment" ]]; then
+        NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
+        DISPLAY=":$NEXT_DISPLAYNUM"
+        PORT=$(( NEXT_DISPLAYNUM + 5900 ))
+    fi
+
     start_cmd=(
         /usr/bin/vncserver "$NEXT_DISPLAY"
         -geometry 1440x900 
@@ -1288,9 +1294,7 @@ service_jriver-xvnc() {
     if ! systemctl_enable_cmd "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY by one and retrying"
-        export NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
-        export NEXT_DISPLAY=":$NEXT_DISPLAYNUM" 
-        service_jriver-xvnc
+        service_jriver-xvnc increment
         return
     fi
     echo "Xvnc running on localhost:$PORT"
