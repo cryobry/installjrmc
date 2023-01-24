@@ -300,7 +300,7 @@ init() {
 
     debug "Using host platform: $ID $VERSION_ID"
 
-    # Set distro-specific functions
+    # Abstract distro-specific package manager commands 
     case "$ID" in
         fedora|centos)
             pkg_install(){ sudo "$RPM_MGR" install -y "$@"; }
@@ -309,7 +309,6 @@ init() {
             pkg_update(){ sudo "$RPM_MGR" makecache; }
             pkg_swap() { sudo dnf swap -y "$1" "$2"; }
             pkg_query(){ rpm -q "$@"; }
-            firewall_cmd(){ sudo firewall-cmd "$@"; }
             ;;
         debian|ubuntu)
             pkg_install(){ sudo apt-get install -y -q0 "$@"; }
@@ -317,7 +316,6 @@ init() {
             pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
             pkg_update(){ sudo apt-get update -y -q0; }
             pkg_query(){ dpkg -s "$@"; }
-            firewall_cmd(){ sudo ufw "$@"; }
             ;;
         suse)
             pkg_install(){ sudo zypper --non-interactive -q install --force --no-confirm "$@"; }
@@ -325,7 +323,6 @@ init() {
             pkg_remove(){ sudo zypper --non-interactive -q remove --clean-deps "$@"; }
             pkg_update(){ sudo zypper --non-interactive -q refresh jriver; }
             pkg_query(){ rpm -q "$@"; }
-            firewall_cmd(){ sudo firewall-cmd "$@"; }
             ;;
         arch)
             pkg_install(){ sudo pacman -Sy --noconfirm "$@"; }
@@ -333,7 +330,6 @@ init() {
             pkg_remove(){ sudo pacman -Rs --noconfirm "$@"; }
             pkg_update(){ sudo pacman -Syy ; }
             pkg_query(){ sudo pacman -Qs "$@"; }
-            #firewall_cmd(){ sudo nft -A INPUT "$@"; }
             ;;
     esac
 }
@@ -413,8 +409,8 @@ setMCVersion() {
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    declare -a pkg_array install_flags
-    declare input pkg skip_check_installed silent pkg_install_cmd refresh allow_downgrades no_gpg_check
+    declare -a pkg_array install_flags pkg_install_cmd
+    declare input pkg skip_check_installed silent refresh allow_downgrades no_gpg_check
     declare -A pkg_aliases
 
     if input=$(getopt -o +s -l skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent -- "$@"); then
@@ -486,9 +482,9 @@ installPackage() {
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
-        pkg_install_cmd="pkg_install ${install_flags[*]} ${pkg_array[*]}"
-        debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-        if ! eval "$pkg_install_cmd"; then       
+        pkg_install_cmd=(pkg_install "${install_flags[@]}" "${pkg_array[@]}")
+        debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
+        if ! eval "${pkg_install_cmd[*]}"; then       
             (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue"
             return 1
         fi
@@ -504,6 +500,7 @@ installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare repo_dir
+    declare -a pkg_install_cmd
 
     case "$ID" in
         fedora|centos)
@@ -532,9 +529,9 @@ installMCFromRepo() {
             ;;
     esac
 
-    declare pkg_update_cmd="pkg_update"
-    debug "$pkg_update_cmd" || pkg_update_cmd+=" &>/dev/null"
-    if ! eval "$pkg_update_cmd"; then
+    declare -a pkg_update_cmd=( pkg_update  )
+    debug "${pkg_update_cmd[*]}" || pkg_update_cmd+=(" &>/dev/null")
+    if ! eval "${pkg_update_cmd[*]}"; then
         err "Package update failed!"
         return 1
     fi
@@ -542,9 +539,13 @@ installMCFromRepo() {
     # Install mesa-va-drivers-freeworld separately from the RPM for dnf swap
     installMesa
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --allow-downgrades --no-gpg-check $MCPKG"
-    debug "$pkg_install_cmd"
-    if ! eval "$pkg_install_cmd"; then
+    pkg_install_cmd=(installPackage 
+                        --skip-check-installed 
+                        --allow-downgrades 
+                        --no-gpg-check 
+                        "$MCPKG")
+    debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
+    if ! eval "${pkg_install_cmd[*]}"; then
         err "Package install failed!"
         return 1
     fi
@@ -750,10 +751,13 @@ buildRPM() {
 
     # Run rpmbuild
     echo "Building MC $MCVERSION RPM, this may take awhile"
-    rpmbuild_cmd="rpmbuild --define=\"%_topdir $OUTPUTDIR\" --define=\"%_libdir /usr/lib\" -bb" 
-    rpmbuild_cmd+=" $OUTPUTDIR/SPECS/mediacenter.spec"
-    debug "$rpmbuild_cmd" || rpmbuild_cmd+=" &>/dev/null"
-    if eval "$rpmbuild_cmd" && [[ -f "$MCRPM" ]] ; then
+    rpmbuild_cmd=(rpmbuild 
+                    --define=\"%_topdir "$OUTPUTDIR"\" 
+                    --define=\"%_libdir /usr/lib\" 
+                    -bb
+                    "$OUTPUTDIR/SPECS/mediacenter.spec")
+    debug "${rpmbuild_cmd[*]}" || rpmbuild_cmd+=(" &>/dev/null")
+    if eval "${rpmbuild_cmd[*]}" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
         err "Build failed"
@@ -771,7 +775,11 @@ buildRPM() {
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"    
 
-    declare pkg_install_cmd="installPackage --skip-check-installed --no-gpg-check --allow-downgrades"
+    declare pkg_install_cmd
+    pkg_install_cmd=(installPackage 
+                        --skip-check-installed 
+                        --no-gpg-check 
+                        --allow-downgrades)
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
@@ -788,9 +796,9 @@ installMCDEB() {
         popd &>/dev/null || return
         rm -rf "$extract_dir"
     fi
-    pkg_install_cmd+=" $MCDEB"
-    debug "$pkg_install_cmd" || pkg_install_cmd+=" &>/dev/null"
-    eval "$pkg_install_cmd"
+    pkg_install_cmd+=("$MCDEB")
+    debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
+    eval "${pkg_install_cmd[*]}"
 }
 
 
@@ -813,14 +821,16 @@ installMCRPM() {
 installMesa() {
     debug "Running: ${FUNCNAME[0]}"
 
+    declare -a pkg_swap_cmd
+
     # Currently only necessary in Fedora/CentOS
     case "$ID" in
         fedora|centos)
             if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
                 if pkg_query mesa-va-drivers &>/dev/null; then
-                    declare pkg_swap_cmd="pkg_swap mesa-va-drivers mesa-va-drivers-freeworld"
-                    debug "$pkg_swap_cmd" || pkg_swap_cmd+=" &>/dev/null"
-                    if ! eval "$pkg_swap_cmd"; then
+                    pkg_swap_cmd=(pkg_swap mesa-va-drivers mesa-va-drivers-freeworld)
+                    debug "${pkg_swap_cmd[*]}" || pkg_swap_cmd+=(" &>/dev/null")
+                    if ! eval "${pkg_swap_cmd[*]}"; then
                         err "Package swap failed!"
                         return 1
                     fi
@@ -839,6 +849,9 @@ installMesa() {
 #######################################
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
+
+    declare -a makepkg_cmd
+
     echo "Arch install under construction"
     [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
@@ -866,14 +879,20 @@ installMCARCH() {
 			bsdtar xf data.tar.xz -C "\$pkgdir"
 		}
 	EOF
+
+    makepkg_cmd=(makepkg --install
+                --syncdeps 
+                --clean 
+                --cleanbuild 
+                --skipinteg 
+                --force
+                --noconfirm 
+                -p mediacenter.pkgbuild)
     
     pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
-    makepkg_cmd="makepkg"
-    # TODO try to acquire checksums from deb
-    makepkg_cmd+=" --syncdeps --clean --cleanbuild --skipinteg --force --install --noconfirm"
-    makepkg_cmd+=" -p mediacenter.pkgbuild"
 
-    if ! eval "${makepkg_cmd}"; then
+    debug "${makepkg_cmd[*]}" || makepkg_cmd+=(" &>/dev/null")
+    if ! eval "${makepkg_cmd[*]}"; then
         echo "makepkg failed"
         exit
     fi
@@ -888,20 +907,20 @@ installMCARCH() {
 runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
+    declare -a cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
 
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        cr_mkdir_cmd="sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"
-        debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-        if ! eval "$cr_mkdir_cmd"; then
-            cr_mkdir_cmd="sudo mkdir -p $CREATEREPO_WEBROOT"
-            debug "$cr_mkdir_cmd" || cr_mkdir_cmd+=" &>/dev/null"
-            cr_chown_cmd="sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-            debug "$cr_chown_cmd" || cr_chown_cmd+=" &>/dev/null"
-            if ! ( eval "$cr_mkdir_cmd" && eval "$cr_chown_cmd" ); then
+        cr_mkdir_cmd=(sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT")
+        debug "${cr_mkdir_cmd[*]}" || cr_mkdir_cmd+=(" &>/dev/null")
+        if ! eval "${cr_mkdir_cmd[*]}"; then
+            cr_mkdir_cmd=(sudo mkdir -p "$CREATEREPO_WEBROOT")
+            debug "${cr_mkdir_cmd[*]}" || cr_mkdir_cmd+=(" &>/dev/null")
+            cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
+            debug "${cr_chown_cmd[*]}" || cr_chown_cmd+=(" &>/dev/null")
+            if ! ( eval "${cr_mkdir_cmd[*]}" && eval "${cr_chown_cmd[*]}" ); then
                 err "Could not create the createrepo-webroot path!"
                 err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $CREATEREPO_USER"
                 err "Or change the repo ownership with --createrepo-user"
@@ -911,26 +930,26 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    cr_cp_cmd="sudo cp -nf $MCRPM $CREATEREPO_WEBROOT"
-    cr_chown_cmd="sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-    debug "$cr_cp_cmd" || cr_cp_cmd+=" &>/dev/null"
-    debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
-    if ! ( eval "$cr_cp_cmd" && eval "$cr_chown_cmd" ); then
+    cr_cp_cmd=(sudo cp -nf "$MCRPM" "$CREATEREPO_WEBROOT")
+    cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
+    debug "${cr_cp_cmd[*]}" || cr_cp_cmd+=(" &>/dev/null")
+    debug "${cr_chown_cmd[*]}" || cr_cp_cmd+=(" &>/dev/null")
+    if ! ( eval "${cr_cp_cmd[*]}" && eval "${cr_chown_cmd[*]}" ); then
         err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
         return 1
     fi
 
     # Run createrepo
-    cr_cmd="sudo -u $CREATEREPO_USER createrepo -q $CREATEREPO_WEBROOT"
-    [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
-    debug "$cr_cmd" || cr_cmd+=" &>/dev/null"
-    if ! eval "$cr_cmd"; then
-        cr_cmd="sudo createrepo -q $CREATEREPO_WEBROOT"
-        [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=" --update"
-        cr_chown_cmd="sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"
-        debug "$cr_cmd" || cr_cmd+=" &>/dev/null"
-        debug "$cr_chown_cmd" || cr_cp_cmd+=" &>/dev/null"
-        if ! ( eval "$cr_cmd" && eval "$cr_chown_cmd"); then
+    cr_cmd=(sudo -u "$CREATEREPO_USER" createrepo -q "$CREATEREPO_WEBROOT")
+    [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
+    debug "${cr_cmd[*]}" || cr_cmd+=(" &>/dev/null")
+    if ! eval "${cr_cmd[*]}"; then
+        cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
+        [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
+        cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
+        debug "${cr_cmd[*]}" || cr_cmd+=(" &>/dev/null")
+        debug "${cr_chown_cmd[*]}" || cr_cp_cmd+=(" &>/dev/null")
+        if ! ( eval "${cr_cmd[*]}" && eval "${cr_chown_cmd[*]}"); then
             err "Createrepo failed"
             return 1
         fi
@@ -945,7 +964,8 @@ symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare mc_cert_link="/usr/lib/jriver/Media Center $MVERSION/ca-certificates.crt"
-    declare target_cert ln_cmd
+    declare target_cert
+    declare -a ln_cmd
 
     target_cert=$(readlink -f "$mc_cert_link")
 
@@ -953,13 +973,13 @@ symlinkCerts() {
 
     # Have to use command array instead of eval because of whitespace in $mc_cert_link
     if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        ln_cmd="sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \"$mc_cert_link\"" # For RHEL
+        ln_cmd=(sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \""$mc_cert_link"\") # For RHEL
     elif [[ -f /var/lib/ca-certificates/ca-bundle.pem ]]; then
-        ln_cmd="sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem \"$mc_cert_link\"" # For SUSE
+        ln_cmd=(sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem \""$mc_cert_link"\") # For SUSE
     fi
     
-    debug "$ln_cmd" || ln_cmd+=" &>/dev/null"
-    if ! eval "$ln_cmd"; then
+    debug "${ln_cmd[*]}" || ln_cmd+=(" &>/dev/null")
+    if ! eval "${ln_cmd[*]}"; then
         err "Symlinking certificates failed"
         return 1
     fi
@@ -1018,15 +1038,15 @@ openFirewall() {
     if ! case "$ID" in
         fedora|centos|suse)
             hash firewall-cmd 2>/dev/null || installPackage firewalld
-            if ! firewall_cmd --get-services | grep -q "$1"; then
-                firewall_cmd --permanent --new-service="$1" &>/dev/null
-                firewall_cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" &>/dev/null
-                firewall_cmd --permanent --service="$1" --set-short="$1" &>/dev/null
+            if ! sudo firewall-cmd --get-services | grep -q "$1"; then
+                sudo firewall-cmd --permanent --new-service="$1" &>/dev/null
+                sudo firewall-cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" &>/dev/null
+                sudo firewall-cmd --permanent --service="$1" --set-short="$1" &>/dev/null
                 for port in "${f_ports[@]}"; do
-                    firewall_cmd --permanent --service="$1" --add-port="$port" &>/dev/null
+                    sudo firewall-cmd --permanent --service="$1" --add-port="$port" &>/dev/null
                 done
-                firewall_cmd --add-service "$1" --permanent &>/dev/null
-                firewall_cmd --reload &>/dev/null
+                sudo firewall-cmd --add-service "$1" --permanent &>/dev/null
+                sudo firewall-cmd --reload &>/dev/null
             fi
             ;;
         debian|ubuntu)
@@ -1040,8 +1060,8 @@ openFirewall() {
 					ports=$u_ports
 				EOF"
             fi
-            firewall_cmd app update "$1" &>/dev/null
-            firewall_cmd allow "$1" &>/dev/null
+            sudo ufw app update "$1" &>/dev/null
+            sudo ufw allow "$1" &>/dev/null
             ;;
         arch)
             # sysctl -w net.ipv4.ip_forward = 1
@@ -1067,7 +1087,7 @@ setVNCPass() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare vncpassfile="$HOME/.vnc/jrmc_passwd"
-    declare vnc_pass_cmd
+    declare -a vnc_pass_cmd
 
     [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
 
@@ -1083,11 +1103,11 @@ setVNCPass() {
 
     if [[ -v VNCPASS ]]; then
         if [[ $1 == "xvnc" ]]; then
-            vnc_pass_cmd="echo $VNCPASS | vncpasswd -f > $vncpassfile"
+            vnc_pass_cmd=(echo "$VNCPASS" "|" vncpasswd -f ">" "$vncpassfile")
         elif [[ $1 == "x11vnc" ]]; then
-            vnc_pass_cmd="x11vnc -storepasswd $VNCPASS $vncpassfile"
+            vnc_pass_cmd=(x11vnc -storepasswd "$VNCPASS" "$vncpassfile")
         fi
-        if ! eval "$vnc_pass_cmd"; then
+        if ! eval "${vnc_pass_cmd[*]}"; then
             err "Could not create VNC password file"
             return 1
         fi
@@ -1506,6 +1526,8 @@ uninstall() {
 
     declare service unit f i
 
+    declare -a firewall_cmd mc_pkg_rm_cmd
+
     echo "Stopping and removing all Media Center services"
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
@@ -1538,22 +1560,19 @@ uninstall() {
 
     echo "Removing firewall rules"
     if hash firewall-cmd 2>/dev/null; then
-        if [[ -v debug ]]; then
-            debug "firewall_cmd --permanent --remove-service=jriver"
-            firewall_cmd --permanent --remove-service=jriver
-            debug "firewall_cmd --permanent --delete-service=jriver"
-            firewall_cmd --permanent --delete-service=jriver
-            debug "firewall_cmd --reload"
-            firewall_cmd --reload
-        else
-            firewall_cmd --permanent --remove-service=jriver &>/dev/null
-            firewall_cmd --permanent --delete-service=jriver &>/dev/null
-            firewall_cmd --reload &>/dev/null
-        fi
+        firewall_cmd=(sudo firewall-cmd --permanent --remove-service=jriver)
+        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
+        eval "${firewall_cmd[*]}"
+        firewall_cmd=(sudo firewall-cmd --permanent --delete-service=jriver)
+        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
+        eval "${firewall_cmd[*]}"
+        firewall_cmd=(sudo firewall-cmd --reload)
+        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
+        eval "${firewall_cmd[*]}"
     elif hash ufw 2>/dev/null; then
-        firewall_cmd="firewall_cmd delete allow jriver"
-        debug "$firewall_cmd" || firewall_cmd+=" &>/dev/null"
-        eval "$firewall_cmd"
+        firewall_cmd=(sudo ufw delete allow jriver)
+        debug "${firewall_cmd[*]}" || firewall_cmd+=(" &>/dev/null")
+        eval "${firewall_cmd[*]}"
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
             sudo rm -f /etc/ufw/applications.d/jriver
     # elif hash nft 2>/dev/null; then
@@ -1561,9 +1580,9 @@ uninstall() {
     fi
 
     echo "Uninstalling JRiver Media Center package"
-    mc_pkg_rm_cmd="pkg_remove $MCPKG"
-    debug "$mc_pkg_rm_cmd" || mc_pkg_rm_cmd+=" &>/dev/null"
-    if eval "$mc_pkg_rm_cmd"; then 
+    mc_pkg_rm_cmd=(pkg_remove "$MCPKG")
+    debug "${mc_pkg_rm_cmd[*]}" || mc_pkg_rm_cmd+=(" &>/dev/null")
+    if eval "${mc_pkg_rm_cmd[*]}"; then 
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
     elif [[ $? -eq 100 ]]; then
@@ -1614,9 +1633,9 @@ main() {
         ubuntu)
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
-                declare add_universe_cmd="sudo add-apt-repository -y universe"
-                debug "$add_universe_cmd" || add_universe_cmd+=" &>/dev/null"
-                if ! eval "$add_universe_cmd"; then
+                declare -a add_universe_cmd=(sudo add-apt-repository -y universe)
+                debug "${add_universe_cmd[*]}" || add_universe_cmd+=(" &>/dev/null")
+                if ! eval "${add_universe_cmd[*]}"; then
                     err "Adding universe repository failed"
                 fi
             fi
