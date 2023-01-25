@@ -124,8 +124,8 @@ execute() {
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH
-    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH TEST_SWITCH
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
+    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH 
     declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts input
@@ -142,7 +142,7 @@ parseInput() {
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
-    long_opts+="service-type:,service:,version,debug,help,uninstall,createrepo::,"
+    long_opts+="service-type:,service:,services:,version,debug,help,uninstall,createrepo::,"
     long_opts+="createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat"
     short_opts="+i:vb::dhus:c:"
 
@@ -181,7 +181,7 @@ parseInput() {
                 --service-type)
                     shift && SERVICE_TYPE="$1"
                     ;;
-                --service|-s)
+                --service|-s|--services)
                     shift && SERVICES+=("$1")
                     ;;
                 --createrepo)
@@ -524,7 +524,8 @@ installMCFromRepo() {
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
 				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main
 			EOF"
-            wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
+            wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
+                sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
             ;;
         *)
             err "An MC repository for $ID is not yet available"
@@ -541,11 +542,13 @@ installMCFromRepo() {
     # Install mesa-va-drivers-freeworld separately from the RPM for dnf swap
     installMesa
 
-    pkg_install_cmd=(installPackage 
-                        --skip-check-installed 
-                        --allow-downgrades 
-                        --no-gpg-check 
-                        "$MCPKG")
+    pkg_install_cmd=(
+        installPackage 
+        --skip-check-installed 
+        --allow-downgrades 
+        --no-gpg-check 
+        "$MCPKG"
+    )
     if ! execute "${pkg_install_cmd[*]}"; then
         err "Package install failed!"
         return 1
@@ -825,7 +828,11 @@ installMesa() {
         fedora|centos)
             if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
                 if pkg_query mesa-va-drivers &>/dev/null; then
-                    pkg_swap_cmd=(pkg_swap mesa-va-drivers mesa-va-drivers-freeworld)
+                    pkg_swap_cmd=(
+                        pkg_swap 
+                        mesa-va-drivers 
+                        mesa-va-drivers-freeworld
+                    )
                     if ! execute "${pkg_swap_cmd[*]}"; then
                         err "Package swap failed!"
                         return 1
@@ -837,7 +844,6 @@ installMesa() {
             ;;
     esac
 }
-
 
 
 #######################################
@@ -1321,7 +1327,8 @@ service_jriver-x11vnc() {
 
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
     if [[ ! -f "$HOME/.Xauthority" ]]; then
-        [[ "$XDG_SESSION_TYPE" == "wayland" ]] && ask_ok "Unsupported Wayland session detected for x11vnc, continue?" || return 1
+        [[ "$XDG_SESSION_TYPE" == "wayland" ]] && 
+        ask_ok "Unsupported Wayland session detected for x11vnc, continue?" || return 1
         touch "$HOME/.Xauthority"
         xauth generate "$DISPLAY" . trusted
         xauth add "$HOST$DISPLAY" . "$(xxd -l 16 -p /dev/urandom)"
@@ -1381,7 +1388,7 @@ service_jriver-createrepo() {
 
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
-		Description=Builds JRiver Media Center RPM file, moves it to the repo dir, and runs createrepo
+		Description=Builds JRiver Media Center RPM, moves it to the repo dir, and runs createrepo
 
 		[Service]
 		$USER_STRING
@@ -1661,13 +1668,13 @@ main() {
             fi
             if ! pkg_query rpmfusion-free-release &>/dev/null; then
                 installPackage --skip-check-installed \
-                    "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
         fedora)
             if ! pkg_query rpmfusion-free-release &>/dev/null; then
                 installPackage --skip-check-installed \
-                    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
     esac
@@ -1723,7 +1730,7 @@ main() {
         for service in "${SERVICES[@]}"; do
             if ! "service_$service"; then
                 if [[ $? -eq 127 ]]; then
-                    err "Service $service does not exist, check your service name"
+                    err "Service $service does not exist, check service name"
                 else
                     err "Failed to create service: $service"
                 fi
@@ -1734,7 +1741,7 @@ main() {
     # for _container in "${CONTAINERS[@]}"; do
     #     if ! "_container_$_container"; then
     #         if [[ $? -eq 127 ]]; then
-    #             err "Container $_container does not exist, check your container name"
+    #             err "Container $_container does not exist, check container name"
     #         else
     #             err "Failed to create container: $_container"
     #         fi
