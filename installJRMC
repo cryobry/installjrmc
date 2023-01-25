@@ -1112,10 +1112,7 @@ setServiceVars() {
     declare -a systemctl_prefix
 
     declare service_name="$1"
-    shift
-    debug "second arg: $2"
     declare service_type="${2:-${SERVICE_TYPE:-system}}"
-    debug "service_type: $service_type"
     declare service_dir="/usr/lib/systemd/$service_type"
 
     if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
@@ -1165,8 +1162,6 @@ setServiceVars() {
         TIMER_FNAME="$service_dir/${TIMER_NAME}"
         USER_STRING=""
     fi
-
-    debug "SERVICE_NAME: $SERVICE_FNAME"
 }
 
 
