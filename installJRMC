@@ -1063,7 +1063,6 @@ setVNCPass() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare vncpassfile="$HOME/.vnc/jrmc_passwd"
-    declare -a vnc_pass_cmd
 
     [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
 
@@ -1079,15 +1078,11 @@ setVNCPass() {
 
     if [[ -v VNCPASS ]]; then
         if [[ $1 == "xvnc" ]]; then
-            vnc_pass_cmd=(echo "$VNCPASS" "|" vncpasswd -f ">" "$vncpassfile")
+            execute "echo $VNCPASS | vncpasswd -f > $vncpassfile"
         elif [[ $1 == "x11vnc" ]]; then
-            vnc_pass_cmd=(x11vnc -storepasswd "$VNCPASS" "$vncpassfile")
+            execute "x11vnc -storepasswd $VNCPASS $vncpassfile"
         fi
-        # Don't use execute, need to pipe stdout
-        if ! eval "${vnc_pass_cmd[*]}"; then
-            err "Could not create VNC password file"
-            return 1
-        fi
+        return $?
     else
         declare -g NOVNCAUTH=1
     fi
@@ -1538,8 +1533,6 @@ uninstall() {
 
     declare service unit f i
 
-    declare -a firewall_cmd mc_pkg_rm_cmd
-
     echo "Stopping and removing all Media Center services"
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
@@ -1567,29 +1560,22 @@ uninstall() {
         "/etc/yum.repos.d/jriver.repo" \
         /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
     if [[ "$ID" == "suse" ]]; then
-        sudo zypper rr jriver &>/dev/null
+        execute "sudo zypper rr jriver"
     fi
 
     echo "Removing firewall rules"
     if hash firewall-cmd 2>/dev/null; then
-        firewall_cmd=(sudo firewall-cmd --permanent --remove-service=jriver)
-        execute "${firewall_cmd[*]}"
-        firewall_cmd=(sudo firewall-cmd --permanent --delete-service=jriver)
-        execute "${firewall_cmd[*]}"
-        firewall_cmd=(sudo firewall-cmd --reload)
-        execute "${firewall_cmd[*]}"
+        execute "sudo firewall-cmd --permanent --remove-service=jriver"
+        execute "sudo firewall-cmd --permanent --delete-service=jriver"
+        execute "sudo firewall-cmd --reload"
     elif hash ufw 2>/dev/null; then
-        firewall_cmd=(sudo ufw delete allow jriver)
-        execute "${firewall_cmd[*]}"
+        execute "sudo ufw delete allow jriver"
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
-            sudo rm -f /etc/ufw/applications.d/jriver
-    # elif hash nft 2>/dev/null; then
-    #     sudo nft delete table inet jriver
+            execute "sudo rm -f /etc/ufw/applications.d/jriver"
     fi
 
     echo "Uninstalling JRiver Media Center package"
-    mc_pkg_rm_cmd=(pkg_remove "$MCPKG")
-    if execute "${mc_pkg_rm_cmd[*]}"; then
+    if execute "pkg_remove $MCPKG"; then
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
     elif [[ $? -eq 100 ]]; then
@@ -1735,6 +1721,6 @@ main() {
 }
 
 # Quickly turn debugging on, also use getopt in parseInput()
-[[ " $* " =~ ( --debug | -d ) ]] && DEBUG=1
+[[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
 
 main "$@"
