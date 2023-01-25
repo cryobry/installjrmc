@@ -1032,14 +1032,12 @@ openFirewall() {
             execute "sudo firewall-cmd --reload"
         fi
     elif hash ufw 2>/dev/null; then
-        if [[ ! -f "/etc/ufw/applications.d/$service" ]]; then
-            sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
-				[$service]
-				title=$service
-				description=$service installed by installJRMC
-				ports=$u_ports
-			EOF"
-        fi
+        sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
+			[$service]
+			title=$service
+			description=$service installed by installJRMC
+			ports=$u_ports
+		EOF"
         execute "sudo ufw app update $service"
         execute "sudo ufw allow $service"
     else
