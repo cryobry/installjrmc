@@ -415,10 +415,13 @@ installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags pkg_install_cmd
-    declare input pkg skip_check_installed silent refresh allow_downgrades no_gpg_check
+    declare long_opts input pkg 
+    declare skip_check_installed allow_downgrades silent refresh no_gpg_check
     declare -A pkg_aliases
 
-    if input=$(getopt -o +s -l skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent -- "$@"); then
+    long_opts="skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent"
+
+    if input=$(getopt -o +s -l "$long_opts" -- "$@"); then
         eval set -- "$input"
         while true; do
             case "$1" in
@@ -463,7 +466,9 @@ installPackage() {
         if [[ -v pkg_aliases[$pkg] ]]; then
             pkg=${pkg_aliases[$pkg]}
         fi
-        if (( skip_check_installed )) || ! (hash "$pkg" &>/dev/null || pkg_query "$pkg" &>/dev/null); then
+        if (( skip_check_installed )) || 
+        ! (hash "$pkg" &>/dev/null || 
+        pkg_query "$pkg" &>/dev/null); then
             pkg_array+=("$pkg")
         else
             debug "$pkg already installed, skipping installation"
@@ -723,7 +728,7 @@ buildRPM() {
 
 		Provides: mediacenter$MVERSION
 
-		License: Copyright 1998-2022, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
+		License: Copyright 1998-2023, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
 
 		%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
@@ -1005,65 +1010,45 @@ restoreLicense() {
 #######################################
 # Opens ports using the system firewall tool
 # Arguments:
-#   Pre-defined service to enable
+#   1. Service name
+#   2. List of ports in firewall-cmd format
 #######################################
 openFirewall() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    # Create OS-specific port rules based on argument (service) name
-    declare -a f_ports # for firewall-cmd
-    declare u_ports # for ufw
-    #declare -a n_ports # for nftables
     declare port
-    if [[ "$1" == "jriver-mediacenter" ]]; then
-        f_ports=(52100-52200/tcp 1900/udp)
-        u_ports="52100:52200/tcp|1900/udp"
-        #n_ports=("tcp dport 52100-52200 accept" "udp dport 1900 accept")
-    elif [[ "$1" =~ ^(jriver-x11vnc|jriver-xvnc)$ ]]; then
-        f_ports=("$PORT"/tcp 1900/udp)
-        u_ports="$PORT/tcp|1900/udp"
-        #n_ports=("tcp dport $PORT accept" "udp dport 1900 accept")
-    fi
+    declare service="$1"
+    shift
+    # for firewall-cmd
+    declare -a f_ports=("$@")
+    # for ufw
+    declare u_ports="${*// /|}" # concatenate
+    u_ports="${u_ports//-/\//}"
 
-    # Open the ports
-    if ! case "$ID" in
-        fedora|centos|suse)
-            hash firewall-cmd 2>/dev/null || installPackage firewalld
-            if ! sudo firewall-cmd --get-services | grep -q "$1"; then
-                sudo firewall-cmd --permanent --new-service="$1" &>/dev/null
-                sudo firewall-cmd --permanent --service="$1" --set-description="$1 installed by installJRMC" &>/dev/null
-                sudo firewall-cmd --permanent --service="$1" --set-short="$1" &>/dev/null
-                for port in "${f_ports[@]}"; do
-                    sudo firewall-cmd --permanent --service="$1" --add-port="$port" &>/dev/null
-                done
-                sudo firewall-cmd --add-service "$1" --permanent &>/dev/null
-                sudo firewall-cmd --reload &>/dev/null
-            fi
-            ;;
-        debian|ubuntu)
-            # Debian ufw package state is broken on fresh installations
-            hash ufw 2>/dev/null || installPackage ufw
-            if [[ ! -f "/etc/ufw/applications.d/$1" ]]; then
-                sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$1
-					[$1]
-					title=$1
-					description=$1 installed by installJRMC
-					ports=$u_ports
-				EOF"
-            fi
-            sudo ufw app update "$1" &>/dev/null
-            sudo ufw allow "$1" &>/dev/null
-            ;;
-        arch)
-            # sysctl -w net.ipv4.ip_forward = 1
-            # sudo nft create table inet "jriver"
-            # sudo nft create chain inet "jriver" "$1" '{ type filter hook input priority 0; policy accept; }'
-            # for port in "${n_ports[@]}"; do
-            #     sudo nft add rule inet jriver "$1" handle tcp dport "$port"
-            # done
-            ;;
-    esac; then
-        err "Firewall ports could not be opened"
+    if hash firewall-cmd 2>/dev/null; then
+        if ! sudo firewall-cmd --get-services | grep -q "$service"; then
+            execute "sudo firewall-cmd --permanent --new-service=$service"
+            execute "sudo firewall-cmd --permanent --service=$service --set-description=$service installed by installJRMC"
+            execute "sudo firewall-cmd --permanent --service=$service --set-short=$service"
+            for port in "${f_ports[@]}"; do
+                execute "sudo firewall-cmd --permanent --service=$service --add-port=$port"
+            done
+            execute "sudo firewall-cmd --add-service $service --permanent"
+            execute "sudo firewall-cmd --reload"
+        fi
+    elif hash ufw 2>/dev/null; then
+        if [[ ! -f "/etc/ufw/applications.d/$service" ]]; then
+            sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
+				[$service]
+				title=$service
+				description=$service installed by installJRMC
+				ports=$u_ports
+			EOF"
+        fi
+        execute "sudo ufw app update $service"
+        execute "sudo ufw allow $service"
+    else
+        err "Please install firewall-cmd or ufw to open firewall ports"
         return 1
     fi
 }
@@ -1085,7 +1070,7 @@ setVNCPass() {
     if [[ -f "$vncpassfile" ]]; then
         if [[ ! -v VNCPASS ]]; then
             err "Refusing to overwrite existing $vncpassfile with an empty password"
-            err "Remove existing $vncpassfile or set --vncpass to use an empty password"
+            err "Remove existing $vncpassfile or use --vncpass ''"
             exit 1
         else
             rm -f "$vncpassfile"
@@ -1117,7 +1102,7 @@ setDisplay() {
 
     declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY NEXT_DISPLAYNUM
 
-    # Check USER_DISPLAY, else environment DISPLAY, else set to :0 by default
+    # Check USER_DISPLAY, else environment DISPLAY, else set to :0
     DISPLAY="${USER_DISPLAY:-${DISPLAY:-0}}"
     DISPLAYNUM="${DISPLAY#*:}" # strip prefix
     DISPLAYNUM="${DISPLAYNUM%%.*}" # strip suffix
@@ -1222,7 +1207,7 @@ service_jriver-mediacenter() {
 
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
-    openFirewall "jriver-mediacenter"
+    openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 }
 
 
@@ -1304,8 +1289,8 @@ service_jriver-xvnc() {
         return
     fi
     echo "Xvnc running on localhost:$PORT"
-    openFirewall "jriver-xvnc"
-    openFirewall "jriver-mediacenter"
+    openFirewall "jriver-xvnc" "$PORT/tcp"
+    openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 }
 
 
@@ -1369,7 +1354,7 @@ service_jriver-x11vnc() {
     systemctl_reload_cmd &&
     systemctl_enable_cmd "$SERVICE_NAME" &&
     echo "x11vnc running on localhost:$PORT" &&
-    openFirewall "jriver-x11vnc"
+    openFirewall "jriver-x11vnc" "$PORT/tcp"
 }
 
 
@@ -1686,7 +1671,7 @@ main() {
             symlinkCerts
             migrateLibrary
             restoreLicense
-            openFirewall "jriver-mediacenter"
+            openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
             disableCoW
         else
             err "JRiver Media Center installation from repo failed"
@@ -1713,7 +1698,7 @@ main() {
         symlinkCerts
         migrateLibrary
         restoreLicense
-        openFirewall "jriver-mediacenter"
+        openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
         disableCoW
     fi
 
