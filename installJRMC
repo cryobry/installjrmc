@@ -492,8 +492,7 @@ installPackage() {
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
-        pkg_install_cmd=(pkg_install "${install_flags[@]}" "${pkg_array[@]}")
-        if ! execute "${pkg_install_cmd[*]}"; then       
+        if ! execute "pkg_install ${install_flags[*]} ${pkg_array[*]}"; then       
             (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue"
             return 1
         fi
@@ -508,13 +507,11 @@ installPackage() {
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare repo_dir
     declare -a pkg_install_cmd
 
     case "$ID" in
         fedora|centos)
-            repo_dir="/etc/yum.repos.d/"
-            sudo bash -c "cat <<-EOF > $repo_dir/jriver.repo
+            sudo bash -c "cat <<-EOF > /etc/yum.repos.d/jriver.repo
 				[jriver]
 				name=JRiver Media Center repo by BryanC
 				baseurl=https://repos.bryanroessler.com/jriver
@@ -523,7 +520,7 @@ installMCFromRepo() {
             ;;
         debian|ubuntu)
             repo_dir="/etc/apt/sources.list.d"
-            [[ ! -d $repo_dir ]] && sudo mkdir -p "$repo_dir"
+            [[ -d $repo_dir ]] || execute "sudo mkdir -p /etc/apt/sources.list.d"
             sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
@@ -570,7 +567,7 @@ acquireDeb() {
     declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-amd64.deb"
 
     # If necessary, create SOURCES dir
-    [[ ! -d "$OUTPUTDIR/SOURCES" ]] && mkdir -p "$OUTPUTDIR/SOURCES"
+    [[ -d "$OUTPUTDIR/SOURCES" ]] || execute "mkdir -p $OUTPUTDIR/SOURCES"
 
     # If deb file already exists, skip download
     if [[ -f "$MCDEB" ]]; then
@@ -757,11 +754,13 @@ buildRPM() {
 
     # Run rpmbuild
     echo "Building MC $MCVERSION RPM, this may take awhile"
-    rpmbuild_cmd=(rpmbuild 
-                    --define=\"%_topdir "$OUTPUTDIR"\" 
-                    --define=\"%_libdir /usr/lib\" 
-                    -bb
-                    "$OUTPUTDIR/SPECS/mediacenter.spec")
+    rpmbuild_cmd=(
+        rpmbuild 
+            --define=\"%_topdir "$OUTPUTDIR"\" 
+            --define=\"%_libdir /usr/lib\" 
+            -bb
+            "$OUTPUTDIR/SPECS/mediacenter.spec"
+    )
     if execute "${rpmbuild_cmd[*]}" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
@@ -802,7 +801,6 @@ installMCDEB() {
         rm -rf "$extract_dir"
     fi
     pkg_install_cmd+=("$MCDEB")
-    debug "${pkg_install_cmd[*]}" || pkg_install_cmd+=(" &>/dev/null")
     execute "${pkg_install_cmd[*]}"
 }
 
@@ -913,17 +911,15 @@ installMCARCH() {
 runCreaterepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a cr_cmd cr_cp_cmd cr_mkdir_cmd cr_chown_cmd
+    declare -a cr_cmd
 
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        cr_mkdir_cmd=(sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT")
-        if ! execute "${cr_mkdir_cmd[*]}"; then
-            cr_mkdir_cmd=(sudo mkdir -p "$CREATEREPO_WEBROOT")
-            cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
-            if ! ( execute "${cr_mkdir_cmd[*]}" && execute "${cr_chown_cmd[*]}" ); then
+        if ! execute "sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"; then
+            if ! ( execute "sudo mkdir -p $CREATEREPO_WEBROOT" && 
+            execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT" ); then
                 err "Could not create the createrepo-webroot path!"
                 err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $CREATEREPO_USER"
                 err "Or change the repo ownership with --createrepo-user"
@@ -933,9 +929,8 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    cr_cp_cmd=(sudo cp -nf "$MCRPM" "$CREATEREPO_WEBROOT")
-    cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
-    if ! ( execute "${cr_cp_cmd[*]}" && execute "${cr_chown_cmd[*]}" ); then
+    if ! ( execute "sudo cp -nf $MCRPM $CREATEREPO_WEBROOT" && 
+    execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT" ); then
         err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
         return 1
     fi
@@ -946,8 +941,8 @@ runCreaterepo() {
     if ! execute "${cr_cmd[*]}"; then
         cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
-        cr_chown_cmd=(sudo chown -R "$CREATEREPO_USER":"$CREATEREPO_USER" "$CREATEREPO_WEBROOT")
-        if ! ( execute "${cr_cmd[*]}" && execute "${cr_chown_cmd[*]}"); then
+        if ! (execute "${cr_cmd[*]}" && 
+        execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"); then
             err "Createrepo failed"
             return 1
         fi
@@ -1019,11 +1014,9 @@ openFirewall() {
     declare port
     declare service="$1"
     shift
-    # for firewall-cmd
-    declare -a f_ports=("$@")
-    # for ufw
+    declare -a f_ports=("$@") # for firewall-cmd
     declare u_ports="${*// /|}" # concatenate
-    u_ports="${u_ports//-/\//}"
+    u_ports="${u_ports//-/\//}" # for ufw
 
     if hash firewall-cmd 2>/dev/null; then
         if ! sudo firewall-cmd --get-services | grep -q "$service"; then
@@ -1064,7 +1057,7 @@ setVNCPass() {
 
     declare vncpassfile="$HOME/.vnc/jrmc_passwd"
 
-    [[ ! -d "${vncpassfile%/*}" ]] && mkdir -p "${vncpassfile%/*}"
+    [[ -d "${vncpassfile%/*}" ]] || execute "mkdir -p ${vncpassfile%/*}"
 
     if [[ -f "$vncpassfile" ]]; then
         if [[ ! -v VNCPASS ]]; then
@@ -1114,35 +1107,40 @@ setDisplay() {
 setServiceVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
-    declare -g SERVICE_TYPE="${SERVICE_TYPE:-system}"
-    declare service_dir="/usr/lib/systemd/$SERVICE_TYPE"
+    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
+    declare -g USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
+    declare -g RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
+    declare -a systemctl_prefix
 
-    if [[ "$USER" == "root" && "$SERVICE_TYPE" == "user" ]]; then
+    declare service_name="$1"
+    shift
+    declare service_type="${2:-${SERVICE_TYPE:-system}}"
+    declare service_dir="/usr/lib/systemd/$service_type"
+
+    if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
         err "Trying to install user service as root"
         err "Use --service-type service and/or execute installJRMC as non-root user"
         return 1
     fi
 
-    if [[ "$SERVICE_TYPE" == "system" ]]; then
-        systemctl_reload_cmd(){ sudo systemctl daemon-reload; }
-        systemctl_enable_cmd(){ sudo systemctl enable --now "$@"; }
-        systemctl_disable_cmd(){ sudo systemctl disable --now "$@"; }
-        systemctl_is_enabled_cmd(){ sudo systemctl is-enabled -q "$@"; }
-        systemctl_is_active_cmd(){ sudo systemctl is-active -q "$@"; }
+    if [[ "$service_type" == "system" ]]; then
+        systemctl_prefix=(sudo systemctl)
         GRAPHICAL_TARGET="graphical.target"
-    elif [[ "$SERVICE_TYPE" == "user" ]]; then
-        systemctl_reload_cmd(){ systemctl --user daemon-reload; }
-        systemctl_enable_cmd(){ systemctl --user enable --now "$@"; }
-        systemctl_disable_cmd(){ systemctl --user disable --now "$@"; }
-        systemctl_is_enabled_cmd(){ systemctl --user is-enabled -q "$@"; }
-        systemctl_is_active_cmd(){ systemctl --user is-active -q "$@"; }
+    elif [[ "$service_type" == "user" ]]; then
+        systemctl_prefix=(systemctl --user)
         GRAPHICAL_TARGET="default.target"
     fi
 
-    [[ ! -d "$service_dir" ]] && sudo mkdir -p "$service_dir"
+    # systemctl commands
+    RELOAD="${systemctl_prefix[*]} daemon-reload"
+    ENABLE="${systemctl_prefix[*]} enable --now"
+    DISABLE="${systemctl_prefix[*]} disable --now"
+    IS_ENABLED="${systemctl_prefix[*]} is-enabled -q"
+    IS_ACTIVE="${systemctl_prefix[*]} is-active -q"
 
-    # TODO Ubuntu needs these in the service file, fedora (and others?) does not
+    [[ -d "$service_dir" ]] || execute "sudo mkdir -p $service_dir"
+
+    # TODO Ubuntu needs these in the service file, fedora (and others?) do not
     case "$ID" in
         ubuntu|debian)
             DISPLAY_STRING="Environment=DISPLAY=$DISPLAY"
@@ -1154,15 +1152,15 @@ setServiceVars() {
     esac
 
     if [[ "$SERVICE_TYPE" == "system" && "$USER" != "root" ]]; then
-        SERVICE_FNAME="$service_dir/${1}@.service"
-        TIMER_FNAME="$service_dir/${1}@.timer"
-        SERVICE_NAME="${1}@$USER.service"
-        TIMER_NAME="${1}@$USER.timer"
+        SERVICE_FNAME="$service_dir/$service_name@.service"
+        TIMER_FNAME="$service_dir/$service_name@.timer"
+        SERVICE_NAME="$service_name@$USER.service"
+        TIMER_NAME="$service_name@$USER.timer"
         USER_STRING="User=%I"
     else
-        SERVICE_NAME="${1}.service"
-        TIMER_NAME="${1}.timer"
-        SERVICE_FNAME="$service_dir/${SERVICE_NAME}"
+        SERVICE_NAME="$service_name.service"
+        TIMER_NAME="$service_name.timer"
+        SERVICE_FNAME="$service_dir/$SERVICE_NAME"
         TIMER_FNAME="$service_dir/${TIMER_NAME}"
         USER_STRING=""
     fi
@@ -1177,7 +1175,7 @@ setServiceVars() {
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars "${FUNCNAME[0]##*_}"
+    setServiceVars "${FUNCNAME[0]##*_}" "user"
 
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
@@ -1200,8 +1198,8 @@ service_jriver-mediacenter() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    systemctl_reload_cmd &&
-    systemctl_enable_cmd "$SERVICE_NAME" &&
+    execute "$RELOAD" &&
+    execute "$ENABLE $SERVICE_NAME" &&
     openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 }
 
@@ -1212,7 +1210,7 @@ service_jriver-mediacenter() {
 service_jriver-mediaserver() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars "${FUNCNAME[0]##*_}"
+    setServiceVars "${FUNCNAME[0]##*_}" "user"
 
     service_jriver-mediacenter "/MediaServer"
 }
@@ -1225,7 +1223,7 @@ service_jriver-mediaserver() {
 service_jriver-xvnc() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars "${FUNCNAME[0]##*_}"
+    setServiceVars "${FUNCNAME[0]##*_}" "system"
     setDisplay
     declare -a start_cmd
     declare -g PORT=$(( NEXT_DISPLAYNUM + 5900 ))
@@ -1276,8 +1274,8 @@ service_jriver-xvnc() {
 		WantedBy=multi-user.target
 	EOF"
 
-    systemctl_reload_cmd
-    if ! systemctl_enable_cmd "$SERVICE_NAME"; then
+    execute "$RELOAD"
+    if ! execute "$ENABLE $SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY and retrying"
         service_jriver-xvnc increment
@@ -1295,7 +1293,7 @@ service_jriver-xvnc() {
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars "${FUNCNAME[0]##*_}"
+    setServiceVars "${FUNCNAME[0]##*_}" "user"
     setDisplay
 
     declare -a start_cmd
@@ -1346,8 +1344,8 @@ service_jriver-x11vnc() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    systemctl_reload_cmd &&
-    systemctl_enable_cmd "$SERVICE_NAME" &&
+    execute "$RELOAD" &&
+    execute "$ENABLE $SERVICE_NAME" &&
     echo "x11vnc running on localhost:$PORT" &&
     openFirewall "jriver-x11vnc" "$PORT/tcp"
 }
@@ -1361,9 +1359,9 @@ service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
     if [[ "$CREATEREPO_USER" != "$USER" ]]; then
-        USER="root" SERVICE_TYPE="system" setServiceVars "${FUNCNAME[0]##*_}"
+        USER="root" setServiceVars "${FUNCNAME[0]##*_}" "system"
     else
-        setServiceVars "${FUNCNAME[0]##*_}"
+        setServiceVars "${FUNCNAME[0]##*_}" "system"
     fi
 
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
@@ -1390,8 +1388,8 @@ service_jriver-createrepo() {
 		WantedBy=timers.target
 	EOF"
 
-    systemctl_reload_cmd &&
-    systemctl_enable_cmd "$TIMER_NAME"
+    execute "$RELOAD" &&
+    execute "$ENABLE $TIMER_NAME"
 }
 
 
@@ -1500,7 +1498,7 @@ disableCoW() {
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
             echo "Disabling CoW for $dir"
-            sudo chattr +C "$dir"
+            execute "sudo chattr +C $dir"
         fi
     done
 }
@@ -1537,21 +1535,21 @@ uninstall() {
     for service in $(compgen -A "function" "service"); do
         service="${service##service_}"
         for i in user system; do
-            SERVICE_TYPE="$i" setServiceVars "$service"; 
+            setServiceVars "$service" "$i"; 
             for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-                if systemctl_is_active_cmd "$unit" &>/dev/null ||
-                systemctl_is_enabled_cmd "$unit" &>/dev/null; then
-                    debug "Disabling $unit"
-                    systemctl_disable_cmd "$unit"
+                if execute "$IS_ACTIVE $unit" ||
+                execute "$IS_ENABLED $unit"; then
+                    execute "$DISABLE $unit"
                 fi
             done
             for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-                [[ -f "$f" ]] && debug "Removing $f" && sudo rm -f "$f"
+                [[ -f "$f" ]] && 
+                execute "sudo rm -f $f"
             done
-            systemctl_reload_cmd
+            execute "$RELOAD"
         done
         for f in /etc/systemd/system/jriver-*; do
-            sudo rm -f "$f"
+            execute "sudo rm -f $f"
         done
     done
 
@@ -1626,8 +1624,7 @@ main() {
         ubuntu)
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
-                declare -a add_universe_cmd=(sudo add-apt-repository -y universe)
-                if ! execute "${add_universe_cmd[*]}"; then
+                if ! execute "sudo add-apt-repository -y universe"; then
                     err "Adding universe repository failed"
                 fi
             fi
