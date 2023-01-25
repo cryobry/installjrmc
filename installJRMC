@@ -1104,7 +1104,7 @@ setDisplay() {
 #   Pre-defined service name
 #######################################
 setServiceVars() {
-    debug "Running: ${FUNCNAME[0]}"
+    debug "Running: ${FUNCNAME[0]}" "$*"
 
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
     declare -g USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
@@ -1183,7 +1183,7 @@ service_jriver-mediacenter() {
 
 		[Service]
 		$USER_STRING
-        $DISPLAY_STRING
+		$DISPLAY_STRING
 		Type=simple
 		Environment=DISPLAY=$DISPLAY
 		Environment=XAUTHORITY=$XAUTHORITY
