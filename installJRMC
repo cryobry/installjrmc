@@ -1030,6 +1030,7 @@ openFirewall() {
             execute "sudo firewall-cmd --reload"
         fi
     elif hash ufw 2>/dev/null; then
+        debug "u_ports: $u_ports"
         if [[ ! -f "/etc/ufw/applications.d/$service" ]]; then
             sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
 				[$service]
