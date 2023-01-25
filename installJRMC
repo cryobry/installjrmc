@@ -1015,8 +1015,10 @@ openFirewall() {
     declare service="$1"
     shift
     declare -a f_ports=("$@") # for firewall-cmd
-    declare u_ports="${*// /|}" # concatenate
-    u_ports="${u_ports//-/\//}" # for ufw
+    declare u_ports="$*"
+    declare u_ports="${u_ports// /|}" # concatenate
+    u_ports="${u_ports//-/\:}" # for ufw
+    debug "u_ports formatted: $u_ports"
 
     if hash firewall-cmd 2>/dev/null; then
         if ! sudo firewall-cmd --get-services | grep -q "$service"; then
@@ -1030,7 +1032,6 @@ openFirewall() {
             execute "sudo firewall-cmd --reload"
         fi
     elif hash ufw 2>/dev/null; then
-        debug "u_ports: $u_ports"
         if [[ ! -f "/etc/ufw/applications.d/$service" ]]; then
             sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
 				[$service]
