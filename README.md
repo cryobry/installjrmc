@@ -23,9 +23,9 @@ $ installJRMC --help
 --compat
     Build/install MC without minimum dependency version requirements
 --mcversion VERSION
-    Build or install a specific MC version, ex. "30.0.51"
+    Build or install a specific MC version, ex. "30.0.51" (default: latest version)
 --outputdir PATH
-    Generate rpmbuild output in this PATH (Default: ./output)
+    Generate rpmbuild output in this PATH (default: ./output)
 --restorefile RESTOREFILE
     Restore file location for automatic license registration
 --betapass PASSWORD
@@ -33,14 +33,14 @@ $ installJRMC --help
 --service, -s SERVICE
     See SERVICES section below for the list of services to deploy
   --service-type user|system
-      Starts services at boot (system) or user login (user) (Default: per-service see SERVICES)
+      Starts services at boot (system) or user login (user) (default: per-service, see SERVICES)
 --container, -c CONTAINER (TODO: Under construction)
     See CONTAINERS section below for a list of containers to deploy
 --createrepo[=suse|fedora|centos]
     Build rpm, copy to webroot, and run createrepo.
     Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
   --createrepo-webroot PATH
-      The webroot directory to install the repo (Default: /var/www/jriver/)
+      The webroot directory to install the repo (default: /var/www/jriver/)
   --createrepo-user USER
       The web server user if different from the current user
 --version, -v
@@ -110,9 +110,9 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
     Install MC from the repository and start/enable `jriver-mediacenter.service` as a user service.
 
-* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 30.0.17`
+* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 30.0.51`
 
-    Build and install an MC 30.0.17 comptability RPM locally and activate it using the `/path/to/license.mjr`
+    Build and install an MC 30.0.51 comptability RPM locally and activate it using the `/path/to/license.mjr`
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
