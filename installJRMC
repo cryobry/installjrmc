@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-dev"
+declare -g SCRIPTVERSION="1.0-rc5"
 declare -g OUTPUTDIR="$PWD/output"
 
 # MC30 (Buster)
@@ -46,7 +46,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. 30.0.51" (default: latest version)
+		        Specify the MC version, ex. 30.0.55" (default: latest version)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (default: ./output)
 		    --restorefile RESTOREFILE
@@ -123,9 +123,11 @@ execute() {
 parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH USER_VERSION_SWITCH
-    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH 
-    declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
+    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g USER_VERSION_SWITCH
+    declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE
+    declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts input
 
@@ -141,8 +143,9 @@ parseInput() {
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
-    long_opts+="service-type:,service:,services:,version,debug,help,uninstall,createrepo::,"
-    long_opts+="createrepo-webroot:,createrepo-user:,vncpass:,display:,container:,tests,compat"
+    long_opts+="service-type:,service:,services:,version,debug,help,uninstall,"
+    long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
+    long_opts+="vncpass:,display:,container:,tests,compat"
     short_opts="+i:vb::dhus:c:"
 
     if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then

@@ -23,7 +23,7 @@ $ installJRMC --help
 --compat
     Build/install MC without minimum dependency version requirements
 --mcversion VERSION
-    Build or install a specific MC version, ex. "30.0.51" (default: latest version)
+    Build or install a specific MC version, ex. "30.0.55" (default: latest version)
 --outputdir PATH
     Generate rpmbuild output in this PATH (default: ./output)
 --restorefile RESTOREFILE
@@ -110,9 +110,9 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
     Install MC from the repository and start/enable `jriver-mediacenter.service` as a user service.
 
-* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 30.0.51`
+* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 30.0.55`
 
-    Build and install an MC 30.0.51 comptability RPM locally and activate it using the `/path/to/license.mjr`
+    Build and install an MC 30.0.55 comptability RPM locally and activate it using the `/path/to/license.mjr`
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
