@@ -6,9 +6,7 @@ This program will install [JRiver Media Center](https://www.jriver.com/) (JRMC) 
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method (i.e. `--install repo` or `--install local`) will need to be explicitly specified. This makes it possible to install services and containers independent of MC.
-
-**Note**: As of v1.0b14 major version library migrations are performed if the destination config directory `$HOME/.jriver/Media Center XX` is missing for major release `XX`. However, it is still a good idea to create a manual library backup before migrating major versions.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center (MC) from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is specified, then the default install method (i.e. `--install repo` or `--install local`) will need to be explicitly specified. This makes it possible to install services and containers independent of MC.
 
 ## Options
 
@@ -24,6 +22,8 @@ $ installJRMC --help
     Build/install MC without minimum dependency version requirements
 --mcversion VERSION
     Build or install a specific MC version, ex. "30.0.55" (default: latest version)
+--arch ARCH
+    Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 --outputdir PATH
     Generate rpmbuild output in this PATH (default: ./output)
 --restorefile RESTOREFILE
@@ -136,6 +136,6 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
 ## Additional Info
 
-Did you find `installJRMC` useful? [Buy me a coffee!](https://paypal.me/bryanroessler?locale.x=en_US)
+Did you find `installJRMC` useful? [Buy me a coffee!](https://paypal.me/bryanroessler)
 
 Did you find a bug? Let me know on [Interact!](https://yabb.jriver.com/interact/index.php/topic,134152.0.html)

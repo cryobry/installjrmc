@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc5"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g OUTPUTDIR="$PWD/output"
 
 # MC30 (Buster)
@@ -46,7 +46,9 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. 30.0.55" (default: latest version)
+		        Specify the MC version, ex. "30.0.55" (default: latest version)
+		    --arch VERSION
+		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (default: ./output)
 		    --restorefile RESTOREFILE
@@ -142,7 +144,7 @@ parseInput() {
         LOCAL_INSTALL_SWITCH=1
     fi
 
-    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
+    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,arch:,"
     long_opts+="service-type:,service:,services:,version,debug,help,uninstall,"
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
     long_opts+="vncpass:,display:,container:,tests,compat"
@@ -175,6 +177,10 @@ parseInput() {
                     shift
                     MCVERSION="$1"
                     USER_VERSION_SWITCH=1
+                    ;;
+                --arch)
+                    shift
+                    ARCH="$1"
                     ;;
                 --restorefile)
                     shift && RESTOREFILE="$1"
@@ -249,7 +255,7 @@ parseInput() {
 init() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID RPM_MGR
+    declare -g ID RPM_MGR ARCH
 
     echo "Starting installJRMC"
     debug || echo "To enable debugging output, use --debug or -d"
@@ -263,7 +269,16 @@ init() {
         exit 1
     fi
 
-    debug "Detected host platform: $ID $VERSION_ID"
+    # Detect architecture and translate to MC convention
+    # Also catch user input in getopt
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)
+            ARCH="amd64"
+            ;;
+    esac
+
+    debug "Detected host platform: $ID $VERSION_ID $ARCH"
 
     # normalize ID and set distro-specific vars
     case "$ID" in
@@ -564,7 +579,7 @@ installMCFromRepo() {
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-amd64.deb"
+    declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-$ARCH.deb"
 
     # If necessary, create SOURCES dir
     [[ -d "$OUTPUTDIR/SOURCES" ]] || execute "mkdir -p $OUTPUTDIR/SOURCES"
@@ -577,13 +592,13 @@ acquireDeb() {
 
     if [[ -v BETAPASS ]] && 
         echo "Checking beta repo for DEB package" && wget -q -O "$MCDEB" \
-            "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-amd64.deb"; then
+            "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-$ARCH.deb"; then
                 echo "Found!"
     elif echo "Checking latest repo for DEB package" && wget -q -O "$MCDEB" \
-            "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb"; then
+            "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-$ARCH.deb"; then
                 echo "Found!"
     elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
-            "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-amd64.deb"; then
+            "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-$ARCH.deb"; then
                 echo "Found!"
     else
         err "Cannot find DEB file"
@@ -712,7 +727,7 @@ buildRPM() {
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-amd64.deb
+		Source0: http://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-$ARCH.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
@@ -877,7 +892,7 @@ installMCARCH() {
 			'vorbis-tools: ogg vorbis support' 
 			'musepack-tools: musepack support'
 		)
-		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-amd64.deb")
+		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-$ARCH.deb")
 
 		package() {
 			cd "\$srcdir"
