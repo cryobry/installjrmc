@@ -335,7 +335,7 @@ init() {
             pkg_query(){ rpm -q "$@"; }
             ;;
         debian|ubuntu)
-            pkg_install(){ sudo apt-get install -y -q0 "$@"; }
+            pkg_install(){ sudo apt-get -f install -y -q0 "$@"; }
             pkg_install_local() { installMCDEB; }
             pkg_remove(){ sudo apt-get remove --auto-remove -y -q0 "$@"; }
             pkg_update(){ sudo apt-get update -y -q0; }
