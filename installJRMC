@@ -127,8 +127,8 @@ parseInput() {
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
     declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
-    declare -g USER_VERSION_SWITCH
-    declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE USER_ARCH
+    declare -g USER_VERSION_SWITCH USER_ARCH
+    declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE
     declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts input
@@ -579,10 +579,9 @@ installMCFromRepo() {
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-
-
-
     declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"
+
+    debug "MCDEB=$MCDEB"
 
     # If necessary, create SOURCES dir
     [[ -d "$OUTPUTDIR/SOURCES" ]] || execute "mkdir -p $OUTPUTDIR/SOURCES"
