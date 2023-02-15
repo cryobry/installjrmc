@@ -431,7 +431,7 @@ setMCVersion() {
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    declare -a pkg_array install_flags pkg_install_cmd
+    declare -a pkg_array install_flags
     declare long_opts input pkg 
     declare skip_check_installed allow_downgrades silent refresh no_gpg_check
     declare -A pkg_aliases
@@ -837,19 +837,14 @@ installMCRPM() {
 installMesa() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a pkg_swap_cmd
-
     # Currently only necessary in Fedora/CentOS
     case "$ID" in
         fedora|centos)
             if ! pkg_query mesa-va-drivers-freeworld &>/dev/null; then
                 if pkg_query mesa-va-drivers &>/dev/null; then
-                    pkg_swap_cmd=(
-                        pkg_swap 
-                        mesa-va-drivers 
-                        mesa-va-drivers-freeworld
-                    )
-                    if ! execute "${pkg_swap_cmd[*]}"; then
+                    if ! execute pkg_swap \
+                        mesa-va-drivers \
+                        mesa-va-drivers-freeworld; then
                         err "Package swap failed!"
                         return 1
                     fi
@@ -1078,7 +1073,7 @@ setVNCPass() {
         if [[ ! -v VNCPASS ]]; then
             err "Refusing to overwrite existing $vncpassfile with an empty password"
             err "Remove existing $vncpassfile or use --vncpass ''"
-            exit 1
+            return 1
         else
             rm -f "$vncpassfile"
         fi
