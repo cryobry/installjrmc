@@ -113,9 +113,11 @@ askOk() {
     [[ "${response,,}" =~ ^(yes|y)$ ]]
 }
 execute() {
-    declare cmd="$*"
-    debug "$cmd" || cmd+=" &>/dev/null"
-    eval "${cmd[*]}"
+    if debug "$*"; then
+        eval "$*"
+    else
+        eval "$* &>/dev/null"
+    fi
 }
 
 
@@ -522,8 +524,6 @@ installPackage() {
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a pkg_install_cmd
-
     case "$ID" in
         fedora|centos)
             sudo bash -c "cat <<-EOF > /etc/yum.repos.d/jriver.repo
@@ -534,7 +534,7 @@ installMCFromRepo() {
 			EOF"
             ;;
         debian|ubuntu)
-            repo_dir="/etc/apt/sources.list.d"
+            declare repo_dir="/etc/apt/sources.list.d"
             [[ -d $repo_dir ]] || execute "sudo mkdir -p /etc/apt/sources.list.d"
             sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
@@ -559,14 +559,11 @@ installMCFromRepo() {
     # Install mesa-va-drivers-freeworld separately from the RPM for dnf swap
     installMesa
 
-    pkg_install_cmd=(
-        installPackage 
-        --skip-check-installed 
-        --allow-downgrades 
-        --no-gpg-check 
-        "$MCPKG"
-    )
-    if ! execute "${pkg_install_cmd[*]}"; then
+    if ! execute installPackage \
+        --skip-check-installed \
+        --allow-downgrades \
+        --no-gpg-check \
+        "$MCPKG"; then
         err "Package install failed!"
         return 1
     fi
@@ -796,11 +793,6 @@ buildRPM() {
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"    
 
-    declare pkg_install_cmd
-    pkg_install_cmd=(installPackage 
-                        --skip-check-installed 
-                        --no-gpg-check 
-                        --allow-downgrades)
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
@@ -817,8 +809,12 @@ installMCDEB() {
         popd &>/dev/null || return
         rm -rf "$extract_dir"
     fi
-    pkg_install_cmd+=("$MCDEB")
-    execute "${pkg_install_cmd[*]}"
+
+    execute installPackage \
+        --skip-check-installed \
+        --no-gpg-check \
+        --allow-downgrades \
+        "$MCDEB"
 }
 
 
@@ -872,8 +868,6 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a makepkg_cmd
-
     echo "Arch install under construction"
     [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
@@ -901,19 +895,18 @@ installMCARCH() {
 			bsdtar xf data.tar.xz -C "\$pkgdir"
 		}
 	EOF
-
-    makepkg_cmd=(makepkg --install
-                --syncdeps 
-                --clean 
-                --cleanbuild 
-                --skipinteg 
-                --force
-                --noconfirm 
-                -p mediacenter.pkgbuild)
     
     pushd "$OUTPUTDIR/PKGBUILD" &>/dev/null || return
 
-    if ! execute "${makepkg_cmd[*]}"; then
+    if ! execute makepkg \
+        --install \
+        --syncdeps \
+        --clean \
+        --cleanbuild \
+        --skipinteg \
+        --force \
+        --noconfirm \
+        -p mediacenter.pkgbuild; then
         echo "makepkg failed"
         exit
     fi
@@ -973,24 +966,24 @@ runCreaterepo() {
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare mc_cert_link="/usr/lib/jriver/MC30/ca-certificates.crt"
-    declare target_cert
-    declare -a ln_cmd
+    declare mc_cert_link="/usr/lib/jriver/MC$MVERSION/ca-certificates.crt"
+    declare target_cert f
+    declare -a source_certs=(
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" 
+        "/var/lib/ca-certificates/ca-bundle.pem")
 
     target_cert=$(readlink -f "$mc_cert_link")
-
     [[ -f $target_cert ]] && return 0
 
-    if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        ln_cmd=(sudo ln -fs /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem "$mc_cert_link") # For RHEL/CentOS
-    elif [[ -f /var/lib/ca-certificates/ca-bundle.pem ]]; then
-        ln_cmd=(sudo ln -fs /var/lib/ca-certificates/ca-bundle.pem "$mc_cert_link") # For SUSE
-    fi
-    
-    if ! execute "${ln_cmd[*]}"; then
-        err "Symlinking certificates failed"
-        return 1
-    fi
+    for f in "${source_certs[@]}"; do
+        if [[ -f "$f" ]]; then
+            if ! execute ln -fs "$f" "$mc_cert_link"; then
+                err "Symlinking certificate failed"
+                return 1
+            fi
+            break
+        fi
+    done
 }
 
 
@@ -1000,22 +993,28 @@ symlinkCerts() {
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare mjrfile
+    declare f 
+    declare -a mjrfiles_sorted
 
-    # Allow user to put the mjr file next to installJRMC
-    if [[ ! -v RESTOREFILE ]]; then
-        for mjrfile in "$PWD"/*.mjr; do
-            [[ $mjrfile -nt $RESTOREFILE ]] && RESTOREFILE="$mjrfile"
-        done
-    fi
+    # Glob mjr files from common directories
+    declare -a mjrfiles=(
+        "$RESTOREFILE" 
+        "$PWD"/*.mjr 
+        "$OUTPUTDIR"/*.mjr 
+        "$HOME"/[dD]ownloads/*.mjr
+        "$HOME"/[dD]ocuments/*.mjr
+    )
 
-    # Restore license
-    if [[ -f "$RESTOREFILE" ]]; then
-        if ! "mediacenter$MVERSION" /RestoreFromFile "$RESTOREFILE"; then
-            err "Automatic license restore failed"
-            return 1
+    # Sort globbed files by time, newest first
+    mjrfiles_sorted=("$(ls -t "${mjrfiles[@]}")")
+
+    for f in "${mjrfiles_sorted[@]}"; do
+        if [[ -f "$f" ]]; then
+            if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
+                return 0
+            fi
         fi
-    fi
+    done
 }
 
 
