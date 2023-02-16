@@ -6,6 +6,10 @@
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
 #
+#
+# TODO (v1)
+#   1. Finish refactoring
+#
 # TODO (v2)
 #   1. Interactive installation (ncurses?)
 #   2. Additional containerization (createrepo and rpmbuild)
@@ -18,9 +22,7 @@ shopt -s extglob
 
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g OUTPUTDIR="$PWD/output"
-
-# MC30 (Buster)
-declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html"
+declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
 declare -g DEBIANBASE="buster"
 declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.55"}" # Hardcoded fallback
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
@@ -146,10 +148,10 @@ parseInput() {
         LOCAL_INSTALL_SWITCH=1
     fi
 
-    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,arch:,"
+    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
     long_opts+="service-type:,service:,services:,version,debug,help,uninstall,"
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
-    long_opts+="vncpass:,display:,container:,tests,compat"
+    long_opts+="vncpass:,display:,container:,tests,compat,arch:"
     short_opts="+i:vb::dhus:c:"
 
     if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
@@ -535,7 +537,7 @@ installMCFromRepo() {
             ;;
         debian|ubuntu)
             declare repo_dir="/etc/apt/sources.list.d"
-            [[ -d $repo_dir ]] || execute "sudo mkdir -p /etc/apt/sources.list.d"
+            [[ -d $repo_dir ]] || execute "sudo mkdir -p $repo_dir"
             sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
@@ -849,7 +851,7 @@ installMesa() {
                         return 1
                     fi
                 else
-                    execute "${PKG_INSTALL[*]} mesa-va-drivers-freeworld"
+                    execute "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld
                 fi
             fi
             ;;
@@ -883,7 +885,7 @@ installMCARCH() {
 			'vorbis-tools: ogg vorbis support' 
 			'musepack-tools: musepack support'
 		)
-		source=("http://files.jriver.com/mediacenter/channels/v30/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb")
+		source=("http://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb")
 
 		package() {
 			cd "\$srcdir"
@@ -903,7 +905,7 @@ installMCARCH() {
         --noconfirm \
         -p mediacenter.pkgbuild; then
         echo "makepkg failed"
-        exit
+        exit 1
     fi
 
     popd &>/dev/null || return
@@ -948,7 +950,7 @@ runCreaterepo() {
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
         if ! (execute "${cr_cmd[*]}" && 
         execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"); then
-            err "Createrepo failed"
+            err "createrepo failed"
             return 1
         fi
     fi
@@ -988,22 +990,29 @@ symlinkCerts() {
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare f 
-    declare -a mjrfiles_sorted
+    declare f newest
 
     # Glob mjr files from common directories
+    shopt -s nullglob
     declare -a mjrfiles=(
-        "$RESTOREFILE" 
         "$PWD"/*.mjr 
         "$OUTPUTDIR"/*.mjr 
         "$HOME"/[dD]ownloads/*.mjr
         "$HOME"/[dD]ocuments/*.mjr
     )
+    shopt -u nullglob
+
+    debug "mjrfiles=(${mjrfiles[*]})"
 
     # Sort globbed files by time, newest first
-    mjrfiles_sorted=("$(ls -t "${mjrfiles[@]}")")
+    newest=${mjrfiles[0]}
+    for f in "${mjrfiles[@]}"; do
+        if [[ -f $f && $f -nt $newest ]]; then
+            newest=$f
+        fi
+    done
 
-    for f in "${mjrfiles_sorted[@]}"; do
+    for f in "$RESTOREFILE" "$newest"; do
         if [[ -f "$f" ]]; then
             if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
                 return 0
@@ -1121,7 +1130,6 @@ setServiceVars() {
     declare -g USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
     declare -g RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
     declare -a systemctl_prefix
-
     declare service_name="$1"
     declare service_type="${2:-${SERVICE_TYPE:-system}}"
     declare service_dir="/usr/lib/systemd/$service_type"
