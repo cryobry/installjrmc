@@ -141,9 +141,9 @@ parseInput() {
     declare -g TARGET=${TARGET:-$ID}
     declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
-    if [[ $# -eq 0 ]] || [[ $# -eq 1 && "$1" =~ ^(--debug|-d)$ ]]; then
+    if [[ $# -eq 0 ]] || [[ $# -eq 1 && " $1 " =~ ^( --debug | -d )$ ]]; then
         REPO_INSTALL_SWITCH=1
-    elif [[ $# -eq 1 && "$1" =~ ^(--compat)$ ]]; then
+    elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
         BUILD_SWITCH=1
         LOCAL_INSTALL_SWITCH=1
     fi
@@ -153,6 +153,9 @@ parseInput() {
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
     long_opts+="vncpass:,display:,container:,tests,compat,arch:"
     short_opts="+i:vb::dhus:c:"
+
+    # Redeclare DEBUG and catch permanently with getopt
+    declare -g DEBUG=0
 
     if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
         eval set -- "$input"
@@ -263,7 +266,7 @@ init() {
     declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE
 
     echo "Starting installJRMC"
-    debug || echo "To enable debugging output, use --debug or -d"
+    (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
 
     if [[ -e "/etc/os-release" ]]; then
         source "/etc/os-release"
@@ -425,27 +428,27 @@ setMCVersion() {
 # Arguments:
 #   One or more package names
 # Options:
-#   --skip-check-installed: Do not check if package is already installed
+#   --no-install-check: Do not check if package is already installed
 #   --no-gpg-check: Disable GPG checks for RPM based distros
 #   --allow-downgrades: Useful for installing specific MC versions
-#   --silent, -s: Do not report errors (useful if package is not strictly required and errors are noisy)
+#   --silent, -s: Do not print errors (useful for optional packages)
 #######################################
 installPackage() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
     declare long_opts input pkg 
-    declare skip_check_installed allow_downgrades silent refresh no_gpg_check
+    declare no_install_check allow_downgrades silent refresh no_gpg_check
     declare -A pkg_aliases
 
-    long_opts="skip-check-installed,allow-downgrades,no-gpg-check,refresh,silent"
+    long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
 
     if input=$(getopt -o +s -l "$long_opts" -- "$@"); then
         eval set -- "$input"
         while true; do
             case "$1" in
-                --skip-check-installed)
-                    skip_check_installed=1
+                --no-install-check)
+                    no_install_check=1
                     ;;
                 --allow-downgrades)
                     allow_downgrades=1
@@ -485,7 +488,7 @@ installPackage() {
         if [[ -v pkg_aliases[$pkg] ]]; then
             pkg=${pkg_aliases[$pkg]}
         fi
-        if (( skip_check_installed )) || 
+        if (( no_install_check )) || 
         ! (hash "$pkg" &>/dev/null || 
         PKG_QUERY "$pkg" &>/dev/null); then
             pkg_array+=("$pkg")
@@ -558,11 +561,11 @@ installMCFromRepo() {
         return 1
     fi
 
-    # Install mesa-va-drivers-freeworld separately from the RPM for dnf swap
+    # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
     installMesa
 
     if ! execute installPackage \
-        --skip-check-installed \
+        --no-install-check \
         --allow-downgrades \
         --no-gpg-check \
         "$MCPKG"; then
@@ -813,7 +816,7 @@ installMCDEB() {
     fi
 
     execute installPackage \
-        --skip-check-installed \
+        --no-install-check \
         --no-gpg-check \
         --allow-downgrades \
         "$MCDEB"
@@ -829,7 +832,7 @@ installMCRPM() {
     # Install mesa-va-freeworld separately from the RPM for dnf swap
     installMesa
     
-    installPackage --skip-check-installed --no-gpg-check --allow-downgrades "$MCRPM"
+    installPackage --no-install-check --no-gpg-check --allow-downgrades "$MCRPM"
 }
 
 
@@ -865,7 +868,6 @@ installMesa() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
 
-    echo "Arch install under construction"
     [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
 		pkgname=mediacenter$MVERSION
@@ -985,7 +987,7 @@ symlinkCerts() {
 
 
 #######################################
-# Restore the mjr license file if it is next to installJRMC or RESTOREFILE is set
+# Restore the mjr license file from RESTOREFILE or other common locations
 #######################################
 restoreLicense() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1011,6 +1013,8 @@ restoreLicense() {
             newest=$f
         fi
     done
+
+    debug "Latest mjrfile: $newest"
 
     for f in "$RESTOREFILE" "$newest"; do
         if [[ -f "$f" ]]; then
@@ -1362,15 +1366,15 @@ service_jriver-x11vnc() {
 	EOF"
 
     execute "$RELOAD" &&
-    execute "$ENABLE $SERVICE_NAME" &&
+    execute "$ENABLE" "$SERVICE_NAME" &&
     echo "x11vnc running on localhost:$PORT" &&
     openFirewall "jriver-x11vnc" "$PORT/tcp"
 }
 
 
 #######################################
-# Starts and enables (at startup) an hourly service to build the latest version of JRiver Media
-# Center RPM from the source DEB and create/update an RPM repository
+# Starts and enables (at startup) an hourly service to build the latest version of
+# JRiver Media Center RPM from the source DEB and create/update an RPM repository
 #######################################
 service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
@@ -1406,7 +1410,7 @@ service_jriver-createrepo() {
 	EOF"
 
     execute "$RELOAD" &&
-    execute "$ENABLE $TIMER_NAME"
+    execute "$ENABLE" "$TIMER_NAME"
 }
 
 
@@ -1514,7 +1518,7 @@ disableCoW() {
         [[ -d "$dir" ]] || return
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
-            echo "Disabling CoW for $dir"
+            echo "Disabling Btrfs CoW for $dir"
             execute "sudo chattr +C $dir"
         fi
     done
@@ -1535,7 +1539,7 @@ migrateLibrary() {
     [[ -d "$previous_config_path" ]] &&
     mkdir -p "$current_config_path"; then
         echo "Migrating $previous_config_path to $current_config_path"
-        cp -fa "$previous_config_path"/* "$current_config_path" &>/dev/null
+        execute cp -fa "$previous_config_path"/* "$current_config_path"
     fi
 }
 
@@ -1614,10 +1618,8 @@ main() {
 
     parseInput "$@"
 
-    if (( DEBUG )); then
-        echo "Debugging on"
-        echo "installJRMC version: $SCRIPTVERSION"
-    fi
+    debug "Debugging on"
+    debug "installJRMC version: $SCRIPTVERSION"
 
     if ((TEST_SWITCH)); then 
         echo "Running tests, all other options are skipped"
@@ -1652,13 +1654,13 @@ main() {
                 installPackage epel-release
             fi
             if ! PKG_QUERY rpmfusion-free-release &>/dev/null; then
-                installPackage --skip-check-installed \
+                installPackage --no-install-check \
                 "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
         fedora)
             if ! PKG_QUERY rpmfusion-free-release &>/dev/null; then
-                installPackage --skip-check-installed \
+                installPackage --no-install-check \
                 "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
@@ -1734,7 +1736,7 @@ main() {
     # done
 }
 
-# Quickly turn debugging on, also use getopt in parseInput()
+# Roughly turn debugging on, reparse in getInput() with getopt
 [[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
 
 main "$@"
