@@ -1018,7 +1018,7 @@ restoreLicense() {
 
     for f in "$RESTOREFILE" "$newest"; do
         if [[ -f "$f" ]]; then
-            if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
+            if "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
                 return 0
             fi
         fi
