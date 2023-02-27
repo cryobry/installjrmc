@@ -7,11 +7,8 @@
 # https://www.apache.org/licenses/LICENSE-2.0
 #
 #
-# TODO (v1)
-#   1. Finish refactoring
-#
-# TODO (v2)
-#   1. Interactive installation (ncurses?)
+# TODO (v1.1)
+#   1. Interactive mode
 #   2. Additional containerization (createrepo and rpmbuild)
 #   3. Tests
 #
@@ -20,11 +17,11 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-dev"
+declare -g SCRIPTVERSION="1.0-rc6"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.55"}" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.67"}" # Hardcoded fallback
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
 declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
@@ -48,7 +45,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "30.0.55" (default: latest version)
+		        Specify the MC version, ex. "30.0.67" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH
