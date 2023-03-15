@@ -17,11 +17,11 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc6"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g OUTPUTDIR="$PWD/output"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.67"}" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.72"}" # Hardcoded fallback
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
 declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
@@ -45,7 +45,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "30.0.67" (default: latest version)
+		        Specify the MC version, ex. "30.0.72" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH
@@ -68,14 +68,16 @@ printHelp() {
 		            Specify the webroot directory to install the repo (default: /var/www/jriver)
 		        --createrepo-user USER
 		            Specify the web server user if it differs from $USER
+		    --uninstall, -u
+		        Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
+		    --yes, -y
+		        Always assume yes for questions
 		    --version, -v
 		        Print this script version and exit
 		    --debug, -d
 		        Print debug output
 		    --help, -h
 		        Print help dialog and exit
-		    --uninstall, -u
-		        Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
 
 		SERVICES
 		    jriver-mediaserver (default --service-type=user)
@@ -108,6 +110,7 @@ debug() { (( DEBUG )) && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 askOk() {
     declare response
+    (( YES_SWITCH )) && return 0
     read -r -p "$* [y/N]: " response
     [[ "${response,,}" =~ ^(yes|y)$ ]]
 }
@@ -127,7 +130,7 @@ parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
-    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH YES_SWITCH
     declare -g USER_VERSION_SWITCH USER_ARCH
     declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE
     declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
@@ -148,7 +151,7 @@ parseInput() {
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
     long_opts+="service-type:,service:,services:,version,debug,help,uninstall,"
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
-    long_opts+="vncpass:,display:,container:,tests,compat,arch:"
+    long_opts+="vncpass:,display:,container:,tests,compat,arch:,yes"
     short_opts="+i:vb::dhus:c:"
 
     # Redeclare DEBUG and catch permanently with getopt
@@ -220,6 +223,9 @@ parseInput() {
                     ;;
                 --container|-c)
                     shift && CONTAINERS+=("$1")
+                    ;;
+                --yes|-y)
+                    YES_SWITCH=1
                     ;;
                 --version|-v)
                     echo "Version: $SCRIPTVERSION"
@@ -323,6 +329,8 @@ init() {
                 ID="arch"
             else
                 err "OS detection failed!"
+                askOk ""
+                ID="unknown"
                 exit 1
             fi
     esac
@@ -359,6 +367,8 @@ init() {
             PKG_QUERY(){ sudo pacman -Qs "$@"; }
             PKG_INSTALL_LOCAL(){ installMCARCH; }
             ;;
+        unknown)
+            PKG_INSTALL_LOCAL(){ installMCRAW; }
     esac
 }
 
@@ -790,7 +800,7 @@ buildRPM() {
 
 
 #######################################
-# Installs local Media Center DEB package and optional compatability fixes
+# Installs Media Center DEB package and optional compatability fixes
 #######################################
 installMCDEB() {
     debug "Running: ${FUNCNAME[0]}"    
@@ -821,7 +831,7 @@ installMCDEB() {
 
 
 #######################################
-# Installs local Media Center RPM package
+# Installs Media Center RPM package
 #######################################
 installMCRPM() {
     debug "Running: ${FUNCNAME[0]}"
@@ -830,6 +840,16 @@ installMCRPM() {
     installMesa
     
     installPackage --no-install-check --no-gpg-check --allow-downgrades "$MCRPM"
+}
+
+
+#######################################
+# Installs Media Center manually
+#######################################
+installMCRAW() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    
 }
 
 
@@ -1324,7 +1344,7 @@ service_jriver-x11vnc() {
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
     if [[ ! -f "$HOME/.Xauthority" ]]; then
         [[ "$XDG_SESSION_TYPE" == "wayland" ]] && 
-        ask_ok "Unsupported Wayland session detected for x11vnc, continue?" || return 1
+        askOk "Unsupported Wayland session detected for x11vnc, continue?" || return 1
         touch "$HOME/.Xauthority"
         xauth generate "$DISPLAY" . trusted
         xauth add "$HOST$DISPLAY" . "$(xxd -l 16 -p /dev/urandom)"

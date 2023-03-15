@@ -54,6 +54,8 @@ $ installJRMC --help
       The webroot directory to install the repo (default: /var/www/jriver/)
   --createrepo-user USER
       The web server user if different from the current user
+--yes, -y
+    Always assumes yes for questions
 --version, -v
     Print this script version and exit
 --debug, -d
@@ -84,7 +86,7 @@ jriver-createrepo (system)
     By default installs as root service to handle www permissions more gracefully
 [/code]
 
-By default, MC services use a sane `--service-type` listed next to the service name in the Services description. User services can be manipulated as an unprivileged user, for example: *systemctl --user stop jriver-mediacenter* and begin at user login. System services are manipulable as root, for example: `sudo systemctl stop jriver-servicename@username.service` and begin at system boot. Note that it is possible to run all services of a particular user at boot using [url=https://www.freedesktop.org/software/systemd/man/loginctl.html]sudo loginctl enable-linger username[/url].
+By default, MC services use a sane `--service-type` listed next to the service name in the Services description. User services can be manipulated as an unprivileged user, for example: [i]systemctl --user stop jriver-mediacenter[/i] and begin at user login. System services are manipulable as root, for example: [i]sudo systemctl stop jriver-servicename@username.service[/i] and begin at system boot. Note that it is possible to run all services of a particular user at boot using [url=https://www.freedesktop.org/software/systemd/man/loginctl.html]sudo loginctl enable-linger username[/url].
 
 Multiple services (but not --service-types) can be installed at one time using multiple --service blocks: [code]installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter[/code]
 
