@@ -25,6 +25,7 @@ declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.72"}" # Hardcoded fallback
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
 declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
+declare -g SCRIPTDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -329,13 +330,15 @@ init() {
                 ID="arch"
             else
                 err "OS detection failed!"
-                askOk ""
+                askOk "Continue with manual installation?" || exit 1
                 ID="unknown"
-                exit 1
+                REPO_INSTALL_SWITCH=0
+                BUILD_SWITCH=1
+                LOCAL_INSTALL_SWITCH=1
             fi
     esac
 
-    debug "Using host platform: $ID $VERSION_ID"
+    [[ $ID != "unknown" ]] && debug "Using host platform: $ID $VERSION_ID"
 
     # Abstract distro-specific package manager commands 
     case "$ID" in
@@ -368,7 +371,7 @@ init() {
             PKG_INSTALL_LOCAL(){ installMCARCH; }
             ;;
         unknown)
-            PKG_INSTALL_LOCAL(){ installMCRAW; }
+            PKG_INSTALL_LOCAL(){ installMCGENERIC; }
     esac
 }
 
@@ -846,10 +849,26 @@ installMCRPM() {
 #######################################
 # Installs Media Center manually
 #######################################
-installMCRAW() {
+installMCGENERIC() {
     debug "Running: ${FUNCNAME[0]}"
 
-    
+    echo "Using raw installation method!"
+
+    declare extract_dir && extract_dir="$(mktemp -d)"
+    pushd "$extract_dir" &>/dev/null || return
+    ar x "$MCDEB"
+    tar xvf "control.tar.gz"
+    echo "You must install the following dependencies manually:"
+    cat control
+    tar xvf "data.tar.gz"
+    pushd data &>/dev/null || return
+    # Add list of files to log for uninstall
+    find . -mindepth 1 >> "$SCRIPTDIR/.uninstall"
+    # Manually install files
+    sudo cp -a ./etc/* /etc/
+    sudo cp -a ./usr/* /usr/
+    popd -1 &>/dev/null || return
+    popd &>/dev/null || return
 }
 
 
@@ -1618,6 +1637,14 @@ uninstall() {
         err "JRiver Media Center package '$MCPKG' is not present and was not uninstalled"
     else
         err "Could not remove Media Center package"
+    fi
+
+    if [[ -f "$SCRIPTDIR/.uninstall" ]]; then
+        echo "Removing files from .uninstall log"
+        while read -r p; do
+            [[ -d $p ]] && sudo rm -rf "$p"
+        done < "$SCRIPTDIR/.uninstall"
+        mv "$SCRIPTDIR/.uninstall" "$SCRIPTDIR/.uninstall.bk"
     fi
 }
 
