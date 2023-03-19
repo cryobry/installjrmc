@@ -1709,6 +1709,8 @@ main() {
             ;;
     esac
 
+    debug "REPO_INSTALL_SWITCH=$REPO_INSTALL_SWITCH"
+
     if (( REPO_INSTALL_SWITCH )); then
         echo "Installing JRiver Media Center from remote repository"
         if installMCFromRepo; then
