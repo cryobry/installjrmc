@@ -861,10 +861,10 @@ installMCGENERIC() {
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
     ar x "$MCDEB"
-    tar xvf "control.tar.gz"
+    tar xvf "control.tar.xz"
     echo "You must install the following dependencies manually:"
     cat control
-    tar xvf "data.tar.gz"
+    tar xvf "data.tar.xz"
     pushd data &>/dev/null || return
     # Add list of files to log for uninstall
     find . -mindepth 1 >> "$SCRIPTDIR/.uninstall"
