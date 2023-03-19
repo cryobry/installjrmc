@@ -331,9 +331,9 @@ init() {
                 err "OS detection failed!"
                 askOk "Continue with manual installation?" || exit 1
                 ID="unknown"
-                REPO_INSTALL_SWITCH=0
-                BUILD_SWITCH=1
-                LOCAL_INSTALL_SWITCH=1
+                declare -g REPO_INSTALL_SWITCH=0
+                declare -g BUILD_SWITCH=1
+                declare -g LOCAL_INSTALL_SWITCH=1
             fi
     esac
 
