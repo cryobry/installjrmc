@@ -863,11 +863,11 @@ installMCGENERIC() {
     ar x "$MCDEB"
     tar xvf "control.tar.xz"
     echo "You must install the following dependencies manually:"
-    cat control
+    grep -i control "Depends:"
     tar xvf "data.tar.xz"
     pushd data &>/dev/null || return
     # Add list of files to log for uninstall
-    find . -mindepth 1 >> "$SCRIPTDIR/.uninstall"
+    find . -mindepth 1 -type f >> "$SCRIPTDIR/.uninstall"
     # Manually install files
     sudo cp -a ./etc/* /etc/
     sudo cp -a ./usr/* /usr/
