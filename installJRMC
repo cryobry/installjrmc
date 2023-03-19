@@ -873,6 +873,7 @@ installMCGENERIC() {
     sudo cp -a ./usr/* /usr/
     popd -1 &>/dev/null || return
     popd &>/dev/null || return
+    return 0
 }
 
 
