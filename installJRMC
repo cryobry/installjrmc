@@ -6,7 +6,6 @@
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
 #
-#
 # TODO (v1.1)
 #   1. Interactive mode
 #   2. Additional containerization (createrepo and rpmbuild)
@@ -324,7 +323,7 @@ init() {
                 ID="centos"
                 RPM_MGR="yum"
                 COMPAT_SWITCH=1
-            elif hash apt &>/dev/null; then
+            elif hash apt-get &>/dev/null; then
                 ID="ubuntu"
             elif hash pacman &>/dev/null; then
                 ID="arch"
