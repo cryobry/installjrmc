@@ -141,7 +141,9 @@ parseInput() {
     declare -g TARGET=${TARGET:-$ID}
     declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
-    if [[ $# -eq 0 ]] || [[ $# -eq 1 && " $1 " =~ ^( --debug | -d )$ ]]; then
+    if [[ $# -eq 0 ]] || 
+    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d )$ ]] &&
+    [[ $ID != "unknown" ]]; then
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
         BUILD_SWITCH=1
@@ -331,9 +333,9 @@ init() {
                 err "OS detection failed!"
                 askOk "Continue with manual installation?" || exit 1
                 ID="unknown"
-                declare -g REPO_INSTALL_SWITCH=0
-                declare -g BUILD_SWITCH=1
-                declare -g LOCAL_INSTALL_SWITCH=1
+                REPO_INSTALL_SWITCH=0
+                BUILD_SWITCH=1
+                LOCAL_INSTALL_SWITCH=1
             fi
     esac
 
@@ -1711,8 +1713,6 @@ main() {
             fi
             ;;
     esac
-
-    debug "REPO_INSTALL_SWITCH=$REPO_INSTALL_SWITCH"
 
     if (( REPO_INSTALL_SWITCH )); then
         echo "Installing JRiver Media Center from remote repository"
