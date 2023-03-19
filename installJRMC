@@ -370,6 +370,9 @@ init() {
             PKG_INSTALL_LOCAL(){ installMCARCH; }
             ;;
         unknown)
+            PKG_INSTALL=("#")
+            PKG_REMOVE=("#")
+            PKG_UPDATE=("#")
             PKG_INSTALL_LOCAL(){ installMCGENERIC; }
     esac
 }
