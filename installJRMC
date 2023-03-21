@@ -872,13 +872,14 @@ installMCGENERIC() {
     execute tar xvf "data.tar.xz"
     # List of files to install
     raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
+    debug "raw_files=(${raw_files[*]})"
     # Output to log file
     for f in "${raw_files[@]}"; do
         echo "/$f" >> "$SCRIPTDIR/.uninstall"
     done
     # Manually install files
     for f in "${raw_files[@]}"; do
-        execute sudo cp -a "$f" /
+        execute sudo cp -a "$f" "/"
     done
     popd &>/dev/null || return
     execute rm -rf "$extract_dir"
