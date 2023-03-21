@@ -871,8 +871,8 @@ installMCGENERIC() {
     grep -i "Depends:" control
     tar xvf "data.tar.xz" &>/dev/null
     # List of files to install
-    #raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
-    debug "raw_files=(${raw_files[*]})"
+    raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
+    #debug "raw_files=(${raw_files[*]})"
     # Output to log file
     for f in "${raw_files[@]}"; do
         echo "/$f"
