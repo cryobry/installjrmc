@@ -116,9 +116,9 @@ askOk() {
 }
 execute() {
     if debug "$*"; then
-        eval "$*"
+        "$@"
     else
-        eval "$* &>/dev/null"
+        "$@" &>/dev/null
     fi
 }
 
@@ -142,7 +142,7 @@ parseInput() {
     declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
 
     if [[ $# -eq 0 ]] || 
-    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d )$ ]] &&
+    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes )$ ]] &&
     [[ $ID != "unknown" ]]; then
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
