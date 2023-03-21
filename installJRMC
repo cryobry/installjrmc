@@ -157,7 +157,7 @@ parseInput() {
     long_opts+="vncpass:,display:,container:,compat,arch:,yes"
     short_opts="+i:vb::dhus:c:"
 
-    # Redeclare DEBUG and catch permanently with getopt
+    # Reset DEBUG and catch with getopt
     declare -g DEBUG=0
 
     if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
@@ -501,6 +501,7 @@ installPackage() {
     # Filter installed packages
     for pkg in "$@"; do
         if [[ -v pkg_aliases[$pkg] ]]; then
+            debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"
             pkg=${pkg_aliases[$pkg]}
         fi
         if (( no_install_check )) || 
@@ -580,7 +581,7 @@ installMCFromRepo() {
     # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
     installMesa
 
-    if ! execute installPackage \
+    if ! installPackage \
         --no-install-check \
         --allow-downgrades \
         --no-gpg-check \
@@ -611,13 +612,13 @@ acquireDeb() {
     fi
 
     if [[ -v BETAPASS ]] && 
-        echo "Checking beta repo for DEB package" && wget -q -O "$MCDEB" \
+        echo "Checking beta repo for DEB package" && execute wget -q -O "$MCDEB" \
             "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
-    elif echo "Checking latest repo for DEB package" && wget -q -O "$MCDEB" \
+    elif echo "Checking latest repo for DEB package" && execute wget -q -O "$MCDEB" \
             "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
-    elif echo "Checking test repo for DEB package" && wget -q -O "$MCDEB" \
+    elif echo "Checking test repo for DEB package" && execute wget -q -O "$MCDEB" \
             "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
     else
@@ -831,7 +832,7 @@ installMCDEB() {
         rm -rf "$extract_dir"
     fi
 
-    execute installPackage \
+    installPackage \
         --no-install-check \
         --no-gpg-check \
         --allow-downgrades \
@@ -858,6 +859,8 @@ installMCRPM() {
 installMCGENERIC() {
     debug "Running: ${FUNCNAME[0]}"
 
+    declare -a raw_files
+
     echo "Using raw installation method!"
 
     declare extract_dir && extract_dir="$(mktemp -d)"
@@ -867,14 +870,18 @@ installMCGENERIC() {
     echo "You must install the following dependencies manually:"
     grep -i "Depends:" control
     tar xvf "data.tar.xz"
-    pushd data &>/dev/null || return
-    # Add list of files to log for uninstall
-    find . -mindepth 1 -type f >> "$SCRIPTDIR/.uninstall"
+    # List of files to install
+    raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
+    # Output to log file
+    for f in "${raw_files[@]}"; do
+        echo "/$f" >> "$SCRIPTDIR/.uninstall"
+    done
     # Manually install files
-    sudo cp -a ./etc/* /etc/
-    sudo cp -a ./usr/* /usr/
-    popd -1 &>/dev/null || return
+    for f in "${raw_files[@]}"; do
+        sudo cp -a "$f" /
+    done
     popd &>/dev/null || return
+    execute rm -rf "$extract_dir"
     return 0
 }
 
