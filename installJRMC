@@ -870,22 +870,15 @@ installMCGENERIC() {
     tar xvf "control.tar.xz" &>/dev/null
     echo "You must install the following dependencies manually:"
     grep -i "Depends:" control
-    raw_files=("$(tar xvf data.tar.xz)")
-    # List of files to install
-    #raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
-    debug "raw_files=(${raw_files[*]})"
+    readarray -t raw_files < <(tar xvf data.tar.xz)
     # Output to log file
-    echo "${raw_files[@]/^.\//\/}" >> "$SCRIPTDIR/.uninstall"
-    # for f in "${raw_files[@]}"; do
-    #     echo "/${f"
-    #     echo "/$f" >> "$SCRIPTDIR/.uninstall"
-    # done
+    echo "${raw_files[@]/#./}" >> "$SCRIPTDIR/.uninstall"
     # Manually install files
     for f in "${raw_files[@]}"; do
-        execute sudo cp -a "$f" "/"
+        execute sudo cp -a "$f" "${f/#./}"
     done
     popd &>/dev/null || return
-    debug || execute rm -rf "$extract_dir"
+    execute rm -rf "$extract_dir"
     return 0
 }
 
