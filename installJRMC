@@ -151,9 +151,10 @@ parseInput() {
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
-    long_opts+="service-type:,service:,services:,version,debug,help,uninstall,"
+    long_opts+="service-type:,service:,services:,"
+    long_opts+="version,debug,verbose,help,uninstall,tests,"
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
-    long_opts+="vncpass:,display:,container:,tests,compat,arch:,yes"
+    long_opts+="vncpass:,display:,container:,compat,arch:,yes"
     short_opts="+i:vb::dhus:c:"
 
     # Redeclare DEBUG and catch permanently with getopt
@@ -233,7 +234,7 @@ parseInput() {
                     echo "Version: $SCRIPTVERSION"
                     exit 0
                     ;;
-                --debug|-d)
+                --debug|-d|--verbose)
                     DEBUG=1
                     ;;
                 --help|-h)
@@ -1557,7 +1558,7 @@ disableCoW() {
         [[ -d "$dir" ]] || execute mkdir -p "$dir"
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C &&
-        execute "sudo chattr +C $dir"; then
+        execute sudo chattr +C "$dir"; then
             echo "Disabled btrfs CoW for $dir directory"
         fi
     done
