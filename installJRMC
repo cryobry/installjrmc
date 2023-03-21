@@ -794,7 +794,7 @@ buildRPM() {
             -bb
             "$OUTPUTDIR/SPECS/mediacenter.spec"
     )
-    if execute "${rpmbuild_cmd[*]}" && [[ -f "$MCRPM" ]] ; then
+    if execute "${rpmbuild_cmd[@]}" && [[ -f "$MCRPM" ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
         err "Build failed"
@@ -988,10 +988,10 @@ runCreaterepo() {
     # Run createrepo
     cr_cmd=(sudo -u "$CREATEREPO_USER" createrepo -q "$CREATEREPO_WEBROOT")
     [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
-    if ! execute "${cr_cmd[*]}"; then
+    if ! execute "${cr_cmd[@]}"; then
         cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
-        if ! (execute "${cr_cmd[*]}" && 
+        if ! (execute "${cr_cmd[@]}" && 
         execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"); then
             err "createrepo failed"
             return 1
@@ -1059,7 +1059,7 @@ restoreLicense() {
 
     for f in "$RESTOREFILE" "$newest"; do
         if [[ -f "$f" ]]; then
-            if "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
+            if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
                 return 0
             fi
         fi
