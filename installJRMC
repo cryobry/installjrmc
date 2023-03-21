@@ -373,9 +373,9 @@ init() {
             PKG_INSTALL_LOCAL(){ installMCARCH; }
             ;;
         unknown)
-            PKG_INSTALL=("#")
-            PKG_REMOVE=("#")
-            PKG_UPDATE=("#")
+            PKG_INSTALL=(":")
+            PKG_REMOVE=(":")
+            PKG_UPDATE=(":")
             PKG_INSTALL_LOCAL(){ installMCGENERIC; }
     esac
 }
@@ -865,11 +865,11 @@ installMCGENERIC() {
 
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
-    ar x "$MCDEB"
-    tar xvf "control.tar.xz"
+    execute ar x "$MCDEB"
+    execute tar xvf "control.tar.xz"
     echo "You must install the following dependencies manually:"
     grep -i "Depends:" control
-    tar xvf "data.tar.xz"
+    execute tar xvf "data.tar.xz"
     # List of files to install
     raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
     # Output to log file
@@ -878,7 +878,7 @@ installMCGENERIC() {
     done
     # Manually install files
     for f in "${raw_files[@]}"; do
-        sudo cp -a "$f" /
+        execute sudo cp -a "$f" /
     done
     popd &>/dev/null || return
     execute rm -rf "$extract_dir"
