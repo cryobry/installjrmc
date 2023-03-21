@@ -1553,10 +1553,8 @@ disableCoW() {
     declare mc_system_path="/usr/lib/jriver"
     declare mc_user_path="$HOME/.jriver"
 
-    [[ -d "$mc_user_path" ]] || mkdir -p "$mc_user_path"
-
     for dir in "$mc_system_path" "$mc_user_path"; do
-        [[ -d "$dir" ]] || return
+        [[ -d "$dir" ]] || execute mkdir -p "$dir"
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
             echo "Disabling Btrfs CoW for $dir"
