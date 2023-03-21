@@ -865,11 +865,11 @@ installMCGENERIC() {
 
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
-    execute ar x "$MCDEB"
-    execute tar xvf "control.tar.xz"
+    ar x "$MCDEB" &>/dev/null
+    tar xvf "control.tar.xz" &>/dev/null
     echo "You must install the following dependencies manually:"
     grep -i "Depends:" control
-    execute tar xvf "data.tar.xz"
+    tar xvf "data.tar.xz" &>/dev/null
     # List of files to install
     raw_files=("$(find etc/ usr/ -mindepth 1 -type f)")
     debug "raw_files=(${raw_files[*]})"
