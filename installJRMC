@@ -555,7 +555,8 @@ installMCFromRepo() {
             ;;
         debian|ubuntu)
             declare repo_dir="/etc/apt/sources.list.d"
-            [[ -d $repo_dir ]] || execute "sudo mkdir -p $repo_dir"
+            [[ -d $repo_dir ]] || execute sudo mkdir -p "$repo_dir"
+            # Remove existing MC repositories
             sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
@@ -601,7 +602,7 @@ acquireDeb() {
     debug "MCDEB=$MCDEB"
 
     # If necessary, create SOURCES dir
-    [[ -d "$OUTPUTDIR/SOURCES" ]] || execute "mkdir -p $OUTPUTDIR/SOURCES"
+    [[ -d "$OUTPUTDIR/SOURCES" ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
 
     # If deb file already exists, skip download
     if [[ -f "$MCDEB" ]]; then
@@ -968,9 +969,9 @@ runCreaterepo() {
 
     # If the webroot does not exist, create it
     if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
-        if ! execute "sudo -u $CREATEREPO_USER mkdir -p $CREATEREPO_WEBROOT"; then
-            if ! ( execute "sudo mkdir -p $CREATEREPO_WEBROOT" && 
-            execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT" ); then
+        if ! execute sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT"; then
+            if ! ( execute sudo mkdir -p "$CREATEREPO_WEBROOT" && 
+            execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT" ); then
                 err "Could not create the createrepo-webroot path!"
                 err "Make sure that the webroot $CREATEREPO_WEBROOT is writeable by user $CREATEREPO_USER"
                 err "Or change the repo ownership with --createrepo-user"
@@ -980,8 +981,8 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    if ! ( execute "sudo cp -nf $MCRPM $CREATEREPO_WEBROOT" && 
-    execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT" ); then
+    if ! ( execute sudo cp -nf "$MCRPM" "$CREATEREPO_WEBROOT" && 
+    execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT" ); then
         err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
         return 1
     fi
@@ -993,7 +994,7 @@ runCreaterepo() {
         cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
         [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
         if ! (execute "${cr_cmd[@]}" && 
-        execute "sudo chown -R $CREATEREPO_USER:$CREATEREPO_USER $CREATEREPO_WEBROOT"); then
+        execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"); then
             err "createrepo failed"
             return 1
         fi
@@ -1087,14 +1088,14 @@ openFirewall() {
 
     if hash firewall-cmd 2>/dev/null; then
         if ! sudo firewall-cmd --get-services | grep -q "$service"; then
-            execute "sudo firewall-cmd --permanent --new-service=$service"
-            execute "sudo firewall-cmd --permanent --service=$service --set-description=$service installed by installJRMC"
-            execute "sudo firewall-cmd --permanent --service=$service --set-short=$service"
+            execute sudo firewall-cmd --permanent "--new-service=$service"
+            execute sudo firewall-cmd --permanent "--service=$service" "--set-description=$service" installed by installJRMC
+            execute sudo firewall-cmd --permanent "--service=$service" "--set-short=$service"
             for port in "${f_ports[@]}"; do
-                execute "sudo firewall-cmd --permanent --service=$service --add-port=$port"
+                execute sudo firewall-cmd --permanent "--service=$service" "--add-port=$port"
             done
-            execute "sudo firewall-cmd --add-service $service --permanent"
-            execute "sudo firewall-cmd --reload"
+            execute sudo firewall-cmd --add-service "$service" --permanent
+            execute sudo firewall-cmd --reload
         fi
     elif hash ufw 2>/dev/null; then
         sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
@@ -1103,8 +1104,8 @@ openFirewall() {
 			description=$service installed by installJRMC
 			ports=$u_ports
 		EOF"
-        execute "sudo ufw app update $service"
-        execute "sudo ufw allow $service"
+        execute sudo ufw app update "$service"
+        execute sudo ufw allow "$service"
     else
         err "Please install firewall-cmd or ufw to open firewall ports"
         return 1
@@ -1136,9 +1137,9 @@ setVNCPass() {
 
     if [[ -v VNCPASS ]]; then
         if [[ $1 == "xvnc" ]]; then
-            execute "echo $VNCPASS | vncpasswd -f > $vncpassfile"
+            echo "$VNCPASS" | vncpasswd -f > "$vncpassfile"
         elif [[ $1 == "x11vnc" ]]; then
-            execute "x11vnc -storepasswd $VNCPASS $vncpassfile"
+            execute x11vnc -storepasswd "$VNCPASS" "$vncpassfile"
         fi
         return $?
     else
@@ -1201,7 +1202,7 @@ setServiceVars() {
     IS_ENABLED="${systemctl_prefix[*]} is-enabled -q"
     IS_ACTIVE="${systemctl_prefix[*]} is-active -q"
 
-    [[ -d "$service_dir" ]] || execute "sudo mkdir -p $service_dir"
+    [[ -d "$service_dir" ]] || execute sudo mkdir -p "$service_dir"
 
     # TODO Ubuntu needs these in the service file, fedora (and others?) do not
     case "$ID" in
@@ -1262,7 +1263,7 @@ service_jriver-mediacenter() {
 	EOF"
 
     execute "$RELOAD" &&
-    execute "$ENABLE $SERVICE_NAME" &&
+    execute "$ENABLE" "$SERVICE_NAME" &&
     openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 }
 
@@ -1338,7 +1339,7 @@ service_jriver-xvnc() {
 	EOF"
 
     execute "$RELOAD"
-    if ! execute "$ENABLE $SERVICE_NAME"; then
+    if ! execute "$ENABLE" "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY and retrying"
         service_jriver-xvnc increment
@@ -1598,19 +1599,19 @@ uninstall() {
         for i in user system; do
             setServiceVars "$service" "$i"; 
             for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-                if execute "$IS_ACTIVE $unit" ||
-                execute "$IS_ENABLED $unit"; then
-                    execute "$DISABLE $unit"
+                if execute "$IS_ACTIVE" "$unit" ||
+                execute "$IS_ENABLED" "$unit"; then
+                    execute "$DISABLE" "$unit"
                 fi
             done
             for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
                 [[ -f "$f" ]] && 
-                execute "sudo rm -f $f"
+                execute sudo rm -f "$f"
             done
             execute "$RELOAD"
         done
         for f in /etc/systemd/system/jriver-*; do
-            execute "sudo rm -f $f"
+            execute sudo rm -f "$f"
         done
     done
 
@@ -1619,18 +1620,18 @@ uninstall() {
         "/etc/yum.repos.d/jriver.repo" \
         /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
     if [[ "$ID" == "suse" ]]; then
-        execute "sudo zypper rr jriver"
+        execute sudo zypper rr jriver
     fi
 
     echo "Removing firewall rules"
     if hash firewall-cmd 2>/dev/null; then
-        execute "sudo firewall-cmd --permanent --remove-service=jriver"
-        execute "sudo firewall-cmd --permanent --delete-service=jriver"
-        execute "sudo firewall-cmd --reload"
+        execute sudo firewall-cmd --permanent --remove-service=jriver
+        execute sudo firewall-cmd --permanent --delete-service=jriver
+        execute sudo firewall-cmd --reload
     elif hash ufw 2>/dev/null; then
-        execute "sudo ufw delete allow jriver"
+        execute sudo ufw delete allow jriver
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
-            execute "sudo rm -f /etc/ufw/applications.d/jriver"
+            execute sudo rm -f /etc/ufw/applications.d/jriver
     fi
 
     echo "Uninstalling JRiver Media Center package"
@@ -1691,7 +1692,7 @@ main() {
         ubuntu)
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
-                if ! execute "sudo add-apt-repository -y universe"; then
+                if ! execute sudo add-apt-repository -y universe; then
                     err "Adding universe repository failed"
                 fi
             fi
