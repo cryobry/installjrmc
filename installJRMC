@@ -1556,9 +1556,9 @@ disableCoW() {
     for dir in "$mc_system_path" "$mc_user_path"; do
         [[ -d "$dir" ]] || execute mkdir -p "$dir"
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
-        ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C; then
-            echo "Disabling Btrfs CoW for $dir"
-            execute "sudo chattr +C $dir"
+        ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C &&
+        execute "sudo chattr +C $dir"; then
+            echo "Disabled btrfs CoW for $dir directory"
         fi
     done
 }
