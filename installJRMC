@@ -1094,7 +1094,7 @@ openFirewall() {
     declare u_ports="${u_ports// /|}" # concatenate
     u_ports="${u_ports//-/\:}" # for ufw
 
-    if hash firewall-cmd 2>/dev/null; then
+    if hash firewall-cmd &>/dev/null; then
         if ! sudo firewall-cmd --get-services | grep -q "$service"; then
             execute sudo firewall-cmd --permanent "--new-service=$service"
             execute sudo firewall-cmd --permanent "--service=$service" "--set-description=$service" installed by installJRMC
@@ -1105,7 +1105,7 @@ openFirewall() {
             execute sudo firewall-cmd --add-service "$service" --permanent
             execute sudo firewall-cmd --reload
         fi
-    elif hash ufw 2>/dev/null; then
+    elif hash ufw &>/dev/null; then
         sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
 			[$service]
 			title=$service
@@ -1632,11 +1632,11 @@ uninstall() {
     fi
 
     echo "Removing firewall rules"
-    if hash firewall-cmd 2>/dev/null; then
+    if hash firewall-cmd &>/dev/null; then
         execute sudo firewall-cmd --permanent --remove-service=jriver
         execute sudo firewall-cmd --permanent --delete-service=jriver
         execute sudo firewall-cmd --reload
-    elif hash ufw 2>/dev/null; then
+    elif hash ufw &>/dev/null; then
         execute sudo ufw delete allow jriver
         [[ -f "/etc/ufw/applications.d/jriver" ]] &&
             execute sudo rm -f /etc/ufw/applications.d/jriver
