@@ -872,7 +872,10 @@ installMCGENERIC() {
     grep -i "Depends:" control
     readarray -t raw_files < <(tar xvf data.tar.xz)
     # Output to log file
-    echo "${raw_files[@]/#./}" >> "$SCRIPTDIR/.uninstall"
+    for f in "${raw_files[@]/#./}"; do
+        echo "$f" >> "$SCRIPTDIR/.uninstall"
+    done
+    #echo "${raw_files[@]/#./}" >> "$SCRIPTDIR/.uninstall"
     # Manually install files
     for f in "${raw_files[@]}"; do
         execute sudo cp -a "$f" "${f/#./}"
