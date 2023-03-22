@@ -21,7 +21,7 @@ declare -g SCRIPTDIR=; SCRIPTDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" 
 declare -g OUTPUTDIR="$SCRIPTDIR/output"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.72"}" # Hardcoded fallback
+declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.83"}" # Hardcoded fallback
 declare -g CREATEREPO_WEBROOT="/var/www/jriver"
 declare -g USER="${SUDO_USER:-$USER}"
 declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
@@ -45,7 +45,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "30.0.72" (default: latest version)
+		        Specify the MC version, ex. "30.0.83" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH
@@ -130,16 +130,17 @@ parseInput() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
-    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH YES_SWITCH
-    declare -g USER_VERSION_SWITCH USER_ARCH
+    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g YES_SWITCH USER_VERSION_SWITCH USER_ARCH
     declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE
-    declare -g VNCPASS USER_DISPLAY CREATEREPO_WEBROOT
+    declare -g VNCPASS USER_DISPLAY
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts input
 
-    # Allow some environment variables to override and set sane fallbacks
-    declare -g TARGET=${TARGET:-$ID}
-    declare -g CREATEREPO_USER="${CREATEREPO_USER:-$USER}"
+    # Set some defaults
+    declare -g REPO_TARGET="$ID"
+    declare -g BUILD_TARGET="$ID"
+    declare -g CREATEREPO_USER="$USER"
 
     if [[ $# -eq 0 ]] || 
     [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes )$ ]] &&
@@ -178,7 +179,7 @@ parseInput() {
                     ;;
                 --build|-b)
                     BUILD_SWITCH=1
-                    shift && TARGET="$1"
+                    shift && BUILD_TARGET="$1"
                     ;;
                 --outputdir)
                     shift && OUTPUTDIR="$1"
@@ -207,7 +208,7 @@ parseInput() {
                 --createrepo)
                     BUILD_SWITCH=1
                     CREATEREPO_SWITCH=1
-                    shift && TARGET="$1"
+                    shift && REPO_TARGET="$1"
                     ;;
                 --createrepo-webroot)
                     shift && CREATEREPO_WEBROOT="$1"
@@ -541,6 +542,32 @@ installPackage() {
 
 
 #######################################
+# Installs mesa-va-drivers-freeworld
+#######################################
+installMesa() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    # Currently only necessary in Fedora/CentOS
+    case "$ID" in
+        fedora|centos)
+            if ! PKG_QUERY mesa-va-drivers-freeworld &>/dev/null; then
+                if PKG_QUERY mesa-va-drivers &>/dev/null; then
+                    if ! execute sudo dnf swap -y \
+                        mesa-va-drivers \
+                        mesa-va-drivers-freeworld; then
+                        err "Package swap failed!"
+                        return 1
+                    fi
+                else
+                    execute "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld
+                fi
+            fi
+            ;;
+    esac
+}
+
+
+#######################################
 # Installs JRiver Media Center from a remote repository
 #######################################
 installMCFromRepo() {
@@ -672,7 +699,7 @@ buildRPM() {
     recommends=("${recommends[@]//)/}")
 
     # Translate package names
-    case "$TARGET" in
+    case "$BUILD_TARGET" in
         fedora|centos)
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
@@ -883,32 +910,6 @@ installMCGENERIC() {
     popd &>/dev/null || return
     execute rm -rf "$extract_dir"
     return 0
-}
-
-
-#######################################
-# Installs mesa-va-drivers-freeworld
-#######################################
-installMesa() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    # Currently only necessary in Fedora/CentOS
-    case "$ID" in
-        fedora|centos)
-            if ! PKG_QUERY mesa-va-drivers-freeworld &>/dev/null; then
-                if PKG_QUERY mesa-va-drivers &>/dev/null; then
-                    if ! execute sudo dnf swap -y \
-                        mesa-va-drivers \
-                        mesa-va-drivers-freeworld; then
-                        err "Package swap failed!"
-                        return 1
-                    fi
-                else
-                    execute "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld
-                fi
-            fi
-            ;;
-    esac
 }
 
 
@@ -1158,7 +1159,7 @@ setVNCPass() {
 #######################################
 # Set display and port variables
 #######################################
-setDisplay() {
+setDisplayVars() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY NEXT_DISPLAYNUM
@@ -1295,7 +1296,7 @@ service_jriver-xvnc() {
     debug "Running: ${FUNCNAME[0]}"
 
     setServiceVars "${FUNCNAME[0]##*_}" "system"
-    setDisplay
+    setDisplayVars
     declare -a start_cmd
     declare -g PORT=$(( NEXT_DISPLAYNUM + 5900 ))
 
@@ -1365,7 +1366,7 @@ service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
 
     setServiceVars "${FUNCNAME[0]##*_}" "user"
-    setDisplay
+    setDisplayVars
 
     declare -a start_cmd
     declare -g PORT=$(( DISPLAYNUM + 5900 ))
@@ -1441,7 +1442,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$SCRIPTDIR/installJRMC --outputdir $OUTPUTDIR --createrepo=$TARGET --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
+		ExecStart=$SCRIPTDIR/installJRMC --outputdir $OUTPUTDIR --createrepo=$REPO_TARGET --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
 
 		[Install]
 		WantedBy=multi-user.target
@@ -1740,7 +1741,7 @@ main() {
     if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
         installPackage "wget"
         acquireDeb
-        if [[ "$TARGET" =~ (centos|fedora|suse) ]]; then
+        if [[ "$BUILD_TARGET" =~ (centos|fedora|suse) ]]; then
             installPackage "dpkg" "rpm-build"
             buildRPM
         fi
