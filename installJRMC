@@ -205,7 +205,7 @@ init() {
     case $ID in
         fedora|centos)
             PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
-            PKG_REMOVE=(execute udo "$RPM_MGR" remove -y)
+            PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
             PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
             PKG_QUERY=(rpm -q)
             PKG_INSTALL_LOCAL(){ installMCRPM; }
