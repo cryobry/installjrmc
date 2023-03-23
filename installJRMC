@@ -128,7 +128,7 @@ init() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g ID RPM_MGR ARCH
-    declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE
+    declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
 
     echo "Starting installJRMC"
     (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
@@ -207,34 +207,35 @@ init() {
             PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
             PKG_REMOVE=(execute udo "$RPM_MGR" remove -y)
             PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
-            PKG_QUERY(){ rpm -q "$@"; }
+            PKG_QUERY=(rpm -q)
             PKG_INSTALL_LOCAL(){ installMCRPM; }
             ;;
         debian|ubuntu)
             PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
             PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
             PKG_UPDATE=(execute sudo apt-get update -y -q0)
-            PKG_QUERY(){ dpkg -s "$@"; }
+            PKG_QUERY=(dpkg -s)
             PKG_INSTALL_LOCAL(){ installMCDEB; }
             ;;
         suse)
             PKG_INSTALL=(execute sudo zypper --non-interactive -q install --force --no-confirm)
             PKG_REMOVE=(execute sudo zypper --non-interactive -q remove --clean-deps)
             PKG_UPDATE=(execute sudo zypper --non-interactive -q refresh jriver)
-            PKG_QUERY(){ rpm -q "$@"; }
+            PKG_QUERY=(rpm -q)
             PKG_INSTALL_LOCAL(){ installMCRPM; }
             ;;
         arch)
             PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
             PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
             PKG_UPDATE=(execute sudo pacman -Syy)
-            PKG_QUERY(){ sudo pacman -Qs "$@"; }
+            PKG_QUERY=(sudo pacman -Qs)
             PKG_INSTALL_LOCAL(){ installMCARCH; }
             ;;
         unknown)
             PKG_INSTALL=(:)
             PKG_REMOVE=(:)
             PKG_UPDATE=(:)
+            PKG_QUERY=(:)
             PKG_INSTALL_LOCAL(){ installMCGENERIC; }
     esac
 }
@@ -510,7 +511,7 @@ installPackage() {
         fi
         if (( no_install_check )) || 
         ! (hash "$pkg" &>/dev/null || 
-        PKG_QUERY "$pkg" &>/dev/null); then
+        "${PKG_QUERY[@]}" "$pkg" &>/dev/null); then
             pkg_array+=("$pkg")
         else
             debug "$pkg already installed, skipping installation"
@@ -552,8 +553,8 @@ installMesa() {
     # Currently only necessary in Fedora/CentOS
     case "$ID" in
         fedora|centos)
-            if ! PKG_QUERY mesa-va-drivers-freeworld &>/dev/null; then
-                if PKG_QUERY mesa-va-drivers &>/dev/null; then
+            if ! "${PKG_QUERY[@]}" mesa-va-drivers-freeworld &>/dev/null; then
+                if "${PKG_QUERY[@]}" mesa-va-drivers &>/dev/null; then
                     if ! execute sudo dnf swap -y \
                         mesa-va-drivers \
                         mesa-va-drivers-freeworld; then
@@ -1719,13 +1720,13 @@ main() {
                 echo "Adding EPEL repository"
                 installPackage epel-release
             fi
-            if ! PKG_QUERY rpmfusion-free-release &>/dev/null; then
+            if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
                 installPackage --no-install-check \
                 "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
         fedora)
-            if ! PKG_QUERY rpmfusion-free-release &>/dev/null; then
+            if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
                 installPackage --no-install-check \
                 "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
