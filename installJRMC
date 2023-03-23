@@ -143,7 +143,7 @@ init() {
     fi
 
     # Detect architecture and translate to MC convention
-    # Also catch user input in getopt
+    # Override with user input with getopt
     ARCH=$(uname -m)
     case "$ARCH" in
         x86_64)
@@ -204,30 +204,30 @@ init() {
     # Abstract distro-specific package manager commands 
     case "$ID" in
         fedora|centos)
-            PKG_INSTALL=(sudo "$RPM_MGR" install -y)
-            PKG_REMOVE=(sudo "$RPM_MGR" remove -y)
-            PKG_UPDATE=(sudo "$RPM_MGR" makecache)
+            PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
+            PKG_REMOVE=(execute udo "$RPM_MGR" remove -y)
+            PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
             PKG_QUERY(){ rpm -q "$@"; }
             PKG_INSTALL_LOCAL(){ installMCRPM; }
             ;;
         debian|ubuntu)
-            PKG_INSTALL=(sudo apt-get -f install -y -q0)
-            PKG_REMOVE=(sudo apt-get remove --auto-remove -y -q0)
-            PKG_UPDATE=(sudo apt-get update -y -q0)
+            PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
+            PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
+            PKG_UPDATE=(execute sudo apt-get update -y -q0)
             PKG_QUERY(){ dpkg -s "$@"; }
             PKG_INSTALL_LOCAL(){ installMCDEB; }
             ;;
         suse)
-            PKG_INSTALL=(sudo zypper --non-interactive -q install --force --no-confirm)
-            PKG_REMOVE=(sudo zypper --non-interactive -q remove --clean-deps)
-            PKG_UPDATE=(sudo zypper --non-interactive -q refresh jriver)
+            PKG_INSTALL=(execute sudo zypper --non-interactive -q install --force --no-confirm)
+            PKG_REMOVE=(execute sudo zypper --non-interactive -q remove --clean-deps)
+            PKG_UPDATE=(execute sudo zypper --non-interactive -q refresh jriver)
             PKG_QUERY(){ rpm -q "$@"; }
             PKG_INSTALL_LOCAL(){ installMCRPM; }
             ;;
         arch)
-            PKG_INSTALL=(sudo pacman -Sy --noconfirm)
-            PKG_REMOVE=(sudo pacman -Rs --noconfirm)
-            PKG_UPDATE=(sudo pacman -Syy)
+            PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
+            PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
+            PKG_UPDATE=(execute sudo pacman -Syy)
             PKG_QUERY(){ sudo pacman -Qs "$@"; }
             PKG_INSTALL_LOCAL(){ installMCARCH; }
             ;;
@@ -534,7 +534,7 @@ installPackage() {
 
     # Install packages from package array
     if [[ ${#pkg_array[@]} -ge 1 ]]; then
-        if ! execute "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then       
+        if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then       
             (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue"
             return 1
         fi
@@ -561,7 +561,7 @@ installMesa() {
                         return 1
                     fi
                 else
-                    execute "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld
+                    "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld
                 fi
             fi
             ;;
@@ -603,7 +603,7 @@ installMCFromRepo() {
             ;;
     esac
 
-    if ! execute "${PKG_UPDATE[@]}"; then
+    if ! "${PKG_UPDATE[@]}"; then
         err "Package update failed!"
         return 1
     fi
@@ -922,6 +922,7 @@ installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
 
     [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
+
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
 		pkgname=mediacenter$MVERSION
 		pkgver=$MCVERSION
@@ -1057,7 +1058,7 @@ restoreLicense() {
     )
     shopt -u nullglob
 
-    if [[ ${#mjrfiles[@]} -ge 1 ]]; then
+    if [[ ${#mjrfiles[@]} -gt 0 ]]; then
 
         debug "mjrfiles=(${mjrfiles[*]})"
 
@@ -1188,7 +1189,7 @@ setServiceVars() {
 
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
     declare -g USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
-    declare -g RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
+    declare -ga RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
     declare -a systemctl_prefix
     declare service_name="$1"
     declare service_type="${2:-${SERVICE_TYPE:-system}}"
@@ -1209,11 +1210,11 @@ setServiceVars() {
     fi
 
     # systemctl commands
-    RELOAD="${systemctl_prefix[*]} daemon-reload"
-    ENABLE="${systemctl_prefix[*]} enable --now"
-    DISABLE="${systemctl_prefix[*]} disable --now"
-    IS_ENABLED="${systemctl_prefix[*]} is-enabled -q"
-    IS_ACTIVE="${systemctl_prefix[*]} is-active -q"
+    RELOAD=(execute "${systemctl_prefix[@]}" daemon-reload)
+    ENABLE=(execute "${systemctl_prefix[@]}" enable --now)
+    DISABLE=(execute "${systemctl_prefix[@]}" disable --now)
+    IS_ENABLED=(execute "${systemctl_prefix[@]}" is-enabled -q)
+    IS_ACTIVE=(execute "${systemctl_prefix[@]}" is-active -q)
 
     [[ -d "$service_dir" ]] || execute sudo mkdir -p "$service_dir"
 
@@ -1275,8 +1276,8 @@ service_jriver-mediacenter() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    execute "$RELOAD" &&
-    execute "$ENABLE" "$SERVICE_NAME" &&
+    "${RELOAD[@]}" &&
+    "${ENABLE[@]}" "$SERVICE_NAME" &&
     openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 }
 
@@ -1351,8 +1352,9 @@ service_jriver-xvnc() {
 		WantedBy=multi-user.target
 	EOF"
 
-    execute "$RELOAD"
-    if ! execute "$ENABLE" "$SERVICE_NAME"; then
+    "${RELOAD[@]}"
+
+    if ! execute "${ENABLE[@]}" "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY and retrying"
         service_jriver-xvnc increment
@@ -1421,8 +1423,8 @@ service_jriver-x11vnc() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    execute "$RELOAD" &&
-    execute "$ENABLE" "$SERVICE_NAME" &&
+    "${RELOAD[@]}" &&
+    "${ENABLE[@]}" "$SERVICE_NAME" &&
     echo "x11vnc running on localhost:$PORT" &&
     openFirewall "jriver-x11vnc" "$PORT/tcp"
 }
@@ -1465,8 +1467,8 @@ service_jriver-createrepo() {
 		WantedBy=timers.target
 	EOF"
 
-    execute "$RELOAD" &&
-    execute "$ENABLE" "$TIMER_NAME"
+    "${RELOAD[@]}" &&
+    "${ENABLE[@]}" "$TIMER_NAME"
 }
 
 
@@ -1612,20 +1614,22 @@ uninstall() {
         for i in user system; do
             setServiceVars "$service" "$i"; 
             for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-                if execute "$IS_ACTIVE" "$unit" ||
-                execute "$IS_ENABLED" "$unit"; then
-                    execute "$DISABLE" "$unit"
+                if "${IS_ACTIVE[@]}" "$unit" || 
+                "${IS_ENABLED[@]}" "$unit"; then
+                    "${DISABLE[@]}" "$unit"
                 fi
             done
             for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
                 [[ -f "$f" ]] && 
                 execute sudo rm -f "$f"
             done
-            execute "$RELOAD"
+            "${RELOAD[@]}"
+            unset f
         done
         for f in /etc/systemd/system/jriver-*; do
             execute sudo rm -f "$f"
         done
+        unset f
     done
 
     echo "Removing repo files"
@@ -1648,7 +1652,7 @@ uninstall() {
     fi
 
     echo "Uninstalling JRiver Media Center package"
-    if execute "${PKG_REMOVE[@]}" "$MCPKG"; then
+    if "${PKG_REMOVE[@]}" "$MCPKG"; then
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your library files, run: rm -rf $HOME/.jriver"
     elif [[ $? -eq 100 ]]; then
