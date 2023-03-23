@@ -133,7 +133,7 @@ init() {
     echo "Starting installJRMC"
     (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
 
-    if [[ -e "/etc/os-release" ]]; then
+    if [[ -e /etc/os-release ]]; then
         source "/etc/os-release"
     else
         err "/etc/os-release not found"
@@ -145,7 +145,7 @@ init() {
     # Detect architecture and translate to MC convention
     # Override with user input with getopt
     ARCH=$(uname -m)
-    case "$ARCH" in
+    case $ARCH in
         x86_64)
             ARCH="amd64"
             ;;
@@ -154,7 +154,7 @@ init() {
     debug "Detected host platform: $ID $VERSION_ID $ARCH"
 
     # normalize ID and set distro-specific vars
-    case "$ID" in
+    case $ID in
         debian|arch)
             ;;
         centos|fedora)
@@ -202,7 +202,7 @@ init() {
     [[ $ID != "unknown" ]] && debug "Using host platform: $ID $VERSION_ID"
 
     # Abstract distro-specific package manager commands 
-    case "$ID" in
+    case $ID in
         fedora|centos)
             PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
             PKG_REMOVE=(execute udo "$RPM_MGR" remove -y)
@@ -287,10 +287,10 @@ parseInput() {
     if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
         eval set -- "$input"
         while true; do
-            case "$1" in
+            case $1 in
                 --install|-i)
                     shift
-                    case "$1" in
+                    case $1 in
                         local|rpm)
                             BUILD_SWITCH=1
                             LOCAL_INSTALL_SWITCH=1
@@ -428,7 +428,7 @@ setMCVersion() {
 
     if [[ $MCVERSION_SOURCE == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
-        case "$ID" in
+        case $ID in
             fedora|centos|suse)
                 MCPKG+="-$MCVERSION"
                 ;;
@@ -466,7 +466,7 @@ installPackage() {
     if input=$(getopt -o +s -l "$long_opts" -- "$@"); then
         eval set -- "$input"
         while true; do
-            case "$1" in
+            case $1 in
                 --no-install-check)
                     no_install_check=1
                     ;;
@@ -495,7 +495,7 @@ installPackage() {
     fi
 
     # Package aliases
-    case "$ID" in
+    case $ID in
         debian|ubuntu)
             pkg_aliases["rpm-build"]="rpm"
             pkg_aliases["createrepo_c"]="createrepo"
@@ -519,7 +519,7 @@ installPackage() {
     done
 
     # Generate distro-specific install flags
-    case "$ID" in
+    case $ID in
         debian|ubuntu)
             (( allow_downgrades )) && install_flags+=(--allow-downgrades)
             ;;
@@ -551,7 +551,7 @@ installMesa() {
     debug "Running: ${FUNCNAME[0]}"
 
     # Currently only necessary in Fedora/CentOS
-    case "$ID" in
+    case $ID in
         fedora|centos)
             if ! "${PKG_QUERY[@]}" mesa-va-drivers-freeworld &>/dev/null; then
                 if "${PKG_QUERY[@]}" mesa-va-drivers &>/dev/null; then
@@ -576,7 +576,7 @@ installMesa() {
 installMCFromRepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    case "$ID" in
+    case $ID in
         fedora|centos)
             sudo bash -c "cat <<-EOF > /etc/yum.repos.d/jriver.repo
 				[jriver]
@@ -634,10 +634,10 @@ acquireDeb() {
     debug "MCDEB=$MCDEB"
 
     # If necessary, create SOURCES dir
-    [[ -d "$OUTPUTDIR/SOURCES" ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
+    [[ -d $OUTPUTDIR/SOURCES ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
 
     # If deb file already exists, skip download
-    if [[ -f "$MCDEB" ]]; then
+    if [[ -f $MCDEB ]]; then
         echo "Using existing DEB: $MCDEB"
         return 0
     fi
@@ -657,7 +657,7 @@ acquireDeb() {
         exit 1
     fi
 
-    if [[ -f "$MCDEB" ]]; then
+    if [[ -f $MCDEB ]]; then
         echo "Downloaded MC $MCVERSION DEB to $MCDEB"
     else
         err "Downloaded DEB file missing or corrupted"
@@ -676,12 +676,12 @@ buildRPM() {
     declare -a requires recommends
 
     # skip rebuilding the rpm if it already exists
-    if [[ -f "$MCRPM" ]]; then
+    if [[ -f $MCRPM ]]; then
         echo "$MCRPM already exists. Skipping build step"
         return 0
     fi
 
-    [[ -d "$OUTPUTDIR/SPECS" ]] || mkdir -p "$OUTPUTDIR/SPECS"
+    [[ -d $OUTPUTDIR/SPECS ]] || mkdir -p "$OUTPUTDIR/SPECS"
 
     # Load deb dependencies into array
     IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
@@ -702,7 +702,7 @@ buildRPM() {
     recommends=("${recommends[@]//)/}")
 
     # Translate package names
-    case "$BUILD_TARGET" in
+    case $BUILD_TARGET in
         fedora|centos)
             requires=("${requires[@]/libc6/glibc}")
             requires=("${requires[@]/libasound2/alsa-lib}")
@@ -828,13 +828,13 @@ buildRPM() {
             -bb
             "$OUTPUTDIR/SPECS/mediacenter.spec"
     )
-    if execute "${rpmbuild_cmd[@]}" && [[ -f "$MCRPM" ]] ; then
+    if execute "${rpmbuild_cmd[@]}" && [[ -f $MCRPM ]] ; then
         echo "Build successful. The RPM file is located at: $MCRPM"
     else
         err "Build failed"
         # For automation, let's remove the source DEB and reaquire it on next 
         # run after failure in case it is corrupted or buggy
-        [[ -f "$MCDEB" ]] && echo "Removing source DEB" && rm -f "$MCDEB"
+        [[ -f $MCDEB ]] && echo "Removing source DEB" && rm -f "$MCDEB"
         exit 1
     fi
 }
@@ -849,16 +849,16 @@ installMCDEB() {
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
-        ar x "$MCDEB"
-        tar -xJf "control.tar.xz"
+        execute ar x "$MCDEB"
+        execute tar -xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
         sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
-        [[ $ID == "ubuntu" && "${VERSION_ID%.*}" -le 16 ]] &&
+        [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] &&
             sed -i 's/libva2/libva1/g' "control"
-        tar -cJf "control.tar.xz" "control" "postinst"
+        execute tar -cJf "control.tar.xz" "control" "postinst"
         declare -g MCDEB="${MCDEB/.deb/.compat.deb}"
-        ar rcs "$MCDEB" "debian-binary" "control.tar.xz" "data.tar.xz"
+        execute ar rcs "$MCDEB" "debian-binary" "control.tar.xz" "data.tar.xz"
         popd &>/dev/null || return
         rm -rf "$extract_dir"
     fi
@@ -922,7 +922,7 @@ installMCGENERIC() {
 installMCARCH() {
     debug "Running: ${FUNCNAME[0]}"
 
-    [[ -d "$OUTPUTDIR/PKGBUILD" ]] || mkdir -p "$OUTPUTDIR/PKGBUILD"
+    [[ -d $OUTPUTDIR/PKGBUILD ]] || execute mkdir -p "$OUTPUTDIR/PKGBUILD"
 
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
 		pkgname=mediacenter$MVERSION
@@ -980,7 +980,7 @@ runCreaterepo() {
     installPackage createrepo_c
 
     # If the webroot does not exist, create it
-    if [[ ! -d "$CREATEREPO_WEBROOT" ]]; then
+    if [[ ! -d $CREATEREPO_WEBROOT ]]; then
         if ! execute sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT"; then
             if ! ( execute sudo mkdir -p "$CREATEREPO_WEBROOT" && 
             execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT" ); then
@@ -1001,10 +1001,10 @@ runCreaterepo() {
 
     # Run createrepo
     cr_cmd=(sudo -u "$CREATEREPO_USER" createrepo -q "$CREATEREPO_WEBROOT")
-    [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
+    [[ -d $CREATEREPO_WEBROOT/repodata ]] && cr_cmd+=(--update)
     if ! execute "${cr_cmd[@]}"; then
         cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
-        [[ -d "$CREATEREPO_WEBROOT/repodata" ]] && cr_cmd+=(--update)
+        [[ -d $CREATEREPO_WEBROOT/repodata ]] && cr_cmd+=(--update)
         if ! (execute "${cr_cmd[@]}" && 
         execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"); then
             err "createrepo failed"
@@ -1030,7 +1030,7 @@ symlinkCerts() {
     [[ -f $target_cert ]] && return 0
 
     for f in "${source_certs[@]}"; do
-        if [[ -f "$f" ]]; then
+        if [[ -f $f ]]; then
             if ! execute ln -fs "$f" "$mc_cert_link"; then
                 err "Symlinking certificate failed"
                 return 1
@@ -1074,7 +1074,7 @@ restoreLicense() {
         debug "Latest mjrfile: $newest"
 
         for f in "$RESTOREFILE" "$newest"; do
-            if [[ -f "$f" ]]; then
+            if [[ -f $f ]]; then
                 if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
                     return 0
                 fi
@@ -1138,15 +1138,15 @@ setVNCPass() {
 
     declare vncpassfile="$HOME/.vnc/jrmc_passwd"
 
-    [[ -d "${vncpassfile%/*}" ]] || execute "mkdir -p ${vncpassfile%/*}"
+    [[ -d ${vncpassfile%/*} ]] || execute mkdir -p "${vncpassfile%/*}"
 
-    if [[ -f "$vncpassfile" ]]; then
+    if [[ -f $vncpassfile ]]; then
         if [[ ! -v VNCPASS ]]; then
             err "Refusing to overwrite existing $vncpassfile with an empty password"
             err "Remove existing $vncpassfile or use --vncpass ''"
             return 1
         else
-            rm -f "$vncpassfile"
+            execute rm -f "$vncpassfile"
         fi
     fi
 
@@ -1217,10 +1217,10 @@ setServiceVars() {
     IS_ENABLED=(execute "${systemctl_prefix[@]}" is-enabled -q)
     IS_ACTIVE=(execute "${systemctl_prefix[@]}" is-active -q)
 
-    [[ -d "$service_dir" ]] || execute sudo mkdir -p "$service_dir"
+    [[ -d $service_dir ]] || execute sudo mkdir -p "$service_dir"
 
     # TODO Ubuntu needs these in the service file, fedora (and others?) do not
-    case "$ID" in
+    case $ID in
         ubuntu|debian)
             DISPLAY_STRING="Environment=DISPLAY=$DISPLAY"
             DISPLAY_STRING+=$'\n'"Environment=XAUTHORITY=$XAUTHORITY"
@@ -1384,7 +1384,7 @@ service_jriver-x11vnc() {
     setVNCPass x11vnc
 
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
-    if [[ ! -f "$HOME/.Xauthority" ]]; then
+    if [[ ! -f $HOME/.Xauthority ]]; then
         [[ $XDG_SESSION_TYPE == "wayland" ]] && 
         askOk "Unsupported Wayland session detected for x11vnc, continue?" || return 1
         touch "$HOME/.Xauthority"
@@ -1572,7 +1572,7 @@ disableCoW() {
     declare mc_user_path="$HOME/.jriver"
 
     for dir in "$mc_system_path" "$mc_user_path"; do
-        [[ -d "$dir" ]] || execute mkdir -p "$dir"
+        [[ -d $dir ]] || execute mkdir -p "$dir"
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C &&
         execute sudo chattr +C "$dir"; then
@@ -1592,8 +1592,8 @@ migrateLibrary() {
     declare current_config_path="$mc_user_path/Media Center $MVERSION"
     declare previous_config_path="$mc_user_path/Media Center $(( MVERSION - 1 ))"
 
-    if [[ ! -d "$current_config_path" ]] &&
-    [[ -d "$previous_config_path" ]] &&
+    if [[ ! -d $current_config_path ]] &&
+    [[ -d $previous_config_path ]] &&
     mkdir -p "$current_config_path"; then
         echo "Migrating $previous_config_path to $current_config_path"
         cp -fa "$previous_config_path"/* "$current_config_path"
@@ -1621,7 +1621,7 @@ uninstall() {
                 fi
             done
             for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-                [[ -f "$f" ]] && 
+                [[ -f $f ]] && 
                 execute sudo rm -f "$f"
             done
             "${RELOAD[@]}"
@@ -1662,7 +1662,7 @@ uninstall() {
         err "Could not remove Media Center package"
     fi
 
-    if [[ -f "$SCRIPTDIR/.uninstall" ]]; then
+    if [[ -f $SCRIPTDIR/.uninstall ]]; then
         echo "Removing files from .uninstall log"
         while read -r p; do
             [[ -d $p ]] && sudo rm -rf "$p"
@@ -1706,7 +1706,7 @@ main() {
     fi
 
     # Install external repos
-    case "$ID" in
+    case $ID in
         ubuntu)
             if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
                 echo "Adding universe repository"
