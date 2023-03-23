@@ -17,14 +17,9 @@
 shopt -s extglob
 
 declare -g SCRIPTVERSION="1.0-dev"
-declare -g SCRIPTDIR=; SCRIPTDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-declare -g OUTPUTDIR="$SCRIPTDIR/output"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
 declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="${MCVERSION:-"30.0.83"}" # Hardcoded fallback
-declare -g CREATEREPO_WEBROOT="/var/www/jriver"
-declare -g USER="${SUDO_USER:-$USER}"
-declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
+declare -g MCVERSION_HARDCODE="30.0.83"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -70,7 +65,7 @@ printHelp() {
 		            Specify the web server user if it differs from $USER
 		    --uninstall, -u
 		        Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
-		    --yes, -y
+		    --yes, -y, --auto
 		        Always assume yes for questions
 		    --version, -v
 		        Print this script version and exit
@@ -105,159 +100,22 @@ printHelp() {
 	EOF
 }
 
+#######################################
 # Helpers
+#######################################
 debug() { (( DEBUG )) && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 askOk() {
     declare response
     (( YES_SWITCH )) && return 0
     read -r -p "$* [y/N]: " response
-    [[ "${response,,}" =~ ^(yes|y)$ ]]
+    [[ ${response,,} =~ ^(yes|y)$ ]]
 }
 execute() {
     if debug "$*"; then
         "$@"
     else
         "$@" &>/dev/null
-    fi
-}
-
-
-#######################################
-# Parses user input and sets sensible defaults
-#######################################
-parseInput() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
-    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
-    declare -g YES_SWITCH USER_VERSION_SWITCH USER_ARCH
-    declare -g OUTPUTDIR RESTOREFILE BETAPASS SERVICE_TYPE
-    declare -g VNCPASS USER_DISPLAY
-    declare -ga SERVICES CONTAINERS
-    declare long_opts short_opts input
-
-    # Set some defaults
-    declare -g REPO_TARGET="$ID"
-    declare -g BUILD_TARGET="$ID"
-    declare -g CREATEREPO_USER="$USER"
-
-    if [[ $# -eq 0 ]] || 
-    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes )$ ]] &&
-    [[ $ID != "unknown" ]]; then
-        REPO_INSTALL_SWITCH=1
-    elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
-        BUILD_SWITCH=1
-        LOCAL_INSTALL_SWITCH=1
-    fi
-
-    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
-    long_opts+="service-type:,service:,services:,"
-    long_opts+="version,debug,verbose,help,uninstall,tests,"
-    long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
-    long_opts+="vncpass:,display:,container:,compat,arch:,yes"
-    short_opts="+i:vb::dhus:c:"
-
-    # Reset DEBUG and catch with getopt
-    declare -g DEBUG=0
-
-    if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
-        eval set -- "$input"
-        while true; do
-            case "$1" in
-                --install|-i)
-                    shift
-                    case "$1" in
-                        local|rpm)
-                            BUILD_SWITCH=1
-                            LOCAL_INSTALL_SWITCH=1
-                            ;;
-                        repo|remote)
-                            REPO_INSTALL_SWITCH=1
-                            ;;
-                    esac
-                    ;;
-                --build|-b)
-                    BUILD_SWITCH=1
-                    shift && BUILD_TARGET="$1"
-                    ;;
-                --outputdir)
-                    shift && OUTPUTDIR="$1"
-                    ;;
-                --mcversion)
-                    shift
-                    MCVERSION="$1"
-                    USER_VERSION_SWITCH=1
-                    ;;
-                --arch)
-                    shift
-                    USER_ARCH="$1"
-                    ;;
-                --restorefile)
-                    shift && RESTOREFILE="$1"
-                    ;;
-                --betapass)
-                    shift && BETAPASS="$1"
-                    ;;
-                --service-type)
-                    shift && SERVICE_TYPE="$1"
-                    ;;
-                --service|-s|--services)
-                    shift && SERVICES+=("$1")
-                    ;;
-                --createrepo)
-                    BUILD_SWITCH=1
-                    CREATEREPO_SWITCH=1
-                    shift && REPO_TARGET="$1"
-                    ;;
-                --createrepo-webroot)
-                    shift && CREATEREPO_WEBROOT="$1"
-                    ;;
-                --createrepo-user)
-                    shift && CREATEREPO_USER="$1"
-                    ;;
-                --vncpass)
-                    shift && VNCPASS="$1"
-                    ;;
-                --display)
-                    shift && USER_DISPLAY="$1"
-                    ;;
-                --compat)
-                    COMPAT_SWITCH=1
-                    ;;
-                --container|-c)
-                    shift && CONTAINERS+=("$1")
-                    ;;
-                --yes|-y)
-                    YES_SWITCH=1
-                    ;;
-                --version|-v)
-                    echo "Version: $SCRIPTVERSION"
-                    exit 0
-                    ;;
-                --debug|-d|--verbose)
-                    DEBUG=1
-                    ;;
-                --help|-h)
-                    printHelp 
-                    exit
-                    ;;
-                --uninstall|-u)
-                    UNINSTALL_SWITCH=1
-                    ;;
-                --tests)
-                    TEST_SWITCH=1
-                    ;;
-                --)
-                    shift
-                    break
-                    ;;
-            esac
-            shift
-        done
-    else
-        err "Incorrect options provided"
-        printHelp && exit 1
     fi
 }
 
@@ -383,6 +241,150 @@ init() {
 
 
 #######################################
+# Parses user input and sets sensible defaults
+#######################################
+parseInput() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
+    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
+    declare -g YES_SWITCH USER_VERSION_SWITCH USER_ARCH
+    declare -g RESTOREFILE BETAPASS SERVICE_TYPE
+    declare -g VNCPASS USER_DISPLAY
+    declare -ga SERVICES CONTAINERS
+    declare long_opts short_opts input
+
+    # Defaults 
+    declare -g BUILD_TARGET="$ID"
+    declare -g REPO_TARGET="$ID"
+    declare -g CREATEREPO_USER="$USER"
+    declare -g SCRIPTDIR=; SCRIPTDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+    declare -g OUTPUTDIR="$SCRIPTDIR/output"
+    declare -g CREATEREPO_WEBROOT="/var/www/jriver"
+    declare -g USER="${SUDO_USER:-$USER}"
+    declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
+
+    if [[ $# -eq 0 ]] || 
+    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes )$ ]] &&
+    [[ $ID != "unknown" ]]; then
+        REPO_INSTALL_SWITCH=1
+    elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
+        BUILD_SWITCH=1
+        LOCAL_INSTALL_SWITCH=1
+    fi
+
+    long_opts="install:,build::,outputdir:,mcversion:,restorefile:,betapass:,"
+    long_opts+="service-type:,service:,services:,"
+    long_opts+="version,debug,verbose,help,uninstall,tests,"
+    long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
+    long_opts+="vncpass:,display:,container:,compat,arch:,yes,auto"
+    short_opts="+i:vb::dhus:c:"
+
+    # Reset DEBUG and catch with getopt
+    declare -g DEBUG=0
+
+    if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
+        eval set -- "$input"
+        while true; do
+            case "$1" in
+                --install|-i)
+                    shift
+                    case "$1" in
+                        local|rpm)
+                            BUILD_SWITCH=1
+                            LOCAL_INSTALL_SWITCH=1
+                            ;;
+                        repo|remote)
+                            REPO_INSTALL_SWITCH=1
+                            ;;
+                    esac
+                    ;;
+                --build|-b)
+                    BUILD_SWITCH=1
+                    shift && BUILD_TARGET="$1"
+                    ;;
+                --outputdir)
+                    shift && OUTPUTDIR="$1"
+                    ;;
+                --mcversion)
+                    shift
+                    MCVERSION="$1"
+                    USER_VERSION_SWITCH=1
+                    ;;
+                --arch)
+                    shift
+                    USER_ARCH="$1"
+                    ;;
+                --restorefile)
+                    shift && RESTOREFILE="$1"
+                    ;;
+                --betapass)
+                    shift && BETAPASS="$1"
+                    ;;
+                --service-type)
+                    shift && SERVICE_TYPE="$1"
+                    ;;
+                --service|-s|--services)
+                    shift && SERVICES+=("$1")
+                    ;;
+                --createrepo)
+                    BUILD_SWITCH=1
+                    CREATEREPO_SWITCH=1
+                    shift && REPO_TARGET="$1"
+                    ;;
+                --createrepo-webroot)
+                    shift && CREATEREPO_WEBROOT="$1"
+                    ;;
+                --createrepo-user)
+                    shift && CREATEREPO_USER="$1"
+                    ;;
+                --vncpass)
+                    shift && VNCPASS="$1"
+                    ;;
+                --display)
+                    shift && USER_DISPLAY="$1"
+                    ;;
+                --compat)
+                    COMPAT_SWITCH=1
+                    ;;
+                --container|-c)
+                    shift && CONTAINERS+=("$1")
+                    ;;
+                --yes|-y|--auto)
+                    YES_SWITCH=1
+                    ;;
+                --version|-v)
+                    echo "Version: $SCRIPTVERSION"
+                    exit 0
+                    ;;
+                --debug|-d|--verbose)
+                    DEBUG=1
+                    ;;
+                --help|-h)
+                    printHelp 
+                    exit
+                    ;;
+                --uninstall|-u)
+                    UNINSTALL_SWITCH=1
+                    ;;
+                --tests)
+                    TEST_SWITCH=1
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+            esac
+            shift
+        done
+    else
+        err "Incorrect options provided"
+        printHelp && exit 1
+    fi
+}
+
+
+#######################################
 # Uses several methods to determine the latest JRiver MC version
 # TODO but how to determine build distro `$DEBIANBASE=buster`?
 #######################################
@@ -394,7 +396,7 @@ setMCVersion() {
 
     # User input
     if (( USER_VERSION_SWITCH )) &&
-    [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    [[ $MCVERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         MCVERSION_SOURCE="user input"
     # Containerized package manager
     elif installPackage --silent buildah &&
@@ -405,12 +407,12 @@ setMCVersion() {
     buildah run "$cnt" -- bash  -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
     MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
-    [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    [[ $MCVERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         MCVERSION_SOURCE="containerized package manager"
         buildah rm "$cnt" &>/dev/null
     # Webscrape
     elif installPackage wget && MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
-    [[ "$MCVERSION" =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    [[ $MCVERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         MCVERSION_SOURCE="webscrape"
     # Hardcoded
     else
@@ -423,7 +425,7 @@ setMCVersion() {
     MCPKG="mediacenter$MVERSION"
     MCRPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MVERSION-$MCVERSION.x86_64.rpm"
 
-    if [[ "$MCVERSION_SOURCE" == "user input" ]]; then
+    if [[ $MCVERSION_SOURCE == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
         case "$ID" in
             fedora|centos|suse)
@@ -435,7 +437,7 @@ setMCVersion() {
         esac
     fi
     echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE"
-    [[ "$MCVERSION_SOURCE" == "user input" ]] || echo "To override, use --mcversion"
+    [[ $MCVERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
     debug "MVERSION: $MVERSION, MCVERSION: $MCVERSION, MCPKG: $MCPKG, MCRPM: $MCRPM"
 }
 
@@ -750,7 +752,7 @@ buildRPM() {
             requires=("${requires[@]/libfreetype6*/freetype}") # Remove minimum version specifier
             requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
             for i in "${!requires[@]}"; do
-                [[ "${requires[$i]}" == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
+                [[ ${requires[$i]} == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
             done
             recommends+=(libvulkan_intel)
             recommends+=(libvulkan_radeon)
@@ -851,7 +853,7 @@ installMCDEB() {
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
         sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
-        [[ "$ID" == "ubuntu" && "${VERSION_ID%.*}" -le 16 ]] &&
+        [[ $ID == "ubuntu" && "${VERSION_ID%.*}" -le 16 ]] &&
             sed -i 's/libva2/libva1/g' "control"
         tar -cJf "control.tar.xz" "control" "postinst"
         declare -g MCDEB="${MCDEB/.deb/.compat.deb}"
@@ -1055,25 +1057,28 @@ restoreLicense() {
     )
     shopt -u nullglob
 
-    debug "mjrfiles=(${mjrfiles[*]})"
+    if [[ ${#mjrfiles[@]} -ge 1 ]]; then
 
-    # Sort globbed files by time, newest first
-    newest=${mjrfiles[0]}
-    for f in "${mjrfiles[@]}"; do
-        if [[ -f $f && $f -nt $newest ]]; then
-            newest=$f
-        fi
-    done
+        debug "mjrfiles=(${mjrfiles[*]})"
 
-    debug "Latest mjrfile: $newest"
-
-    for f in "$RESTOREFILE" "$newest"; do
-        if [[ -f "$f" ]]; then
-            if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
-                return 0
+        # Sort globbed files by time, newest first
+        newest=${mjrfiles[0]}
+        for f in "${mjrfiles[@]}"; do
+            if [[ -f $f && $f -nt $newest ]]; then
+                newest=$f
             fi
-        fi
-    done
+        done
+
+        debug "Latest mjrfile: $newest"
+
+        for f in "$RESTOREFILE" "$newest"; do
+            if [[ -f "$f" ]]; then
+                if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
+                    return 0
+                fi
+            fi
+        done
+    fi
 }
 
 
@@ -1189,16 +1194,16 @@ setServiceVars() {
     declare service_type="${2:-${SERVICE_TYPE:-system}}"
     declare service_dir="/usr/lib/systemd/$service_type"
 
-    if [[ "$USER" == "root" && "$service_type" == "user" ]]; then
+    if [[ $USER == "root" && $service_type == "user" ]]; then
         err "Trying to install user service as root"
         err "Use --service-type service and/or execute installJRMC as non-root user"
         return 1
     fi
 
-    if [[ "$service_type" == "system" ]]; then
+    if [[ $service_type == "system" ]]; then
         systemctl_prefix=(sudo systemctl)
         GRAPHICAL_TARGET="graphical.target"
-    elif [[ "$service_type" == "user" ]]; then
+    elif [[ $service_type == "user" ]]; then
         systemctl_prefix=(systemctl --user)
         GRAPHICAL_TARGET="default.target"
     fi
@@ -1223,7 +1228,7 @@ setServiceVars() {
             ;;
     esac
 
-    if [[ "$SERVICE_TYPE" == "system" && "$USER" != "root" ]]; then
+    if [[ $SERVICE_TYPE == "system" && $USER != "root" ]]; then
         SERVICE_FNAME="$service_dir/$service_name@.service"
         TIMER_FNAME="$service_dir/$service_name@.timer"
         SERVICE_NAME="$service_name@$USER.service"
@@ -1377,7 +1382,7 @@ service_jriver-x11vnc() {
 
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
     if [[ ! -f "$HOME/.Xauthority" ]]; then
-        [[ "$XDG_SESSION_TYPE" == "wayland" ]] && 
+        [[ $XDG_SESSION_TYPE == "wayland" ]] && 
         askOk "Unsupported Wayland session detected for x11vnc, continue?" || return 1
         touch "$HOME/.Xauthority"
         xauth generate "$DISPLAY" . trusted
@@ -1430,7 +1435,7 @@ service_jriver-x11vnc() {
 service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    if [[ "$CREATEREPO_USER" != "$USER" ]]; then
+    if [[ $CREATEREPO_USER != "$USER" ]]; then
         USER="root" setServiceVars "${FUNCNAME[0]##*_}" "system"
     else
         setServiceVars "${FUNCNAME[0]##*_}" "system"
@@ -1627,7 +1632,7 @@ uninstall() {
     sudo rm -rf \
         "/etc/yum.repos.d/jriver.repo" \
         /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
-    if [[ "$ID" == "suse" ]]; then
+    if [[ $ID == "suse" ]]; then
         execute sudo zypper rr jriver
     fi
 
@@ -1741,7 +1746,7 @@ main() {
     if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
         installPackage "wget"
         acquireDeb
-        if [[ "$BUILD_TARGET" =~ (centos|fedora|suse) ]]; then
+        if [[ $BUILD_TARGET =~ (centos|fedora|suse) ]]; then
             installPackage "dpkg" "rpm-build"
             buildRPM
         fi
@@ -1769,7 +1774,7 @@ main() {
         fi
     fi
 
-    if [[ "${#SERVICES[@]}" -gt 0 ]]; then
+    if [[ ${#SERVICES[@]} -gt 0 ]]; then
         declare service
         for service in "${SERVICES[@]}"; do
             if ! "service_$service"; then

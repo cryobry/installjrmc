@@ -45,7 +45,7 @@ $ installJRMC --help
       The webroot directory to install the repo (default: /var/www/jriver/)
   --createrepo-user USER
       The web server user if different from the current user
---yes, -y
+--yes, -y, --auto
     Always assume yes for questions
 --version, -v
     Print this script version and exit
