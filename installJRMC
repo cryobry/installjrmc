@@ -1313,11 +1313,6 @@ service_jriver-xvnc() {
 
     setVNCPass xvnc
 
-    if [[ $# -eq 1 && $1 == "increment" ]]; then
-        NEXT_DISPLAYNUM=$(( DISPLAYNUM + count ))
-        PORT=$(( NEXT_DISPLAYNUM + 5900 ))
-    fi
-
     start_cmd=(
         /usr/bin/vncserver "$NEXT_DISPLAY"
         -geometry 1440x900 
@@ -1359,8 +1354,8 @@ service_jriver-xvnc() {
     if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY and retrying"
-        service_jriver-xvnc increment
-        return 1
+        service_jriver-xvnc
+        return
     else
         echo "Xvnc running on localhost:$PORT"
         openFirewall "jriver-xvnc" "$PORT/tcp"
