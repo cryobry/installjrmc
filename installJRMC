@@ -1165,7 +1165,7 @@ setVNCPass() {
 setDisplayVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY NEXT_DISPLAYNUM
+    declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY
 
     # Check USER_DISPLAY, else environment DISPLAY, else set to :0
     DISPLAY="${USER_DISPLAY:-${DISPLAY:-:0}}"
@@ -1173,11 +1173,11 @@ setDisplayVars() {
     DISPLAYNUM="${DISPLAYNUM%%.*}" # strip suffix
     # Increment each time we run this
     if (( NEXT_DISPLAYNUM )); then
-        NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
+        declare -g NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
     else
-        NEXT_DISPLAYNUM=$(( DISPLAYNUM + 1 ))
+        declare -g NEXT_DISPLAYNUM=$(( DISPLAYNUM + 1 ))
     fi
-    NEXT_DISPLAY=":$NEXT_DISPLAYNUM"
+    declare -g NEXT_DISPLAY=":$NEXT_DISPLAYNUM"
 }
 
 
