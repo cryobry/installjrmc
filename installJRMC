@@ -1118,7 +1118,7 @@ openFirewall() {
         execute sudo ufw app update "$service"
         execute sudo ufw allow "$service"
     else
-        err "Please install firewall-cmd or ufw to open firewall ports"
+        echo "Warning: Install firewall-cmd or ufw to open firewall ports"
         return 1
     fi
 }
@@ -1309,8 +1309,8 @@ service_jriver-xvnc() {
     setVNCPass xvnc
 
     if [[ $# -eq 1 && $1 == "increment" ]]; then
-        NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
-        DISPLAY=":$NEXT_DISPLAYNUM"
+        count+=1
+        NEXT_DISPLAYNUM=$(( DISPLAYNUM + count ))
         PORT=$(( NEXT_DISPLAYNUM + 5900 ))
     fi
 
@@ -1655,7 +1655,7 @@ uninstall() {
     echo "Uninstalling JRiver Media Center package"
     if "${PKG_REMOVE[@]}" "$MCPKG"; then
         echo "JRiver Media Center has been completely uninstalled"
-        echo "To remove your library files, run: rm -rf $HOME/.jriver"
+        echo "To remove your MC library: rm -rf $HOME/.jriver"
     elif [[ $? -eq 100 ]]; then
         err "JRiver Media Center package '$MCPKG' is not present and was not uninstalled"
     else
