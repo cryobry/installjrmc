@@ -1273,9 +1273,10 @@ service_jriver-mediacenter() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    "${RELOAD[@]}" &&
-    "${ENABLE[@]}" "$SERVICE_NAME" &&
     openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+
+    "${RELOAD[@]}" &&
+    "${ENABLE[@]}" "$SERVICE_NAME"
 }
 
 
@@ -1351,15 +1352,17 @@ service_jriver-xvnc() {
 
     "${RELOAD[@]}"
 
-    if ! execute "${ENABLE[@]}" "$SERVICE_NAME"; then
+    if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         err "Incrementing DISPLAY and retrying"
         service_jriver-xvnc increment
-        return
+        return 1
+    else
+        echo "Xvnc running on localhost:$PORT"
+        openFirewall "jriver-xvnc" "$PORT/tcp"
+        openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
     fi
-    echo "Xvnc running on localhost:$PORT"
-    openFirewall "jriver-xvnc" "$PORT/tcp"
-    openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+    return 0
 }
 
 
@@ -1420,10 +1423,11 @@ service_jriver-x11vnc() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
+    openFirewall "jriver-x11vnc" "$PORT/tcp"
+
     "${RELOAD[@]}" &&
     "${ENABLE[@]}" "$SERVICE_NAME" &&
-    echo "x11vnc running on localhost:$PORT" &&
-    openFirewall "jriver-x11vnc" "$PORT/tcp"
+    echo "x11vnc running on localhost:$PORT"
 }
 
 
