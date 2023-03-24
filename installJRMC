@@ -1194,7 +1194,7 @@ setServiceVars() {
     declare -ga RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
     declare -a systemctl_prefix
     declare service_name="$1"
-    declare service_type="${2:-${SERVICE_TYPE:-system}}"
+    declare service_type="${SERVICE_TYPE:-${2:-system}}"
     declare service_dir="/usr/lib/systemd/$service_type"
 
     if [[ $USER == "root" && $service_type == "user" ]]; then
@@ -1231,7 +1231,7 @@ setServiceVars() {
             ;;
     esac
 
-    if [[ $SERVICE_TYPE == "system" && $USER != "root" ]]; then
+    if [[ $service_type == "system" && $USER != "root" ]]; then
         SERVICE_FNAME="$service_dir/$service_name@.service"
         TIMER_FNAME="$service_dir/$service_name@.timer"
         SERVICE_NAME="$service_name@$USER.service"
