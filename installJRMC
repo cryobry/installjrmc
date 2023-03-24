@@ -1353,19 +1353,18 @@ service_jriver-xvnc() {
 
     if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
-        err "Incrementing DISPLAY and retrying"
         # Allow to increment 10 times before breaking
         max=$(( DISPLAYNUM + 10 ))
         while [[ $NEXT_DISPLAYNUM -lt $max ]]; do
+            echo "Incrementing DISPLAY and retrying"
             service_jriver-xvnc
         done
-        return 1
     else
         echo "Xvnc running on localhost:$PORT"
         openFirewall "jriver-xvnc" "$PORT/tcp"
         openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+        return 0
     fi
-    return 0
 }
 
 
