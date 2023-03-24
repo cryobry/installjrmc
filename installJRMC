@@ -1357,8 +1357,9 @@ service_jriver-xvnc() {
         max=$(( DISPLAYNUM + 10 ))
         while [[ $NEXT_DISPLAYNUM -lt $max ]]; do
             echo "Incrementing DISPLAY and retrying"
-            service_jriver-xvnc
+            service_jriver-xvnc && return
         done
+        return 1
     else
         echo "Xvnc running on localhost:$PORT"
         openFirewall "jriver-xvnc" "$PORT/tcp"
