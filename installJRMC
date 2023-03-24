@@ -855,7 +855,7 @@ installMCDEB() {
         declare -g MCDEB="${MCDEB/.deb/.compat.deb}"
         execute ar rcs "$MCDEB" "debian-binary" "control.tar.xz" "data.tar.xz"
         popd &>/dev/null || return
-        rm -rf "$extract_dir"
+        execute rm -rf "$extract_dir"
     fi
 
     installPackage \
