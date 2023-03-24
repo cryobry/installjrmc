@@ -218,9 +218,9 @@ init() {
             PKG_INSTALL_LOCAL(){ installMCDEB; }
             ;;
         suse)
-            PKG_INSTALL=(execute sudo zypper --non-interactive -q install --force --no-confirm)
-            PKG_REMOVE=(execute sudo zypper --non-interactive -q remove --clean-deps)
-            PKG_UPDATE=(execute sudo zypper --non-interactive -q refresh jriver)
+            PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
+            PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
+            PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
             PKG_QUERY=(rpm -q)
             PKG_INSTALL_LOCAL(){ installMCRPM; }
             ;;
@@ -529,7 +529,8 @@ installPackage() {
             (( refresh )) && install_flags+=(--refresh)
             ;;
         suse)
-            (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
+            (( no_gpg_check )) && 
+            install_flags+=(--allow-unsigned-rpm)
             ;;
     esac
 
@@ -1633,7 +1634,7 @@ uninstall() {
         "/etc/yum.repos.d/jriver.repo" \
         /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
     if [[ $ID == "suse" ]]; then
-        execute sudo zypper rr jriver
+        execute sudo zypper --non-interactive removerepo jriver
     fi
 
     echo "Removing firewall rules"
