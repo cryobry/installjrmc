@@ -633,9 +633,6 @@ acquireDeb() {
 
     debug "MCDEB=$MCDEB"
 
-    # If necessary, create SOURCES dir
-    [[ -d $OUTPUTDIR/SOURCES ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
-
     # If deb file already exists, skip download
     if [[ -f $MCDEB ]]; then
         echo "Using existing DEB: $MCDEB"
@@ -680,8 +677,6 @@ buildRPM() {
         echo "$MCRPM already exists. Skipping build step"
         return 0
     fi
-
-    [[ -d $OUTPUTDIR/SPECS ]] || mkdir -p "$OUTPUTDIR/SPECS"
 
     # Load deb dependencies into array
     IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
@@ -850,7 +845,7 @@ installMCDEB() {
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
         execute ar x "$MCDEB"
-        execute tar -xJf "control.tar.xz"
+        execute tar xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
         sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
@@ -896,11 +891,11 @@ installMCGENERIC() {
 
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
-    ar x "$MCDEB" &>/dev/null
-    tar xvf "control.tar.xz" &>/dev/null
+    execute ar x "$MCDEB"
+    execute tar xJf "control.tar.xz"
     echo "You must install the following dependencies manually:"
     grep -i "Depends:" control
-    readarray -t raw_files < <(tar xvf data.tar.xz)
+    readarray -t raw_files < <(tar xJvf data.tar.xz)
     # Output to log file
     for f in "${raw_files[@]/#./}"; do
         echo "$f" >> "$SCRIPTDIR/.uninstall"
@@ -1665,7 +1660,7 @@ uninstall() {
     if [[ -f $SCRIPTDIR/.uninstall ]]; then
         echo "Removing files from .uninstall log"
         while read -r p; do
-            [[ -d $p ]] && sudo rm -rf "$p"
+            [[ -d $p ]] && execute sudo rm -rf "$p"
         done < "$SCRIPTDIR/.uninstall"
         mv "$SCRIPTDIR/.uninstall" "$SCRIPTDIR/.uninstall.bk"
     fi
@@ -1750,9 +1745,11 @@ main() {
 
     if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
         installPackage "wget"
+        [[ -d $OUTPUTDIR/SOURCES ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
         acquireDeb
         if [[ $BUILD_TARGET =~ (centos|fedora|suse) ]]; then
             installPackage "dpkg" "rpm-build"
+            [[ -d $OUTPUTDIR/SPECS ]] || mkdir -p "$OUTPUTDIR/SPECS"
             buildRPM
         fi
     fi
@@ -1786,10 +1783,13 @@ main() {
                 if [[ $? -eq 127 ]]; then
                     err "Service $service does not exist, check service name"
                 else
-                    err "Failed to create service: $service"
+                    err "Failed to create $service service"
                 fi
+            else
+                echo "Started and enabled $service service"
             fi
         done
+        unset service
     fi
 
     # for _container in "${CONTAINERS[@]}"; do
