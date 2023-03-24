@@ -599,7 +599,7 @@ installMCFromRepo() {
             ;;
         *)
             err "An MC repository for $ID is not yet available"
-            err "Try using --install local to install MC on $ID"
+            err "Use --install local to install MC on $ID"
             return 1
             ;;
     esac
@@ -818,8 +818,8 @@ buildRPM() {
     echo "Building MC $MCVERSION RPM, this may take awhile"
     rpmbuild_cmd=(
         rpmbuild 
-            --define=\"%_topdir "$OUTPUTDIR"\" 
-            --define=\"%_libdir /usr/lib\" 
+            --define="%_topdir $OUTPUTDIR" 
+            --define="%_libdir /usr/lib" 
             -bb
             "$OUTPUTDIR/SPECS/mediacenter.spec"
     )
