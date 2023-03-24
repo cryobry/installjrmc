@@ -1168,10 +1168,15 @@ setDisplayVars() {
     declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY NEXT_DISPLAYNUM
 
     # Check USER_DISPLAY, else environment DISPLAY, else set to :0
-    DISPLAY="${USER_DISPLAY:-${DISPLAY:-0}}"
+    DISPLAY="${USER_DISPLAY:-${DISPLAY:-:0}}"
     DISPLAYNUM="${DISPLAY#*:}" # strip prefix
     DISPLAYNUM="${DISPLAYNUM%%.*}" # strip suffix
-    NEXT_DISPLAYNUM=$(( DISPLAYNUM + 1 ))
+    # Increment each time we run this
+    if (( NEXT_DISPLAYNUM )); then
+        NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
+    else
+        NEXT_DISPLAYNUM=$(( DISPLAYNUM + 1 ))
+    fi
     NEXT_DISPLAY=":$NEXT_DISPLAYNUM"
 }
 
@@ -1309,7 +1314,6 @@ service_jriver-xvnc() {
     setVNCPass xvnc
 
     if [[ $# -eq 1 && $1 == "increment" ]]; then
-        count+=1
         NEXT_DISPLAYNUM=$(( DISPLAYNUM + count ))
         PORT=$(( NEXT_DISPLAYNUM + 5900 ))
     fi
