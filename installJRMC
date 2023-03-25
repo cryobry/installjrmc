@@ -1386,11 +1386,12 @@ service_jriver-x11vnc() {
     setVNCPass x11vnc
 
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
-    debug "Generating $HOME/.Xauthority"
     if [[ ! -f "$HOME/.Xauthority" ]]; then
+        debug "Generating $HOME/.Xauthority"
         [[ $XDG_SESSION_TYPE == "wayland" ]] && 
         askOk "Unsupported Wayland session detected for x11vnc, continue?" || return 1
-        touch "$HOME/.Xauthority"
+        execute touch "$HOME/.Xauthority"
+        execute chmod 644 "$HOME/.Xauthority"
         xauth generate "$DISPLAY" . trusted
         xauth add "$HOST$DISPLAY" . "$(xxd -l 16 -p /dev/urandom)"
     fi
