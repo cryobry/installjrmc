@@ -1375,7 +1375,7 @@ service_jriver-xvnc() {
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars "${FUNCNAME[0]##*_}" "system"
+    setServiceVars "${FUNCNAME[0]##*_}" "user"
     setDisplayVars
 
     declare -a start_cmd
@@ -1387,6 +1387,7 @@ service_jriver-x11vnc() {
 
     # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
     if [[ ! -f $HOME/.Xauthority ]]; then
+        echo "Generating $HOME/.Xauthority"
         [[ $XDG_SESSION_TYPE == "wayland" ]] && 
         askOk "Unsupported Wayland session detected for x11vnc, continue?" || return 1
         touch "$HOME/.Xauthority"
