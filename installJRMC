@@ -1231,9 +1231,7 @@ setServiceVars() {
             ;;
     esac
 
-    debug "service_type=$service_type, USER=$USER"
     if [[ $service_type == "system" && $USER != "root" ]]; then
-        debug HERE
         SERVICE_FNAME="$service_dir/$service_name@.service"
         TIMER_FNAME="$service_dir/$service_name@.timer"
         SERVICE_NAME="$service_name@$USER.service"
@@ -1377,7 +1375,7 @@ service_jriver-xvnc() {
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
 
-    setServiceVars "${FUNCNAME[0]##*_}" "user"
+    setServiceVars "${FUNCNAME[0]##*_}" "system"
     setDisplayVars
 
     declare -a start_cmd
