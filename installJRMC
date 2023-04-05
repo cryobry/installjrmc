@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc7"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
 declare -g DEBIANBASE="buster"
 declare -g MCVERSION_HARDCODE="30.0.83"
@@ -1455,7 +1455,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$SCRIPTDIR/installJRMC --outputdir $OUTPUTDIR --createrepo=$REPO_TARGET --createrepo-webroot $CREATEREPO_WEBROOT --createrepo-user $CREATEREPO_USER
+		ExecStart=$SCRIPTDIR/installJRMC --outputdir=$OUTPUTDIR --createrepo=$REPO_TARGET --createrepo-webroot=$CREATEREPO_WEBROOT --createrepo-user=$CREATEREPO_USER
 
 		[Install]
 		WantedBy=multi-user.target
@@ -1757,9 +1757,10 @@ main() {
         installPackage "wget"
         [[ -d $OUTPUTDIR/SOURCES ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
         acquireDeb
+        debug "BUILD_TARGET=$BUILD_TARGET"
         if [[ $BUILD_TARGET =~ (centos|fedora|suse) ]]; then
             installPackage "dpkg" "rpm-build"
-            [[ -d $OUTPUTDIR/SPECS ]] || mkdir -p "$OUTPUTDIR/SPECS"
+            [[ -d $OUTPUTDIR/SPECS ]] || execute mkdir -p "$OUTPUTDIR/SPECS"
             buildRPM
         fi
     fi
