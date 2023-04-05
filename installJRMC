@@ -1757,8 +1757,8 @@ main() {
         installPackage "wget"
         [[ -d $OUTPUTDIR/SOURCES ]] || execute mkdir -p "$OUTPUTDIR/SOURCES"
         acquireDeb
-        debug "BUILD_TARGET=$BUILD_TARGET"
-        if [[ $BUILD_TARGET =~ (centos|fedora|suse) ]]; then
+        if [[ $BUILD_TARGET =~ (centos|fedora|suse) ||
+        $REPO_TARGET =~ (centos|fedora|suse) ]]; then
             installPackage "dpkg" "rpm-build"
             [[ -d $OUTPUTDIR/SPECS ]] || execute mkdir -p "$OUTPUTDIR/SPECS"
             buildRPM
