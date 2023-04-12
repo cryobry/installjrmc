@@ -331,7 +331,7 @@ parseInput() {
                 --createrepo)
                     BUILD_SWITCH=1
                     CREATEREPO_SWITCH=1
-                    shift && REPO_TARGET="$1"
+                    shift && REPO_TARGET="$1" && BUILD_TARGET="$1"
                     ;;
                 --createrepo-webroot)
                     shift && CREATEREPO_WEBROOT="$1"
