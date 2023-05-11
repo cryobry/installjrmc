@@ -654,13 +654,13 @@ acquireDeb() {
 
     if [[ -v BETAPASS ]] && 
         echo "Checking beta repo for DEB package" && execute wget -q -O "$MCDEB" \
-            "https://files.jriver.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
+            "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
     elif echo "Checking latest repo for DEB package" && execute wget -q -O "$MCDEB" \
-            "https://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
+            "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
     elif echo "Checking test repo for DEB package" && execute wget -q -O "$MCDEB" \
-            "https://files.jriver.com/mediacenter/test/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
+            "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
     else
         err "Cannot find DEB file"
@@ -787,7 +787,7 @@ buildRPM() {
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb
+		Source0: http://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
@@ -950,7 +950,7 @@ installMCARCH() {
 			'vorbis-tools: ogg vorbis support' 
 			'musepack-tools: musepack support'
 		)
-		source=("http://files.jriver.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb")
+		source=("http://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb")
 
 		package() {
 			cd "\$srcdir"
