@@ -16,10 +16,10 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-dev"
-declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,76.0.html" # MC30
-declare -g DEBIANBASE="buster"
-declare -g MCVERSION_HARDCODE="30.0.83"
+declare -g SCRIPTVERSION="1.0-rc8"
+declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,80.0.html" # MC31
+declare -g DEBIANBASE="bullseye"
+declare -g MCVERSION_HARDCODE="31.0.11"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -40,7 +40,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "30.0.83" (default: latest version)
+		        Specify the MC version, ex. "31.0.11" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH
@@ -387,7 +387,7 @@ parseInput() {
 
 #######################################
 # Uses several methods to determine the latest JRiver MC version
-# TODO but how to determine build distro `$DEBIANBASE=buster`?
+# TODO but how to determine build distro `$DEBIANBASE=bullseye`?
 #######################################
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
