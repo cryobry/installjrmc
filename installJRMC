@@ -347,6 +347,7 @@ parseInput() {
                     ;;
                 --compat)
                     COMPAT_SWITCH=1
+                    BUILD_SWITCH=1
                     ;;
                 --container|-c)
                     shift && CONTAINERS+=("$1")
