@@ -19,7 +19,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,80.0.html" # MC31
 declare -g DEBIANBASE="bullseye"
-declare -g MCVERSION_HARDCODE="31.0.11"
+declare -g MCVERSION_HARDCODE="31.0.12"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -40,7 +40,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "31.0.11" (default: latest version)
+		        Specify the MC version, ex. "31.0.12" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH

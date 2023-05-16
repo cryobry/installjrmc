@@ -1,14 +1,9 @@
 [size=20pt]installJRMC[/size]
 
-This self-contained program will install [url=https://www.jriver.com/]JRiver Media Center[/url] and associated services on most major Linux distros.
+This program will install [url=https://www.jriver.com/]JRiver Media Center[/url] and associated services on most major Linux distros.
 
 You can always find the latest version of installJRMC, changelog, and documentation in [url=https://git.bryanroessler.com/bryan/installJRMC]my repository[/url].
 
-[size=18pt]Major changes for MC30[/size]
-[list type=decimal]
-[li]RPM packages have been renamed from [i]MediaCenter[/i] to [i]mediacenterXX[/i], with [i]XX[/i] being the major version number (i.e. mediacenter30) to improve consistency with Debian naming conventions and licensing.[/li]
-[li]mesa-va-drivers-freeworld (RPMFusion) is installed automatically from RPMFusion on Fedora/CentOS to enable hardware acceleration.[/li]
-[/list]
 [size=18pt]Instructions[/size]
 
 Download and unzip installJRMC from the attachment below or grab the latest stable version directly from my repo and execute it:
@@ -17,7 +12,7 @@ Download and unzip installJRMC from the attachment below or grab the latest stab
 chmod +x ./installJRMC && 
 ./installJRMC [--option [ARGUMENT]][/code]
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [url=https://repos.bryanroessler.com/jriver/]unofficial repository[/url] (Fedora/CentOS) using the system package manager ([i]i.e.[/i] --install repo). If any other option is passed, then the install method (--install repo or --install local) must be specified. This makes it possible to install services and containers independent of MC.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [url=https://repos.bryanroessler.com/jriver/]unofficial repository[/url] (Fedora/CentOS) using the system package manager ([i]i.e.[/i] --install repo). If any other option is passed, then the install method (--install repo or --install local) must be specified, to make it possible to install services and containers independent of MC.
 
 [size=18pt]Options[/size]
 
@@ -32,7 +27,7 @@ $ installJRMC --help
 --compat
     Build/install MC without minimum dependency version requirements
 --mcversion VERSION
-    Build or install a specific MC version, ex. "31.0.11"
+    Build or install a specific MC version, ex. "31.0.12"
 --arch ARCH
     Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 --outputdir PATH
@@ -111,8 +106,8 @@ Install the latest version of MC from the best available repository.
 Install a more widely-compatible version of the latest MC version.
 [code]installJRMC --install repo --service jriver-mediacenter --service-type user[/code]
 Install MC from the repository and start/enable jriver-mediacenter.service as a user service.
-[code]installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 31.0.11[/code]
-Build and install an MC 31.0.11 comptability RPM locally and activate it using the /path/to/license.mjr
+[code]installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 31.0.12[/code]
+Build and install an MC 31.0.12 comptability RPM locally and activate it using the /path/to/license.mjr
 [code]installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user[/code]
 Build an RPM locally for the current distro, move it to the webroot, and run createrepo as www-user.
 [code]installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user[/code]
