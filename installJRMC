@@ -149,6 +149,9 @@ init() {
         x86_64)
             ARCH="amd64"
             ;;
+        aarch64)
+            ARCH="arm64"
+            ;;
     esac
 
     debug "Detected host platform: $ID $VERSION_ID $ARCH"
@@ -313,8 +316,7 @@ parseInput() {
                     USER_VERSION_SWITCH=1
                     ;;
                 --arch)
-                    shift
-                    USER_ARCH="$1"
+                    shift && USER_ARCH="$1"
                     ;;
                 --restorefile)
                     shift && RESTOREFILE="$1"
@@ -914,7 +916,6 @@ installMCGENERIC() {
     for f in "${raw_files[@]/#./}"; do
         echo "$f" >> "$SCRIPTDIR/.uninstall"
     done
-    #echo "${raw_files[@]/#./}" >> "$SCRIPTDIR/.uninstall"
     # Manually install files
     for f in "${raw_files[@]}"; do
         execute sudo cp -a "$f" "${f/#./}"
