@@ -720,7 +720,7 @@ buildRPM() {
             requires=("${requires[@]/libuuid1/libuuid}")
             requires=("${requires[@]/libx11-6/libX11}")
             requires=("${requires[@]/libxext6/libXext}")
-            requires=("${requires[@]/libxcb1/libxcb}")
+            requires=("${requires[@]/libxcb1*/libxcb}") # TODO Remove minimum version for MC31 (*)
             requires=("${requires[@]/libxdmcp6/libXdmcp}")
             requires=("${requires[@]/libstdc++6/libstdc++}")
             requires=("${requires[@]/libgtk-3-0/gtk3}")
