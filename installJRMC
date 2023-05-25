@@ -19,7 +19,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,80.0.html" # MC31
 declare -g DEBIANBASE="bullseye"
-declare -g MCVERSION_HARDCODE="31.0.12"
+declare -g MC_VERSION_HARDCODE="31.0.12"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -312,7 +312,7 @@ parseInput() {
                     ;;
                 --mcversion)
                     shift
-                    MCVERSION="$1"
+                    MC_VERSION="$1"
                     USER_VERSION_SWITCH=1
                     ;;
                 --arch)
@@ -395,13 +395,14 @@ parseInput() {
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCVERSION_SOURCE MVERSION MCPKG MCRPM 
+    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT 
+    declare -g MC_PKG MC_RPM MC_STUB MC_STUB_TARGET
     declare cnt
 
     # User input
     if (( USER_VERSION_SWITCH )) &&
-    [[ $MCVERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MCVERSION_SOURCE="user input"
+    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        MC_VERSION_SOURCE="user input"
     # Containerized package manager
     elif installPackage --silent buildah &&
     hash buildah &>/dev/null &&
@@ -410,39 +411,42 @@ setMCVersion() {
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
     buildah run "$cnt" -- bash  -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
-    MCVERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
-    [[ $MCVERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MCVERSION_SOURCE="containerized package manager"
+    MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
+    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        MC_VERSION_SOURCE="containerized package manager"
         buildah rm "$cnt" &>/dev/null
     # Webscrape
-    elif installPackage wget && MCVERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
-    [[ $MCVERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MCVERSION_SOURCE="webscrape"
+    elif installPackage wget && MC_VERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
+    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        MC_VERSION_SOURCE="webscrape"
     # Hardcoded
     else
-        declare -g MCVERSION="$MCVERSION_HARDCODE"
-        MCVERSION_SOURCE="hardcoded or MCVERSION env"
+        declare -g MC_VERSION="$MC_VERSION_HARDCODE"
+        MC_VERSION_SOURCE="hardcoded or MC_VERSION env"
         err "Warning! Using hardcoded version number"
     fi
     
-    MVERSION="${MCVERSION%%.*}"
-    MCPKG="mediacenter$MVERSION"
-    MCRPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MVERSION-$MCVERSION.x86_64.rpm"
+    MC_MVERSION="${MC_VERSION%%.*}"
+    MC_PKG="mediacenter$MC_MVERSION"
+    MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
+    MC_ROOT="/usr/lib/jriver/MC$MC_MVERSION"
+    MC_STUB="$MC_ROOT/mc$MC_MVERSION"
+    MC_STUB_TARGET="/usr/bin/mc$MC_MVERSION"
 
-    if [[ $MCVERSION_SOURCE == "user input" ]]; then
+    if [[ $MC_VERSION_SOURCE == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
         case $ID in
             fedora|centos|suse)
-                MCPKG+="-$MCVERSION"
+                MC_PKG+="-$MC_VERSION"
                 ;;
             debian|ubuntu)
-                MCPKG+="=$MCVERSION"
+                MC_PKG+="=$MC_VERSION"
                 ;;
         esac
     fi
-    echo "Using MC version $MCVERSION determined by $MCVERSION_SOURCE"
-    [[ $MCVERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
-    debug "MVERSION: $MVERSION, MCVERSION: $MCVERSION, MCPKG: $MCPKG, MCRPM: $MCRPM"
+    echo "Using MC version $MC_VERSION determined by $MC_VERSION_SOURCE"
+    [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
+    debug "MVERSION: $MC_MVERSION, MC_VERSION: $MC_VERSION, MC_PKG: $MC_PKG, MC_RPM: $MC_RPM"
 }
 
 
@@ -632,7 +636,7 @@ installMCFromRepo() {
         --no-install-check \
         --allow-downgrades \
         --no-gpg-check \
-        "$MCPKG"; then
+        "$MC_PKG"; then
         err "Package install failed!"
         return 1
     fi
@@ -645,33 +649,33 @@ installMCFromRepo() {
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MCDEB="$OUTPUTDIR/SOURCES/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"
+    declare -g MC_DEB="$OUTPUTDIR/SOURCES/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"
 
-    debug "MCDEB=$MCDEB"
+    debug "MC_DEB=$MC_DEB"
 
     # If deb file already exists, skip download
-    if [[ -f $MCDEB ]]; then
-        echo "Using existing DEB: $MCDEB"
+    if [[ -f $MC_DEB ]]; then
+        echo "Using existing DEB: $MC_DEB"
         return 0
     fi
 
     if [[ -v BETAPASS ]] && 
-        echo "Checking beta repo for DEB package" && execute wget -q -O "$MCDEB" \
-            "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
+        echo "Checking beta repo for DEB package" && execute wget -q -O "$MC_DEB" \
+            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
-    elif echo "Checking latest repo for DEB package" && execute wget -q -O "$MCDEB" \
-            "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
+    elif echo "Checking latest repo for DEB package" && execute wget -q -O "$MC_DEB" \
+            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
-    elif echo "Checking test repo for DEB package" && execute wget -q -O "$MCDEB" \
-            "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb"; then
+    elif echo "Checking test repo for DEB package" && execute wget -q -O "$MC_DEB" \
+            "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"; then
                 echo "Found!"
     else
         err "Cannot find DEB file"
         exit 1
     fi
 
-    if [[ -f $MCDEB ]]; then
-        echo "Downloaded MC $MCVERSION DEB to $MCDEB"
+    if [[ -f $MC_DEB ]]; then
+        echo "Downloaded MC $MC_VERSION DEB to $MC_DEB"
     else
         err "Downloaded DEB file missing or corrupted"
         exit 1
@@ -689,14 +693,14 @@ buildRPM() {
     declare -a requires recommends
 
     # skip rebuilding the rpm if it already exists
-    if [[ -f $MCRPM ]]; then
-        echo "$MCRPM already exists. Skipping build step"
+    if [[ -f $MC_RPM ]]; then
+        echo "$MC_RPM already exists. Skipping build step"
         return 0
     fi
 
     # Load deb dependencies into array
-    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MCDEB" Depends)"
-    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$MCDEB" Recommends)"
+    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MC_DEB" Depends)"
+    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$MC_DEB" Recommends)"
 
     # Clean up formatting
     requires=("${requires[@]%%|*}")
@@ -785,12 +789,12 @@ buildRPM() {
 
     # Create spec file
     cat <<-EOF > "$OUTPUTDIR/SPECS/mediacenter.spec"
-		Name:    mediacenter$MVERSION
-		Version: $MCVERSION
+		Name:    mediacenter$MC_MVERSION
+		Version: $MC_VERSION
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb
+		Source0: http://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
@@ -801,7 +805,7 @@ buildRPM() {
 
 		Conflicts: MediaCenter
 
-		Provides: mediacenter$MVERSION
+		Provides: mediacenter$MC_MVERSION
 
 		License: Copyright 1998-2023, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
@@ -823,15 +827,15 @@ buildRPM() {
 		%postun -p /sbin/ldconfig
 
 		%files
-		%{_bindir}/mediacenter$MVERSION
+		%{_bindir}/mediacenter$MC_MVERSION
 		%{_libdir}/jriver
 		%{_datadir}
-		%exclude %{_datadir}/applications/media_center_packageinstaller_$MVERSION.desktop
+		%exclude %{_datadir}/applications/media_center_packageinstaller_$MC_MVERSION.desktop
 		/etc/security/limits.d/*
 	EOF
 
     # Run rpmbuild
-    echo "Building MC $MCVERSION RPM, this may take awhile"
+    echo "Building MC $MC_VERSION RPM, this may take awhile"
     rpmbuild_cmd=(
         rpmbuild 
             --define="%_topdir $OUTPUTDIR" 
@@ -839,13 +843,13 @@ buildRPM() {
             -bb
             "$OUTPUTDIR/SPECS/mediacenter.spec"
     )
-    if execute "${rpmbuild_cmd[@]}" && [[ -f $MCRPM ]] ; then
-        echo "Build successful. The RPM file is located at: $MCRPM"
+    if execute "${rpmbuild_cmd[@]}" && [[ -f $MC_RPM ]] ; then
+        echo "Build successful. The RPM file is located at: $MC_RPM"
     else
         err "Build failed"
         # For automation, let's remove the source DEB and reaquire it on next 
         # run after failure in case it is corrupted or buggy
-        [[ -f $MCDEB ]] && echo "Removing source DEB" && rm -f "$MCDEB"
+        [[ -f $MC_DEB ]] && echo "Removing source DEB" && rm -f "$MC_DEB"
         exit 1
     fi
 }
@@ -860,7 +864,7 @@ installMCDEB() {
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
-        execute ar x "$MCDEB"
+        execute ar x "$MC_DEB"
         execute tar xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
@@ -868,8 +872,8 @@ installMCDEB() {
         [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] &&
             sed -i 's/libva2/libva1/g' "control"
         execute tar -cJf "control.tar.xz" "control" "postinst"
-        declare -g MCDEB="${MCDEB/.deb/.compat.deb}"
-        execute ar rcs "$MCDEB" "debian-binary" "control.tar.xz" "data.tar.xz"
+        declare -g MC_DEB="${MC_DEB/.deb/.compat.deb}"
+        execute ar rcs "$MC_DEB" "debian-binary" "control.tar.xz" "data.tar.xz"
         popd &>/dev/null || return
         execute rm -rf "$extract_dir"
     fi
@@ -878,7 +882,7 @@ installMCDEB() {
         --no-install-check \
         --no-gpg-check \
         --allow-downgrades \
-        "$MCDEB"
+        "$MC_DEB"
 }
 
 
@@ -891,7 +895,7 @@ installMCRPM() {
     # Install mesa-va-freeworld separately from the RPM for dnf swap
     installMesa
     
-    installPackage --no-install-check --no-gpg-check --allow-downgrades "$MCRPM"
+    installPackage --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
 
@@ -907,7 +911,7 @@ installMCGENERIC() {
 
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
-    execute ar x "$MCDEB"
+    execute ar x "$MC_DEB"
     execute tar xJf "control.tar.xz"
     echo "You must install the following dependencies manually:"
     grep -i "Depends:" control
@@ -935,8 +939,8 @@ installMCARCH() {
     [[ -d $OUTPUTDIR/PKGBUILD ]] || execute mkdir -p "$OUTPUTDIR/PKGBUILD"
 
     cat <<-EOF > "$OUTPUTDIR/PKGBUILD/mediacenter.pkgbuild"
-		pkgname=mediacenter$MVERSION
-		pkgver=$MCVERSION
+		pkgname=mediacenter$MC_MVERSION
+		pkgver=$MC_VERSION
 		pkgrel=1
 		pkgdesc="The Most Comprehensive Media Software"
 		arch=('x86_64')
@@ -952,7 +956,7 @@ installMCARCH() {
 			'vorbis-tools: ogg vorbis support' 
 			'musepack-tools: musepack support'
 		)
-		source=("http://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MCVERSION-${USER_ARCH:-$ARCH}.deb")
+		source=("http://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb")
 
 		package() {
 			cd "\$srcdir"
@@ -1003,9 +1007,9 @@ runCreaterepo() {
     fi
 
     # Copy built rpms to webroot
-    if ! ( execute sudo cp -nf "$MCRPM" "$CREATEREPO_WEBROOT" && 
+    if ! ( execute sudo cp -nf "$MC_RPM" "$CREATEREPO_WEBROOT" && 
     execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT" ); then
-        err "Could not copy $MCRPM to $CREATEREPO_WEBROOT"
+        err "Could not copy $MC_RPM to $CREATEREPO_WEBROOT"
         return 1
     fi
 
@@ -1025,12 +1029,27 @@ runCreaterepo() {
 
 
 #######################################
+# Symlink MC stub
+#######################################
+symlinkStub() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    if [[ -f $MC_STUB && ! -e $MC_STUB_TARGET ]]; then
+        if ! execute sudo ln -fs "$MC_STUB" "$MC_STUB_TARGET"; then
+            err "Symlinking $MC_STUB to $MC_STUB_TARGET failed"
+            return 1
+        fi
+    fi
+}
+
+
+#######################################
 # Symlink certificates if they do not exist in default location
 #######################################
 symlinkCerts() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare mc_cert_link="/usr/lib/jriver/MC$MVERSION/ca-certificates.crt"
+    declare mc_cert_link="$MC_ROOT/ca-certificates.crt"
     declare target_cert f
     declare -a source_certs=(
         "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" 
@@ -1041,7 +1060,7 @@ symlinkCerts() {
 
     for f in "${source_certs[@]}"; do
         if [[ -f $f ]]; then
-            if ! execute ln -fs "$f" "$mc_cert_link"; then
+            if ! execute sudo ln -fs "$f" "$mc_cert_link"; then
                 err "Symlinking certificate failed"
                 return 1
             fi
@@ -1085,7 +1104,7 @@ restoreLicense() {
 
         for f in "$RESTOREFILE" "$newest"; do
             if [[ -f $f ]]; then
-                if execute "mediacenter$MVERSION" "/RestoreFromFile" "$f"; then
+                if execute "mediacenter$MC_MVERSION" "/RestoreFromFile" "$f"; then
                     return 0
                 fi
             fi
@@ -1273,7 +1292,7 @@ service_jriver-mediacenter() {
 
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
-		Description=JRiver Media Center $MVERSION
+		Description=JRiver Media Center $MC_MVERSION
 		After=$GRAPHICAL_TARGET
 
 		[Service]
@@ -1282,10 +1301,11 @@ service_jriver-mediacenter() {
 		Type=simple
 		Environment=DISPLAY=$DISPLAY
 		Environment=XAUTHORITY=$XAUTHORITY
-		ExecStart=/usr/bin/mediacenter$MVERSION $*
+		ExecStart=/usr/bin/mediacenter$MC_MVERSION $*
+		ExecStop=$MC_STUB_TARGET /MCC 20007
+		KillMode=none
 		Restart=always
 		RestartSec=10
-		KillSignal=SIGTERM
 		TimeoutStopSec=30
 
 		[Install]
@@ -1332,7 +1352,7 @@ service_jriver-xvnc() {
         -geometry 1440x900 
         -alwaysshared
         -autokill
-        -xstartup "/usr/bin/mediacenter$MVERSION"
+        -xstartup "/usr/bin/mediacenter$MC_MVERSION"
     )
 
     if (( NOVNCAUTH )); then
@@ -1523,9 +1543,9 @@ service_jriver-createrepo() {
 #     add-pkg ca-certificates gnupg &&
 #     add-pkg --virtual build-dependencies wget &&
 #     wget -qO- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | tee /etc/apt/trusted.gpg.d/jriver.asc &&
-#     wget -O /etc/apt/sources.list.d/mediacenter${MVERSION}.list http://dist.jriver.com/latest/mediacenter/mediacenter${MVERSION}.list &&
+#     wget -O /etc/apt/sources.list.d/mediacenter${MC_MVERSION}.list http://dist.jriver.com/latest/mediacenter/mediacenter${MC_MVERSION}.list &&
 #     apt update &&
-#     add-pkg mediacenter${MVERSION} &&
+#     add-pkg mediacenter${MC_MVERSION} &&
 #     del-pkg build-dependencies
 #     "
 
@@ -1534,14 +1554,14 @@ service_jriver-createrepo() {
 #         --label maintainer="$MAINTAINER" \
 #         --env TZ="$TZ" \
 #         --workingdir /app \
-#         --cmd "mediacenter$MVERSION"
+#         --cmd "mediacenter$MC_MVERSION"
 
 
 #     # EXPOSE 5800 5900 52100 52101 52199 1900/udp
 
 #     podman_create_cmd=(
 #         podman create 
-#         --name "mediacenter$MVERSION"
+#         --name "mediacenter$MC_MVERSION"
 #     )
 
 #     podman_create_cmd+=(-v "$HOME/.jriver:/root/.jriver")
@@ -1570,11 +1590,11 @@ service_jriver-createrepo() {
 # 		wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - &>/dev/null
 # 	EOF
 
-#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MVERSION.list"
+#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MC_MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MC_MVERSION.list"
 
 #     brc apt update -y -q0
 
-#     brc add-pkg "mediacenter$MVERSION"
+#     brc add-pkg "mediacenter$MC_MVERSION"
 
 #     brc del-pkg .build-deps
 # }
@@ -1587,10 +1607,9 @@ disableCoW() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare dir
-    declare mc_system_path="/usr/lib/jriver"
     declare mc_user_path="$HOME/.jriver"
 
-    for dir in "$mc_system_path" "$mc_user_path"; do
+    for dir in "$MC_ROOT" "$mc_user_path"; do
         [[ -d $dir ]] || execute mkdir -p "$dir"
         if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
         ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C &&
@@ -1608,8 +1627,8 @@ migrateLibrary() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare mc_user_path="$HOME/.jriver"
-    declare current_config_path="$mc_user_path/Media Center $MVERSION"
-    declare previous_config_path="$mc_user_path/Media Center $(( MVERSION - 1 ))"
+    declare current_config_path="$mc_user_path/Media Center $MC_MVERSION"
+    declare previous_config_path="$mc_user_path/Media Center $(( MC_MVERSION - 1 ))"
 
     if [[ ! -d $current_config_path ]] &&
     [[ -d $previous_config_path ]] &&
@@ -1672,11 +1691,11 @@ uninstall() {
     fi
 
     echo "Uninstalling JRiver Media Center package"
-    if "${PKG_REMOVE[@]}" "$MCPKG"; then
+    if "${PKG_REMOVE[@]}" "$MC_PKG"; then
         echo "JRiver Media Center has been completely uninstalled"
         echo "To remove your MC library: rm -rf $HOME/.jriver"
     elif [[ $? -eq 100 ]]; then
-        err "JRiver Media Center package '$MCPKG' is not present and was not uninstalled"
+        err "JRiver Media Center package '$MC_PKG' is not present and was not uninstalled"
     else
         err "Could not remove Media Center package"
     fi
@@ -1688,6 +1707,12 @@ uninstall() {
         done < "$SCRIPTDIR/.uninstall"
         mv "$SCRIPTDIR/.uninstall" "$SCRIPTDIR/.uninstall.bk"
     fi
+
+    if [[ -e $MC_STUB_TARGET ]]; then
+        echo "Removing $MC_STUB_TARGET"
+        execute sudo rm -f "$MC_STUB_TARGET"
+    fi
+    return 0
 }
 
 
