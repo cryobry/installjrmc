@@ -1285,7 +1285,7 @@ service_jriver-mediacenter() {
 		ExecStart=/usr/bin/mediacenter$MVERSION $*
 		Restart=always
 		RestartSec=10
-		KillSignal=SIGHUP
+		KillSignal=SIGTERM
 		TimeoutStopSec=30
 
 		[Install]
