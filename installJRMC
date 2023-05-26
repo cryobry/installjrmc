@@ -19,7 +19,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,80.0.html" # MC31
 declare -g DEBIANBASE="bullseye"
-declare -g MC_VERSION_HARDCODE="31.0.12"
+declare -g MC_VERSION_HARDCODE="31.0.13"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -40,7 +40,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "31.0.12" (default: latest version)
+		        Specify the MC version, ex. "31.0.13" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --outputdir PATH
@@ -404,26 +404,29 @@ setMCVersion() {
     [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         MC_VERSION_SOURCE="user input"
     # Containerized package manager
-    elif installPackage --silent buildah &&
-    hash buildah &>/dev/null &&
-    cnt=$(buildah from --quiet debian:$DEBIANBASE-slim) &>/dev/null &&
-    buildah run "$cnt" -- bash -c \
-        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
-    buildah run "$cnt" -- bash  -c \
-        "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
-    MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
-    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MC_VERSION_SOURCE="containerized package manager"
-        buildah rm "$cnt" &>/dev/null
-    # Webscrape
-    elif installPackage wget && MC_VERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
-    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MC_VERSION_SOURCE="webscrape"
-    # Hardcoded
     else
-        declare -g MC_VERSION="$MC_VERSION_HARDCODE"
-        MC_VERSION_SOURCE="hardcoded or MC_VERSION env"
-        err "Warning! Using hardcoded version number"
+        echo "Determining latest MC version"
+        if installPackage --silent buildah &&
+        hash buildah &>/dev/null &&
+        cnt=$(buildah from --quiet debian:$DEBIANBASE-slim) &>/dev/null &&
+        buildah run "$cnt" -- bash -c \
+            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
+        buildah run "$cnt" -- bash  -c \
+            "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
+        MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
+        [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+            MC_VERSION_SOURCE="containerized package manager"
+            execute buildah rm "$cnt"
+        # Webscrape
+        elif installPackage wget && MC_VERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
+        [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+            MC_VERSION_SOURCE="webscrape"
+        # Hardcoded
+        else
+            declare -g MC_VERSION="$MC_VERSION_HARDCODE"
+            MC_VERSION_SOURCE="hardcoded or MC_VERSION env"
+            err "Warning! Using hardcoded version number"
+        fi
     fi
     
     MC_MVERSION="${MC_VERSION%%.*}"
@@ -1302,8 +1305,8 @@ service_jriver-mediacenter() {
 		Environment=DISPLAY=$DISPLAY
 		Environment=XAUTHORITY=$XAUTHORITY
 		ExecStart=/usr/bin/mediacenter$MC_MVERSION $*
-		ExecStop=$MC_STUB_TARGET /MCC 20007
-		KillMode=none
+		KillMode=process
+		KillSignal=SIGHUP
 		Restart=always
 		RestartSec=10
 		TimeoutStopSec=30
@@ -1780,14 +1783,14 @@ main() {
     if (( REPO_INSTALL_SWITCH )); then
         echo "Installing JRiver Media Center from remote repository"
         if installMCFromRepo; then
-            echo "JRiver Media Center installed successfully from repo"
+            echo "JRiver Media Center installed successfully from remote repository"
             symlinkCerts
             migrateLibrary
             restoreLicense
             openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
             disableCoW
         else
-            err "JRiver Media Center installation from repo failed"
+            err "JRiver Media Center installation from remote repository failed"
             return 1
         fi
     fi
