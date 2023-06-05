@@ -432,7 +432,7 @@ setMCVersion() {
     MC_MVERSION="${MC_VERSION%%.*}"
     MC_PKG="mediacenter$MC_MVERSION"
     MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
-    MC_ROOT="/usr/lib/jriver/MC$MC_MVERSION"
+    MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
     MC_STUB="$MC_ROOT/mc$MC_MVERSION"
     MC_STUB_TARGET="/usr/bin/mc$MC_MVERSION"
 
