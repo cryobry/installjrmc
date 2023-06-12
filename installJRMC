@@ -612,7 +612,7 @@ installMCFromRepo() {
             declare repo_dir="/etc/apt/sources.list.d"
             [[ -d $repo_dir ]] || execute sudo mkdir -p "$repo_dir"
             # Remove existing MC repositories
-            sudo rm -rf "$repo_dir"/mediacenter*.list
+            execute sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
 				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main
@@ -1303,7 +1303,6 @@ service_jriver-mediacenter() {
 		$DISPLAY_STRING
 		Type=simple
 		Environment=DISPLAY=$DISPLAY
-		Environment=XAUTHORITY=$XAUTHORITY
 		ExecStart=/usr/bin/mediacenter$MC_MVERSION $*
 		KillMode=none
 		ExecStop=$MC_STUB_TARGET /MCC 20007
