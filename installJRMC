@@ -1259,8 +1259,7 @@ setServiceVars() {
     # TODO Ubuntu needs these in the service file, fedora (and others?) do not
     case $ID in
         ubuntu|debian)
-            DISPLAY_STRING="Environment=DISPLAY=$DISPLAY"
-            DISPLAY_STRING+=$'\n'"Environment=XAUTHORITY=$XAUTHORITY"
+            DISPLAY_STRING="Environment=XAUTHORITY=$XAUTHORITY"
             ;;
         *)
             DISPLAY_STRING=""
@@ -1299,9 +1298,9 @@ service_jriver-mediacenter() {
 		After=$GRAPHICAL_TARGET
 
 		[Service]
+		Type=simple
 		$USER_STRING
 		$DISPLAY_STRING
-		Type=simple
 		Environment=DISPLAY=$DISPLAY
 		ExecStart=/usr/bin/mediacenter$MC_MVERSION $*
 		KillMode=none
