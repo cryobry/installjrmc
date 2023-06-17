@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0-rc9"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,80.0.html" # MC31
 declare -g DEBIANBASE="bullseye"
 declare -g MC_VERSION_HARDCODE="31.0.23" # Do find all replace
