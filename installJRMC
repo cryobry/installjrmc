@@ -745,6 +745,7 @@ buildRPM() {
             requires=("${requires[@]/libharfbuzz0b/harfbuzz}")
             requires=("${requires[@]/libgbm1/mesa-libgbm}")
             requires=("${requires[@]/libva2/libva}")
+            requires=("${requires[@]/libva-drm2/libva}")
             requires=("${requires[@]/libepoxy0/libepoxy}")
             requires=("${requires[@]/liblcms2-2/lcms2}")
             requires=("${requires[@]/libvulkan1/vulkan-loader}")
@@ -838,7 +839,7 @@ buildRPM() {
 	EOF
 
     # Run rpmbuild
-    echo "Building MC $MC_VERSION RPM, this may take awhile"
+    echo "Building MC $MC_VERSION RPM, this may take some time"
     rpmbuild_cmd=(
         rpmbuild 
             --define="%_topdir $OUTPUTDIR" 
