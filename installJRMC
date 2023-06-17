@@ -839,7 +839,7 @@ buildRPM() {
 	EOF
 
     # Run rpmbuild
-    echo "Building MC $MC_VERSION RPM, this may take awhile"
+    echo "Building MC $MC_VERSION RPM, this may take some time"
     rpmbuild_cmd=(
         rpmbuild 
             --define="%_topdir $OUTPUTDIR" 
