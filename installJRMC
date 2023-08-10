@@ -170,7 +170,7 @@ init() {
         rhel)
             ID="centos"
             ;;
-        linuxmint|neon|*ubuntu*)
+        linuxmint|neon|zorin|*ubuntu*)
             ID="ubuntu"
             ;;
         *suse*)
@@ -874,7 +874,8 @@ installMCDEB() {
         sed -i 's/ ([^)]*)//g' "control"
         sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
         [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] &&
-            sed -i 's/libva2/libva1/g' "control"
+        ! grep -q zorin /etc/os-release && # TODO ugly ZorinOS workaround
+        sed -i 's/libva2/libva1/g' "control"
         execute tar -cJf "control.tar.xz" "control" "postinst"
         declare -g MC_DEB="${MC_DEB/.deb/.compat.deb}"
         execute ar rcs "$MC_DEB" "debian-binary" "control.tar.xz" "data.tar.xz"
