@@ -868,6 +868,7 @@ installMCDEB() {
     if (( COMPAT_SWITCH )); then
         declare extract_dir && extract_dir="$(mktemp -d)"
         pushd "$extract_dir" &>/dev/null || return
+        hash ar &>/dev/null || installPackage binutils
         execute ar x "$MC_DEB"
         execute tar xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
