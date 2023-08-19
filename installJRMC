@@ -133,6 +133,8 @@ init() {
     echo "Starting installJRMC"
     (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
 
+    (( EUID == 0 )) && err "Running as root user"
+
     if [[ -e /etc/os-release ]]; then
         source "/etc/os-release"
     else
