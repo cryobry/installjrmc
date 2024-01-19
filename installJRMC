@@ -835,6 +835,7 @@ buildRPM() {
 
 		%files
 		%{_bindir}/mediacenter$MC_MVERSION
+        %{_bindir}/mc$MC_MVERSION
 		%{_libdir}/jriver
 		%{_datadir}
 		%exclude %{_datadir}/applications/media_center_packageinstaller_$MC_MVERSION.desktop
