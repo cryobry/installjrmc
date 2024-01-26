@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
 declare -g DEBIANBASE="bullseye"
 declare -g MC_VERSION_HARDCODE="32.0.6" # Do find all replace
@@ -753,7 +753,7 @@ buildRPM() {
             requires=("${requires[@]/libvulkan1/vulkan-loader}")
             requires=("${requires[@]/libepoxy0/libepoxy}")
             requires=("${requires[@]/python/python3}")
-            requires=("${requires[@]/libwebkit2gtk/webkit2gtk4.0}")
+            requires=("${requires[@]/libwebkit2gtk*/webkit2gtk4.0}")
             recommends+=(mesa-va-drivers-freeworld)
             ;;
         suse)
