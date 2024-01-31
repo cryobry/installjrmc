@@ -772,8 +772,8 @@ buildRPM() {
             requires=("${requires[@]/libnspr4/mozilla-nspr}")
             requires=("${requires[@]/libfribidi0/fribidi}")
             requires=("${requires[@]/libfontconfig1/fontconfig}")
-            requires=("${requires[@]/libfreetype6*/freetype}") # Remove minimum version specifier
             requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
+            requires=("${requires[@]/libwebkit2gtk*/libwebkit2gtk-4_0-37}")
             for i in "${!requires[@]}"; do
                 [[ ${requires[$i]} == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
             done
