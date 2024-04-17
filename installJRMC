@@ -2,7 +2,7 @@
 # Install JRiver Media Center and associated services
 # See installJRMC --help or printHelp() below
 #
-# Copyright (c) 2021-2023 Bryan C. Roessler
+# Copyright (c) 2021-2024 Bryan C. Roessler
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
 #
@@ -169,7 +169,7 @@ init() {
                 RPM_MGR="yum"
             fi
             ;;
-        rhel)
+        rhel|almalinux)
             ID="centos"
             ;;
         linuxmint|neon|zorin|*ubuntu*)
@@ -814,7 +814,7 @@ buildRPM() {
 
 		Provides: mediacenter$MC_MVERSION
 
-		License: Copyright 1998-2023, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
+		License: Copyright 1998-2024, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
 
 		%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
@@ -835,7 +835,7 @@ buildRPM() {
 
 		%files
 		%{_bindir}/mediacenter$MC_MVERSION
-        %{_bindir}/mc$MC_MVERSION
+		%{_bindir}/mc$MC_MVERSION
 		%{_libdir}/jriver
 		%{_datadir}
 		%exclude %{_datadir}/applications/media_center_packageinstaller_$MC_MVERSION.desktop
