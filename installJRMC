@@ -175,8 +175,8 @@ init() {
         linuxmint|neon|zorin|*ubuntu*)
             ID="ubuntu"
             if [[ ${VERSION_ID%.*} -ge 24 ]]; then
-                debug "Switching to bookworm for *buntu 24"
-                declare -g DEBIANBASE='bookworm'
+                debug "Switching to noble repo for *buntu 24"
+                declare -g DEBIANBASE='noble'
             fi
             ;;
         *suse*)
