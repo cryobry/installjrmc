@@ -286,7 +286,7 @@ parseInput() {
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,arch:,base:,compat,"
-    long_opts="restorefile:,betapass:,"
+    long_opts+="restorefile:,betapass:,"
     long_opts+="service-type:,service:,services:,"
     long_opts+="version,debug,verbose,help,uninstall,tests,yes,auto,"
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
