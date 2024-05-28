@@ -422,6 +422,7 @@ setMCVersion() {
     # Containerized package manager
     elif installPackage --silent buildah &&
     cnt=$(buildah from --quiet debian:stable-slim) &>/dev/null &&
+    debug "$cnt" &&
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
     buildah run "$cnt" -- bash  -c \
