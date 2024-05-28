@@ -18,7 +18,7 @@ shopt -s extglob
 
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
-declare -g BASE_REPO="bullseye"
+declare -g MC_REPO="bullseye"
 declare -g MC_VERSION_HARDCODE="32.0.45" # Do find all replace
 
 printHelp() {
@@ -43,8 +43,8 @@ printHelp() {
 		        Specify the MC version, ex. "$MC_VERSION_HARDCODE" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
-		    --base BASE_REPO
-		        Specify the MC base repo, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
+		    --mcrepo REPO
+		        Specify the MC repository, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
 		    --outputdir PATH
 		        Generate rpmbuild output in this directory (default: ./output)
 		    --restorefile RESTOREFILE
@@ -178,7 +178,7 @@ init() {
             ID="ubuntu"
             if [[ ${VERSION_ID%.*} -ge 24 ]]; then
                 debug "Switching to noble repo for *buntu 24"
-                declare -g BASE_REPO='noble'
+                declare -g MC_REPO='noble'
             fi
             ;;
         *suse*)
@@ -285,7 +285,7 @@ parseInput() {
         LOCAL_INSTALL_SWITCH=1
     fi
 
-    long_opts="install:,build::,outputdir:,mcversion:,arch:,base:,compat,"
+    long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
     long_opts+="restorefile:,betapass:,"
     long_opts+="service-type:,service:,services:,"
     long_opts+="version,debug,verbose,help,uninstall,tests,yes,auto,"
@@ -327,8 +327,8 @@ parseInput() {
                 --arch)
                     shift && USER_ARCH="$1"
                     ;;
-                --base)
-                    shift && declare -g BASE_REPO="$1"
+                --mcrepo)
+                    shift && declare -g MC_REPO="$1"
                     ;;
                 --restorefile)
                     shift && RESTOREFILE="$1"
@@ -402,7 +402,7 @@ parseInput() {
 
 #######################################
 # Uses several methods to determine the latest JRiver MC version
-# TODO but how to determine build distro `$BASE_REPO=bullseye`?
+# TODO but how to determine build distro `$MC_REPO=bullseye`?
 #######################################
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
@@ -420,9 +420,9 @@ setMCVersion() {
         echo "Determining latest MC version"
         if installPackage --silent buildah &&
         hash buildah &>/dev/null &&
-        cnt=$(buildah from --quiet debian:"${BASE_REPO/noble/bullseye}"-slim) &>/dev/null &&
+        cnt=$(buildah from --quiet debian:"${MC_REPO/noble/bullseye}"-slim) &>/dev/null &&
         buildah run "$cnt" -- bash -c \
-            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
+            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
         buildah run "$cnt" -- bash  -c \
             "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
         MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
@@ -627,7 +627,7 @@ installMCFromRepo() {
             execute sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
-				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $BASE_REPO main
+				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main
 			EOF"
             wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
                 sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
