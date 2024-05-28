@@ -19,6 +19,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
 declare -g MC_VERSION="32.0.45" # Do find all replace
+declare -g MC_REPO="bullseye"
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -411,7 +412,7 @@ parseInput() {
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT MC_REPO
+    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT
     declare -g MC_PKG MC_RPM MC_STUB MC_STUB_TARGET
     declare cnt
 
@@ -442,22 +443,21 @@ setMCVersion() {
         err "Warning! Using hardcoded version number"
     fi
     
-    # Set major vresion var
+    # Set major version var
     MC_MVERSION="${MC_VERSION%%.*}"
 
-    # Set the appropriate MC repo to use based on the major version number
+    # Set legacy MC repos based on the major version number
     # Users can override with --mcrepo
-    case $MC_MVERSION in
-        2[0-6])
-            MC_REPO="${USER_MC_REPO:-jessie}"
-            ;;
-        2[7-9]|30)
-            MC_REPO="${USER_MC_REPO:-buster}"
-            ;;
-        *)
-            MC_REPO="${USER_MC_REPO:-bullseye}"
-            ;;
-    esac
+    if [[ -z $USER_MC_REPO ]]; then
+        case $MC_MVERSION in
+            2[0-6])
+                MC_REPO="jessie"
+                ;;
+            2[7-9]|30)
+                MC_REPO="buster"
+                ;;
+        esac
+    fi
 
     MC_PKG="mediacenter$MC_MVERSION"
     MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
