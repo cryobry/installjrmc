@@ -16,9 +16,8 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0.3"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
-declare -g MC_REPO="bullseye"
 declare -g MC_VERSION_HARDCODE="32.0.45" # Do find all replace
 
 printHelp() {
@@ -178,7 +177,7 @@ init() {
             ID="ubuntu"
             if [[ ${VERSION_ID%.*} -ge 24 ]]; then
                 debug "Switching to noble repo for *buntu 24"
-                declare -g MC_REPO='noble'
+                declare -g USER_MC_REPO='noble' # Pretend to be user input
             fi
             ;;
         *suse*)
@@ -328,7 +327,7 @@ parseInput() {
                     shift && USER_ARCH="$1"
                     ;;
                 --mcrepo)
-                    shift && declare -g MC_REPO="$1"
+                    shift && declare -g USER_MC_REPO="$1"
                     ;;
                 --restorefile)
                     shift && RESTOREFILE="$1"
@@ -407,7 +406,7 @@ parseInput() {
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT 
+    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT MC_REPO
     declare -g MC_PKG MC_RPM MC_STUB MC_STUB_TARGET
     declare cnt
 
@@ -420,7 +419,7 @@ setMCVersion() {
         echo "Determining latest MC version"
         if installPackage --silent buildah &&
         hash buildah &>/dev/null &&
-        cnt=$(buildah from --quiet debian:"${MC_REPO/noble/bullseye}"-slim) &>/dev/null &&
+        cnt=$(buildah from --quiet debian:stable-slim) &>/dev/null &&
         buildah run "$cnt" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
         buildah run "$cnt" -- bash  -c \
@@ -442,6 +441,21 @@ setMCVersion() {
     fi
     
     MC_MVERSION="${MC_VERSION%%.*}"
+
+    # Set the appropriate MC repo to use based on the major version number
+    # Users can override with --mcrepo
+    case $MC_MVERSION in
+        2[0-6])
+            MC_REPO="${USER_MC_REPO:-jessie}"
+            ;;
+        2[7-9]|30)
+            MC_REPO="${USER_MC_REPO:-buster}"
+            ;;
+        *)
+            MC_REPO="${USER_MC_REPO:-bullseye}"
+            ;;
+    esac
+
     MC_PKG="mediacenter$MC_MVERSION"
     MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
     MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
@@ -461,7 +475,7 @@ setMCVersion() {
     fi
     echo "Using MC version $MC_VERSION determined by $MC_VERSION_SOURCE"
     [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
-    debug "MVERSION: $MC_MVERSION, MC_VERSION: $MC_VERSION, MC_PKG: $MC_PKG, MC_RPM: $MC_RPM"
+    debug "MC_VERSION=$MC_VERSION, MC_REPO=$MC_REPO, MC_PKG=$MC_PKG, MC_RPM=$MC_RPM"
 }
 
 
