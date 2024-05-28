@@ -39,7 +39,7 @@ printHelp() {
 		    --compat
 		        Build/install MC locally without minimum dependency version requirements
 		    --mcversion VERSION
-		        Specify the MC version, ex. "$MC_VERSION_HARDCODE" (default: latest version)
+		        Specify the MC version, ex. "$MC_VERSION" (default: latest version)
 		    --arch VERSION
 		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		    --mcrepo REPO
@@ -218,35 +218,35 @@ init() {
             PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
             PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
             PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL(){ installMCRPM; }
+            PKG_INSTALL_LOCAL(){ installMCRpm; }
             ;;
         debian|ubuntu)
             PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
             PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
             PKG_UPDATE=(execute sudo apt-get update -y -q0)
             PKG_QUERY=(dpkg -s)
-            PKG_INSTALL_LOCAL(){ installMCDEB; }
+            PKG_INSTALL_LOCAL(){ installMCDeb; }
             ;;
         suse)
             PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
             PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
             PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
             PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL(){ installMCRPM; }
+            PKG_INSTALL_LOCAL(){ installMCRpm; }
             ;;
         arch)
             PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
             PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
             PKG_UPDATE=(execute sudo pacman -Syy)
             PKG_QUERY=(sudo pacman -Qs)
-            PKG_INSTALL_LOCAL(){ installMCARCH; }
+            PKG_INSTALL_LOCAL(){ installMCArch; }
             ;;
         unknown)
             PKG_INSTALL=(:)
             PKG_REMOVE=(:)
             PKG_UPDATE=(:)
             PKG_QUERY=(:)
-            PKG_INSTALL_LOCAL(){ installMCGENERIC; }
+            PKG_INSTALL_LOCAL(){ installMCGeneric; }
     esac
 }
 
@@ -411,7 +411,8 @@ parseInput() {
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_VERSION_SOURCE
+    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT MC_REPO
+    declare -g MC_PKG MC_RPM MC_STUB MC_STUB_TARGET
     declare cnt
 
     # User input
@@ -891,7 +892,7 @@ buildRPM() {
 #######################################
 # Installs Media Center DEB package and optional compatability fixes
 #######################################
-installMCDEB() {
+installMCDeb() {
     debug "Running: ${FUNCNAME[0]}"    
 
     if (( COMPAT_SWITCH )); then
@@ -924,7 +925,7 @@ installMCDEB() {
 #######################################
 # Installs Media Center RPM package
 #######################################
-installMCRPM() {
+installMCRpm() {
     debug "Running: ${FUNCNAME[0]}"
 
     # Install mesa-va-freeworld separately from the RPM for dnf swap
@@ -937,7 +938,7 @@ installMCRPM() {
 #######################################
 # Installs Media Center manually
 #######################################
-installMCGENERIC() {
+installMCGeneric() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -a raw_files
@@ -968,7 +969,7 @@ installMCGENERIC() {
 #######################################
 # Installs local Media Center PKGBUILD
 #######################################
-installMCARCH() {
+installMCArch() {
     debug "Running: ${FUNCNAME[0]}"
 
     [[ -d $OUTPUTDIR/PKGBUILD ]] || execute mkdir -p "$OUTPUTDIR/PKGBUILD"
