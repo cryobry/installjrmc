@@ -59,36 +59,36 @@ $ installJRMC --help
     Uninstall JRiver MC, service files, and firewall rules (does not remove library or media files)
 ```
 
-## Services
+## `--service=`
 
 ```text
-jriver-mediaserver (--service-type=user)
+jriver-mediaserver [--service-type=user]
     Enable and start a mediaserver systemd service (requires an existing X server)
-jriver-mediacenter (user)
+jriver-mediacenter [--service-type=user]
     Enable and start a mediacenter systemd service (requires an existing X server)
-jriver-x11vnc (user)
+jriver-x11vnc [--service-type=user]
     Enable and start x11vnc for the local desktop (requires an existing X server, does NOT support Wayland)
   --vncpass and --display are also valid options (see below)
-jriver-xvnc (system)
+jriver-xvnc [--service-type=system]
     Enable and start a new Xvnc session running JRiver Media Center
   --vncpass PASSWORD
     Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
   --display DISPLAY
     Manually specify display to use for x11vnc/Xvnc (ex. ':1')
-jriver-createrepo (system)
+jriver-createrepo [--service-type=system]
     Install hourly service to build latest MC RPM and run createrepo
     By default installs as root service to handle www permissions more gracefully
 ```
 
-### `--service-type`
+### `--service-type=`
 
-By default, MC services use a sane `--service-type` listed next to the service name in the [Services](#services) description. User services can be manipulated as an unprivileged user, for example: `systemctl --user stop jriver-mediacenter` and begin at user login. System services are manipulable as root, for example: `sudo systemctl stop jriver-servicename@username.service` and begin at system boot. Note that it is also possible to run all services of a particular user at boot using [`sudo loginctl enable-linger username`](https://www.freedesktop.org/software/systemd/man/loginctl.html).
+By default, MC services use a sane `--service-type` listed next to the service name in the [`--service=`](#--service) section. User services begin at user login and are managed by the unprivileged user, for example: `systemctl --user stop jriver-mediacenter`. System services begin at boot and are managed by root, for example: `sudo systemctl stop jriver-servicename@username.service`. It is possible to run all services of a particular user at boot using [`sudo loginctl enable-linger username`](https://www.freedesktop.org/software/systemd/man/loginctl.html).
 
 Multiple services (but not `--service-types`) can be installed at one time using multiple `--service` blocks: `installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter`
 
 ### `jriver-x11vnc` versus `jriver-xvnc`
 
-[jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [jriver-xvnc](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display.
+[jriver-x11vnc](http://www.karlrunge.com/x11vnc/) shares the existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [jriver-xvnc](https://tigervnc.org/doc/Xvnc.html) creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display.
 
 ## Containers
 
