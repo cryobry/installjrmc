@@ -26,8 +26,8 @@ $ installJRMC --help
     Build or install a specific MC version, ex. "32.0.45" (default: latest version)
 --arch ARCH
     Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
---base DEBIAN_BASE
-    Specify the MC debian base, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
+--base BASE_REPO
+    Specify the MC base repo, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
 --outputdir PATH
     Generate rpmbuild output in this PATH (default: ./output)
 --restorefile RESTOREFILE
