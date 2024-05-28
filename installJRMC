@@ -420,7 +420,7 @@ setMCVersion() {
         echo "Determining latest MC version"
         if installPackage --silent buildah &&
         hash buildah &>/dev/null &&
-        cnt=$(buildah from --quiet debian:$DEBIANBASE-slim) &>/dev/null &&
+        cnt=$(buildah from --quiet debian:"$DEBIANBASE"-slim) &>/dev/null &&
         buildah run "$cnt" -- bash -c \
             "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $DEBIANBASE main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
         buildah run "$cnt" -- bash  -c \
