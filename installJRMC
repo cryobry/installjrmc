@@ -18,7 +18,7 @@ shopt -s extglob
 
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
-declare -g MC_VERSION_HARDCODE="32.0.45" # Do find all replace
+declare -g MC_VERSION="32.0.45" # Do find all replace
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -259,7 +259,7 @@ parseInput() {
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
     declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
-    declare -g YES_SWITCH USER_VERSION_SWITCH USER_ARCH
+    declare -g YES_SWITCH USER_MC_VERSION USER_ARCH
     declare -g RESTOREFILE BETAPASS SERVICE_TYPE
     declare -g VNCPASS USER_DISPLAY
     declare -ga SERVICES CONTAINERS
@@ -320,8 +320,13 @@ parseInput() {
                     ;;
                 --mcversion)
                     shift
-                    MC_VERSION="$1"
-                    USER_VERSION_SWITCH=1
+                    if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+                        USER_MC_VERSION="$1"
+                    else
+                        err "Bad --mcversion"
+                        printHelp
+                        exit 1
+                    fi
                     ;;
                 --arch)
                     shift && USER_ARCH="$1"
@@ -406,40 +411,36 @@ parseInput() {
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT MC_REPO
-    declare -g MC_PKG MC_RPM MC_STUB MC_STUB_TARGET
+    declare -g MC_VERSION_SOURCE
     declare cnt
 
     # User input
-    if (( USER_VERSION_SWITCH )) &&
-    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    if [[ -n $USER_MC_VERSION ]]; then
         MC_VERSION_SOURCE="user input"
+        MC_VERSION="$USER_MC_VERSION"
     # Containerized package manager
+    elif installPackage --silent buildah &&
+    cnt=$(buildah from --quiet debian:stable-slim) &>/dev/null &&
+    buildah run "$cnt" -- bash -c \
+        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
+    buildah run "$cnt" -- bash  -c \
+        "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
+    MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
+    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        MC_VERSION_SOURCE="containerized package manager"
+        execute buildah rm "$cnt"
+    # Webscrape
+    elif installPackage --silent wget &&
+    MC_VERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
+    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+        MC_VERSION_SOURCE="webscrape"
+    # Hardcoded
     else
-        echo "Determining latest MC version"
-        if installPackage --silent buildah &&
-        hash buildah &>/dev/null &&
-        cnt=$(buildah from debian:stable-slim) &&
-        buildah run "$cnt" -- bash -c \
-            "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
-        buildah run "$cnt" -- bash  -c \
-            "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
-        MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
-        [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-            MC_VERSION_SOURCE="containerized package manager"
-            execute buildah rm "$cnt"
-        # Webscrape
-        elif installPackage wget && MC_VERSION=$(wget -qO- "$BOARDURL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
-        [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-            MC_VERSION_SOURCE="webscrape"
-        # Hardcoded
-        else
-            declare -g MC_VERSION="$MC_VERSION_HARDCODE"
-            MC_VERSION_SOURCE="hardcoded or MC_VERSION env"
-            err "Warning! Using hardcoded version number"
-        fi
+        MC_VERSION_SOURCE="hardcoded"
+        err "Warning! Using hardcoded version number"
     fi
     
+    # Set major vresion var
     MC_MVERSION="${MC_VERSION%%.*}"
 
     # Set the appropriate MC repo to use based on the major version number
