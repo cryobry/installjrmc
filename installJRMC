@@ -260,7 +260,7 @@ parseInput() {
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
     declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
-    declare -g YES_SWITCH USER_MC_VERSION USER_ARCH
+    declare -g YES_SWITCH USER_MC_VERSION
     declare -g RESTOREFILE BETAPASS SERVICE_TYPE
     declare -g VNCPASS USER_DISPLAY
     declare -ga SERVICES CONTAINERS
@@ -330,7 +330,9 @@ parseInput() {
                     fi
                     ;;
                 --arch)
-                    shift && USER_ARCH="$1"
+                    shift
+                    echo "Switching from $ARCH to $1 architecture"
+                    ARCH="$1"
                     ;;
                 --mcrepo)
                     shift && declare -g USER_MC_REPO="$1"
@@ -426,7 +428,7 @@ setMCVersion() {
     debug "$cnt" &&
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
-    buildah run "$cnt" -- bash  -c \
+    buildah run "$cnt" -- bash -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
     MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
     [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
@@ -681,7 +683,7 @@ installMCFromRepo() {
 acquireDeb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_DEB="$OUTPUTDIR/SOURCES/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"
+    declare -g MC_DEB="$OUTPUTDIR/SOURCES/MediaCenter-$MC_VERSION-$ARCH.deb"
 
     debug "MC_DEB=$MC_DEB"
 
@@ -693,13 +695,13 @@ acquireDeb() {
 
     if [[ -v BETAPASS ]] && 
         echo "Checking beta repo for DEB package" && execute wget -q -O "$MC_DEB" \
-            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"; then
+            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/MediaCenter-$MC_VERSION-$ARCH.deb"; then
                 echo "Found!"
     elif echo "Checking latest repo for DEB package" && execute wget -q -O "$MC_DEB" \
-            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"; then
+            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-$ARCH.deb"; then
                 echo "Found!"
     elif echo "Checking test repo for DEB package" && execute wget -q -O "$MC_DEB" \
-            "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb"; then
+            "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MC_VERSION-$ARCH.deb"; then
                 echo "Found!"
     else
         err "Cannot find DEB file"
@@ -828,7 +830,7 @@ buildRPM() {
 		Release: 1
 		Summary: JRiver Media Center
 		Group:   Applications/Media
-		Source0: http://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb
+		Source0: http://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-$ARCH.deb
 		BuildArch: x86_64
 		%define _rpmfilename %%{ARCH}/%%{NAME}-%%{version}.%%{ARCH}.rpm
 
@@ -993,7 +995,7 @@ installMCArch() {
 			'vorbis-tools: ogg vorbis support' 
 			'musepack-tools: musepack support'
 		)
-		source=("http://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-${USER_ARCH:-$ARCH}.deb")
+		source=("http://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-$ARCH.deb")
 
 		package() {
 			cd "\$srcdir"
