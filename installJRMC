@@ -19,7 +19,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
 declare -g MC_VERSION="32.0.45" # Do find all replace
-declare -g MC_REPO="bullseye"
+declare -g MC_REPO="bullseye" # should match the MC_VERSION 
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -425,7 +425,6 @@ setMCVersion() {
     # Containerized package manager
     elif installPackage --silent buildah &&
     cnt=$(buildah from --quiet debian:stable-slim) &>/dev/null &&
-    debug "$cnt" &&
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
     buildah run "$cnt" -- bash -c \
@@ -478,7 +477,9 @@ setMCVersion() {
                 ;;
         esac
     fi
-    echo "Using MC version $MC_VERSION determined by $MC_VERSION_SOURCE"
+
+    echo "Using the $MC_REPO repository"
+    echo "Using MC version $MC_VERSION from the $MC_REPO repo determined by $MC_VERSION_SOURCE"
     [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
     debug "MC_VERSION=$MC_VERSION, MC_REPO=$MC_REPO, MC_PKG=$MC_PKG, MC_RPM=$MC_RPM"
 }
