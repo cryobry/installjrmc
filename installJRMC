@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.1.0"
+declare -g SCRIPTVERSION="1.1.1-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
 declare -g MC_VERSION="32.0.45" # Do find all replace
 declare -g MC_REPO="bullseye" # should match the MC_VERSION 
@@ -1240,19 +1240,19 @@ setVNCPass() {
 setDisplayVars() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g DISPLAY DISPLAYNUM NEXT_DISPLAY
+    declare -g THIS_DISPLAY THIS_DISPLAY_NUM NEXT_DISPLAY
 
     # Check USER_DISPLAY, else environment DISPLAY, else set to :0
-    DISPLAY="${USER_DISPLAY:-${DISPLAY:-:0}}"
-    DISPLAYNUM="${DISPLAY#*:}" # strip prefix
-    DISPLAYNUM="${DISPLAYNUM%%.*}" # strip suffix
+    THIS_DISPLAY="${USER_DISPLAY:-${DISPLAY:-:0}}"
+    THIS_DISPLAY_NUM="${THIS_DISPLAY#*:}" # strip prefix
+    THIS_DISPLAY_NUM="${THIS_DISPLAY_NUM%%.*}" # strip suffix
     # Increment each time we run this
-    if (( NEXT_DISPLAYNUM )); then
-        declare -g NEXT_DISPLAYNUM=$(( NEXT_DISPLAYNUM + 1 ))
+    if (( NEXT_DISPLAY_NUM )); then
+        declare -g NEXT_DISPLAY_NUM=$(( NEXT_DISPLAY_NUM + 1 ))
     else
-        declare -g NEXT_DISPLAYNUM=$(( DISPLAYNUM + 1 ))
+        declare -g NEXT_DISPLAY_NUM=$(( THIS_DISPLAY_NUM + 1 ))
     fi
-    declare -g NEXT_DISPLAY=":$NEXT_DISPLAYNUM"
+    declare -g NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
 }
 
 
@@ -1340,7 +1340,7 @@ service_jriver-mediacenter() {
 		Type=simple
 		$USER_STRING
 		$DISPLAY_STRING
-		Environment=DISPLAY=$DISPLAY
+		Environment=DISPLAY=$THIS_DISPLAY
 		ExecStart=/usr/bin/mediacenter$MC_MVERSION $*
 		KillMode=none
 		ExecStop=$MC_STUB_TARGET /MCC 20007
@@ -1381,7 +1381,7 @@ service_jriver-xvnc() {
     setServiceVars "${FUNCNAME[0]##*_}" "system"
     setDisplayVars
     declare -a start_cmd
-    declare -g PORT=$(( NEXT_DISPLAYNUM + 5900 ))
+    declare -g PORT=$(( NEXT_DISPLAY_NUM + 5900 ))
 
     installPackage tigervnc-server
 
@@ -1428,8 +1428,8 @@ service_jriver-xvnc() {
     if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
         err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
         # Allow to increment 10 times before breaking
-        max=$(( DISPLAYNUM + 10 ))
-        while [[ $NEXT_DISPLAYNUM -lt $max ]]; do
+        max=$(( THIS_DISPLAY_NUM + 10 ))
+        while [[ $NEXT_DISPLAY_NUM -lt $max ]]; do
             echo "Incrementing DISPLAY and retrying"
             service_jriver-xvnc && return
         done
@@ -1453,7 +1453,7 @@ service_jriver-x11vnc() {
     setDisplayVars
 
     declare -a start_cmd
-    declare -g PORT=$(( DISPLAYNUM + 5900 ))
+    declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
 
     installPackage x11vnc
 
