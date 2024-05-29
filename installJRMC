@@ -425,11 +425,11 @@ setMCVersion() {
     # Containerized package manager
     elif installPackage --silent buildah &&
     cnt=$(buildah from --quiet alpine:edge) &&
-    buildah run "$cnt" -- bash -c \
+    buildah run "$cnt" -- sh -c \
         "apk add apt" &>/dev/null &&
-    buildah run "$cnt" -- bash -c \
+    buildah run "$cnt" -- sh -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
-    buildah run "$cnt" -- bash -c \
+    buildah run "$cnt" -- sh -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
     MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
     [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
