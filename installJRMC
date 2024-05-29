@@ -1252,7 +1252,7 @@ setDisplayVars() {
     else
         declare -g NEXT_DISPLAY_NUM=$(( THIS_DISPLAY_NUM + 1 ))
     fi
-    declare -g NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
+    NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
 }
 
 
@@ -1298,7 +1298,7 @@ setServiceVars() {
     # TODO Ubuntu needs these in the service file, fedora (and others?) do not
     case $ID in
         ubuntu|debian)
-            DISPLAY_STRING="Environment=XAUTHORITY=$XAUTHORITY"
+            DISPLAY_STRING="Environment=XAUTHORITY=${XAUTHORITY:-$(echo /run/user/"$(id -u)"/.mutter*)}"
             ;;
         *)
             DISPLAY_STRING=""
