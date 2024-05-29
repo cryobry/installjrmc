@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.0.4"
+declare -g SCRIPTVERSION="1.0-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
 declare -g MC_VERSION="32.0.45" # Do find all replace
 declare -g MC_REPO="bullseye" # should match the MC_VERSION 
@@ -424,7 +424,9 @@ setMCVersion() {
         MC_VERSION="$USER_MC_VERSION"
     # Containerized package manager
     elif installPackage --silent buildah &&
-    cnt=$(buildah from --quiet debian:stable-slim) &>/dev/null &&
+    cnt=$(buildah from --quiet alpine:edge) &>/dev/null &&
+    buildah run "$cnt" -- bash -c \
+        "apk add apt" &>/dev/null &&
     buildah run "$cnt" -- bash -c \
         "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
     buildah run "$cnt" -- bash -c \
