@@ -19,7 +19,7 @@ shopt -s extglob
 declare -g SCRIPTVERSION="1.2.0"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -g MC_VERSION="33.0.13" # Do find all replace
-declare -g MC_REPO="bullseye" # should match the MC_VERSION 
+declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION 
 
 printHelp() {
     debug "Running: ${FUNCNAME[0]}"
@@ -178,7 +178,7 @@ init() {
             ID="ubuntu"
             if [[ ${VERSION_ID%.*} -ge 24 ]]; then
                 debug "Switching to noble repo for *buntu 24"
-                declare -g USER_MC_REPO='noble' # Pretend to be user input
+                declare -g MC_DEFAULT_REPO='noble'
             fi
             ;;
         *suse*)
@@ -335,7 +335,7 @@ parseInput() {
                     ARCH="$1"
                     ;;
                 --mcrepo)
-                    shift && declare -g USER_MC_REPO="$1"
+                    shift && declare -g MC_REPO="$1"
                     ;;
                 --restorefile)
                     shift && RESTOREFILE="$1"
@@ -428,7 +428,7 @@ setMCVersion() {
     buildah run "$cnt" -- sh -c \
         "apk add apt" &>/dev/null &&
     buildah run "$cnt" -- sh -c \
-        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null &&
+        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main' > /etc/apt/sources.list 2>&1" &>/dev/null && # we are only using this to parse the repo so just use the default
     buildah run "$cnt" -- sh -c \
         "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
     MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
@@ -449,21 +449,19 @@ setMCVersion() {
     # Set major version var
     MC_MVERSION="${MC_VERSION%%.*}"
 
-    # Set legacy MC repos based on the major version number
+    # Set legacy MC repos automatically based on the major version number (if not passed by --mcrepo)
     # Users can override with --mcrepo
-    if [[ -z $USER_MC_REPO ]]; then
-        case $MC_MVERSION in
-            2[0-6])
-                MC_REPO="jessie"
-                ;;
-            2[7-9]|30)
-                MC_REPO="buster"
-                ;;
-            3[1-3])
-                MC_REPO="bullseye"
-                ;;
-        esac
-    fi
+    case $MC_MVERSION in
+        2[0-6])
+            MC_DEFAULT_REPO="jessie"
+            ;;
+        2[7-9]|30)
+            MC_DEFAULT_REPO="buster"
+            ;;
+        3[1-3])
+            MC_DEFAULT_REPO="bullseye"
+            ;;
+    esac
 
     MC_PKG="mediacenter$MC_MVERSION"
     MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
@@ -483,10 +481,10 @@ setMCVersion() {
         esac
     fi
 
-    echo "Using the $MC_REPO repository"
-    echo "Using MC version $MC_VERSION from the $MC_REPO repo determined by $MC_VERSION_SOURCE"
+    echo "Using the ${MC_REPO:-$MC_DEFAULT_REPO} repository"
+    echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo determined by $MC_VERSION_SOURCE"
     [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
-    debug "MC_VERSION=$MC_VERSION, MC_REPO=$MC_REPO, MC_PKG=$MC_PKG, MC_RPM=$MC_RPM"
+    debug "MC_VERSION=$MC_VERSION, MC_REPO=${MC_REPO:-$MC_DEFAULT_REPO}, MC_PKG=$MC_PKG, MC_RPM=$MC_RPM"
 }
 
 
@@ -652,7 +650,7 @@ installMCFromRepo() {
             execute sudo rm -rf "$repo_dir"/mediacenter*.list
             installPackage wget
             sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
-				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main
+				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main
 			EOF"
             wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
                 sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null

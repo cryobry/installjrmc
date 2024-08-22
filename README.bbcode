@@ -1,0 +1,128 @@
+[size=20pt]installJRMC[/size]
+
+This program will install [url=https://www.jriver.com/]JRiver Media Center[/url] and associated services on most major Linux distros.
+
+You can always find the latest version of installJRMC, changelog, and documentation in [url=https://git.bryanroessler.com/bryan/installJRMC]my repository[/url].
+
+[size=18pt]tl;dr One-line MC install[/size] 
+[code]curl https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC|bash[/code]
+
+[size=18pt]Instructions[/size]
+
+Download and unzip installJRMC from the attachment below or grab the latest stable version directly:
+[code]curl -O https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC && 
+chmod +x ./installJRMC && 
+./installJRMC [--option [ARGUMENT]][/code]
+
+Running `installJRMC` without any options will install the latest version of JRiver Media Center from the official JRiver repository (Ubuntu/Debian) or my [url=https://repos.bryanroessler.com/jriver/]unofficial repository[/url] (Fedora/CentOS) using the system package manager ([i]i.e.[/i] --install repo). If any other option is passed, then the install method (--install repo or --install local) must be specified, to make it possible to install services and containers independent of MC.
+
+[size=18pt]Options[/size]
+
+[code]
+$ installJRMC --help
+--install, -i repo|local
+    repo: Install MC from repository, future updates will be handled by the system package manager
+    local: Build and install MC package from official source package
+--build[=suse|fedora|centos]
+    Build RPM from source DEB but do not install
+    Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
+--compat
+    Build/install MC without minimum dependency version requirements
+--mcversion VERSION
+    Build or install a specific MC version, ex. "33.0.13"
+--arch ARCH
+    Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
+--mcrepo REPO
+    Specify the MC repository, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
+--outputdir PATH
+    Generate rpmbuild output in this PATH (default: ./output)
+--restorefile RESTOREFILE
+    Restore file location for automatic license registration
+--betapass PASSWORD
+    Enter beta team password for access to beta builds
+--service, -s SERVICE
+    See SERVICES section below for the list of services to deploy
+  --service-type user|system
+      Starts services at boot (system) or user login (user) (default: per-service, see SERVICES)
+--container, -c CONTAINER (TODO: Under construction)
+    See CONTAINERS section below for a list of containers to deploy
+--createrepo[=suse|fedora|centos]
+    Build rpm, copy to webroot, and run createrepo.
+    Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
+  --createrepo-webroot PATH
+      The webroot directory to install the repo (default: /var/www/jriver/)
+  --createrepo-user USER
+      The web server user if different from the current user
+--yes, -y, --auto
+    Always assumes yes for questions
+--version, -v
+    Print this script version and exit
+--debug, -d
+    Print debug output
+--help, -h
+    Print help dialog and exit
+--uninstall, -u
+    Uninstall JRiver MC, service files, and firewall rules (does not remove library or media files)
+[/code]
+
+[size=18pt]Services[/size]
+
+[code]jriver-mediaserver (user)
+    Enable and start a mediaserver systemd service (requires an existing X server)
+jriver-mediacenter (user)
+    Enable and start a mediacenter systemd service (requires an existing X server)
+jriver-x11vnc (user)
+    Enable and start x11vnc for the local desktop (requires an existing X server, does NOT support Wayland)
+  --vncpass and --display are also valid options (see below)
+jriver-xvnc (system)
+    Enable and start a new Xvnc session running JRiver Media Center
+  --vncpass PASSWORD
+    Set vnc password for x11vnc/Xvnc access. If no password is set, the script will either use existing password stored in ~/.vnc/jrmc_passwd or use no password
+  --display DISPLAY
+    Manually specify display to use for x11vnc/Xvnc (ex. ':1')
+jriver-createrepo (system)
+    Install hourly service to build latest MC RPM and run createrepo
+    By default installs as root service to handle www permissions more gracefully
+[/code]
+
+By default, MC services use a sane `--service-type` listed next to the service name in the Services description. User services can be manipulated as an unprivileged user, for example: [i]systemctl --user stop jriver-mediacenter[/i] and begin at user login. System services are manipulable as root, for example: [i]sudo systemctl stop jriver-servicename@username.service[/i] and begin at system boot. Note that it is possible to run all services of a particular user at boot using [url=https://www.freedesktop.org/software/systemd/man/loginctl.html]sudo loginctl enable-linger username[/url].
+
+Multiple services (but not --service-types) can be installed at one time using multiple --service blocks: [code]installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter[/code]
+
+[size=14pt]jriver-x11vnc versus jriver-xvnc[/size]
+
+[url=http://www.karlrunge.com/x11vnc/]jriver-x11vnc[/url] shares your existing X display via VNC and can be combined with additional services to start Media Center or Media Server. Conversely, [url=https://tigervnc.org/doc/Xvnc.html]jriver-xvnc[/url] creates a new Xvnc display and starts a JRiver Media Center service in the foreground of the new VNC display.
+
+[size=18pt]Containers[/size]
+
+[b]Coming soon![/b]
+
+[size=18pt]Firewall[/size]
+
+`installJRMC` automatically creates port forwarding firewall rules for remote access to Media Network (52100-52200/tcp, 1900/udp DLNA) and Xvnc/x11vnc (if selected), using `firewall-cmd` or `ufw`.
+[b]Note:[/b] `ufw` is not installed by default on Debian but will be installed by `installJRMC`. To prevent SSH lock-out, Debian users that have not already enabled `ufw` will need to `sudo ufw enable` after running `installJRMC` and inspecting their configuration.
+
+[size=18pt]Examples[/size]
+
+[code]installJRMC[/code]
+Install the latest version of MC from the best available repository.
+[code]installJRMC --install local --compat[/code]
+Install a more widely-compatible version of the latest MC version.
+[code]installJRMC --install repo --service jriver-mediacenter --service-type user[/code]
+Install MC from the repository and start/enable jriver-mediacenter.service as a user service.
+[code]installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 33.0.13[/code]
+Build and install an MC 33.0.13 comptability RPM locally and activate it using the /path/to/license.mjr
+[code]installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user[/code]
+Build an RPM locally for the current distro, move it to the webroot, and run createrepo as www-user.
+[code]installJRMC --service jriver-createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user[/code]
+Install the jriver-createrepo timer and service to build the RPM, move it to the webroot, and run createrepo as www-user hourly.
+[code]installJRMC --install repo --service jriver-x11vnc --service jriver-mediacenter --vncpass "letmein"[/code]
+Install services to share the existing local desktop via VNC and automatically run MC on startup.
+[code]installJRMC --install repo --service jriver-xvnc --display ":2"[/code]
+Install an Xvnc server on display ':2' that starts MC.
+[code]installJRMC --uninstall[/code]
+Uninstall MC, services, and firewall rules. This will [b]not[/b] remove your media, media library/database, or library backup folder.
+
+[size=18pt]Additional Info[/size]
+
+Did you find installJRMC useful? [url=https://paypal.me/bryanroessler?locale.x=en_US]Buy me a coffee![/url]
