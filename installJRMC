@@ -415,7 +415,7 @@ setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
 
     declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT
-    declare -g MC_PKG MC_RPM MC_STUB MC_STUB_TARGET
+    declare -g MC_PKG MC_RPM
     declare cnt
 
     # User input
@@ -466,8 +466,6 @@ setMCVersion() {
     MC_PKG="mediacenter$MC_MVERSION"
     MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
     MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
-    MC_STUB="$MC_ROOT/mc$MC_MVERSION"
-    MC_STUB_TARGET="/usr/bin/mc$MC_MVERSION"
 
     if [[ $MC_VERSION_SOURCE == "user input" ]]; then
         # Append explicit package version when user provides --mcversion
@@ -1072,21 +1070,6 @@ runCreaterepo() {
 
 
 #######################################
-# Symlink MC stub
-#######################################
-symlinkStub() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    if [[ -f $MC_STUB && ! -e $MC_STUB_TARGET ]]; then
-        if ! execute sudo ln -fs "$MC_STUB" "$MC_STUB_TARGET"; then
-            err "Symlinking $MC_STUB to $MC_STUB_TARGET failed"
-            return 1
-        fi
-    fi
-}
-
-
-#######################################
 # Symlink certificates if they do not exist in default location
 #######################################
 symlinkCerts() {
@@ -1344,7 +1327,7 @@ service_jriver-mediacenter() {
 		Environment=DISPLAY=$THIS_DISPLAY
 		ExecStart=/usr/bin/mediacenter$MC_MVERSION $*
 		KillMode=none
-		ExecStop=$MC_STUB_TARGET /MCC 20007
+		ExecStop=/usr/bin/mc$MC_MVERSION /MCC 20007
 		Restart=always
 		RestartSec=10
 		TimeoutStopSec=30
@@ -1749,10 +1732,6 @@ uninstall() {
         mv "$SCRIPTDIR/.uninstall" "$SCRIPTDIR/.uninstall.bk"
     fi
 
-    if [[ -e $MC_STUB_TARGET ]]; then
-        echo "Removing $MC_STUB_TARGET"
-        execute sudo rm -f "$MC_STUB_TARGET"
-    fi
     return 0
 }
 
