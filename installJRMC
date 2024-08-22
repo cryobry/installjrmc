@@ -178,7 +178,7 @@ init() {
             ID="ubuntu"
             if [[ ${VERSION_ID%.*} -ge 24 ]]; then
                 debug "Switching to noble repo for *buntu 24"
-                declare -g MC_DEFAULT_REPO='noble'
+                declare -g MC_REPO='noble'
             fi
             ;;
         *suse*)
