@@ -16,9 +16,9 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.1.1-dev"
-declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,83.0.html" # MC32
-declare -g MC_VERSION="32.0.45" # Do find all replace
+declare -g SCRIPTVERSION="1.2.0"
+declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
+declare -g MC_VERSION="33.0.13" # Do find all replace
 declare -g MC_REPO="bullseye" # should match the MC_VERSION 
 
 printHelp() {
@@ -266,7 +266,7 @@ parseInput() {
     declare -ga SERVICES CONTAINERS
     declare long_opts short_opts input
 
-    # Defaults 
+    # Defaults
     declare -g BUILD_TARGET="$ID"
     declare -g REPO_TARGET="$ID"
     declare -g CREATEREPO_USER="$USER"
@@ -277,7 +277,7 @@ parseInput() {
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
     if [[ $# -eq 0 ]] || 
-    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes )$ ]] &&
+    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes | --auto )$ ]] &&
     [[ $ID != "unknown" ]]; then
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
@@ -458,6 +458,9 @@ setMCVersion() {
                 ;;
             2[7-9]|30)
                 MC_REPO="buster"
+                ;;
+            3[1-3])
+                MC_REPO="bullseye"
                 ;;
         esac
     fi
@@ -697,13 +700,13 @@ acquireDeb() {
     fi
 
     if [[ -v BETAPASS ]] && 
-        echo "Checking beta repo for DEB package" && execute wget -q -O "$MC_DEB" \
+        echo "Checking beta repo for DEB package" && execute wget --quiet --output-document "$MC_DEB" \
             "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/MediaCenter-$MC_VERSION-$ARCH.deb"; then
                 echo "Found!"
-    elif echo "Checking latest repo for DEB package" && execute wget -q -O "$MC_DEB" \
+    elif echo "Checking latest repo for DEB package" && execute wget --quiet --output-document "$MC_DEB" \
             "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/MediaCenter-$MC_VERSION-$ARCH.deb"; then
                 echo "Found!"
-    elif echo "Checking test repo for DEB package" && execute wget -q -O "$MC_DEB" \
+    elif echo "Checking test repo for DEB package" && execute wget --quiet --output-document "$MC_DEB" \
             "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MC_VERSION-$ARCH.deb"; then
                 echo "Found!"
     else
@@ -1663,20 +1666,20 @@ disableCoW() {
 #######################################
 # Migrate major versions
 #######################################
-migrateLibrary() {
-    debug "Running: ${FUNCNAME[0]}"
+# migrateLibrary() {
+#     debug "Running: ${FUNCNAME[0]}"
 
-    declare mc_user_path="$HOME/.jriver"
-    declare current_config_path="$mc_user_path/Media Center $MC_MVERSION"
-    declare previous_config_path="$mc_user_path/Media Center $(( MC_MVERSION - 1 ))"
+#     declare mc_user_path="$HOME/.jriver"
+#     declare current_config_path="$mc_user_path/Media Center $MC_MVERSION"
+#     declare previous_config_path="$mc_user_path/Media Center $(( MC_MVERSION - 1 ))"
 
-    if [[ ! -d $current_config_path ]] &&
-    [[ -d $previous_config_path ]] &&
-    mkdir -p "$current_config_path"; then
-        echo "Migrating $previous_config_path to $current_config_path"
-        cp -fa "$previous_config_path"/* "$current_config_path"
-    fi
-}
+#     if [[ ! -d $current_config_path ]] &&
+#     [[ -d $previous_config_path ]] &&
+#     mkdir -p "$current_config_path"; then
+#         echo "Migrating $previous_config_path to $current_config_path"
+#         cp -fa "$previous_config_path"/* "$current_config_path"
+#     fi
+# }
 
 
 #######################################
@@ -1822,7 +1825,7 @@ main() {
         if installMCFromRepo; then
             echo "JRiver Media Center installed successfully from remote repository"
             symlinkCerts
-            migrateLibrary
+            # migrateLibrary
             restoreLicense
             openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
             disableCoW
@@ -1852,7 +1855,7 @@ main() {
             return 1
         fi
         symlinkCerts
-        migrateLibrary
+        # migrateLibrary
         restoreLicense
         openFirewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
         disableCoW
@@ -1897,3 +1900,4 @@ main() {
 [[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
 
 main "$@"
+

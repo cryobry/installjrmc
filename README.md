@@ -8,7 +8,11 @@ You can always find the latest version of installJRMC, changelog, and documentat
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center (MC) from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is passed, then the default install method (i.e. `--install repo` or `--install local`) must be specified. This makes it possible to install services and containers independent of MC.
+Running `installJRMC` without any options will install the latest version of JRiver Media Center (MC) from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is passed, then the default install method (i.e. `--install repo` or `--install local`) must be specified. This makes it possible to install services and containers independent of MC.>
+
+## tl;dr
+
+`curl https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC|bash`
 
 ## Options
 
@@ -23,7 +27,7 @@ $ installJRMC --help
 --compat
     Build/install MC without minimum dependency version requirements
 --mcversion VERSION
-    Build or install a specific MC version, ex. "32.0.45" (default: latest version)
+    Build or install a specific MC version, ex. "33.0.13" (default: latest version)
 --mcrepo REPO
     Specify the MC repository, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
 --arch ARCH
@@ -114,9 +118,9 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
     Install MC from the repository and start/enable `jriver-mediacenter.service` as a user service.
 
-* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 32.0.45`
+* `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 33.0.13`
 
-    Build and install an MC 32.0.45 comptability RPM locally and activate it using the `/path/to/license.mjr`
+    Build and install an MC 33.0.13 comptability RPM locally and activate it using the `/path/to/license.mjr`
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
