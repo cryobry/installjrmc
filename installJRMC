@@ -301,6 +301,7 @@ parseInput() {
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
     if [[ $# -eq 0 && $ID != "unknown" ]]; then
+        debug "Automatically setting --install repo"
         REPO_INSTALL_SWITCH=1
     elif [[ $# -eq 1 || $# -eq 2 ]]; then
         case "$1" in
@@ -1646,6 +1647,7 @@ main() {
 
     debug "Debugging on"
     debug "installJRMC version: $SCRIPTVERSION"
+    ((DEBUG)) && declare -p
 
     if ((TEST_SWITCH)); then 
         echo "Running tests, all other options are skipped"
