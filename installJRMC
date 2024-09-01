@@ -458,7 +458,7 @@ setMCVersion() {
         MC_VERSION="$USER_MC_VERSION"
     # Containerized package manager
     elif installPackage --silent buildah &&
-    cnt=$(buildah from --quiet alpine:edge) &>/dev/null &&
+    cnt=$(buildah from --quiet alpine:edge 2>/dev/null) &&
     buildah run "$cnt" -- sh -c \
         "apk add apt" &>/dev/null &&
     buildah run "$cnt" -- sh -c \
