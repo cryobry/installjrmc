@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.2.2"
+declare -g SCRIPTVERSION="1.2.3-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -g MC_VERSION="33.0.15" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION 
@@ -280,7 +280,7 @@ init() {
 # Parses user input and sets sensible defaults
 #######################################
 parseInput() {
-    debug "Running: ${FUNCNAME[0]}"
+    debug "Running: ${FUNCNAME[0]} $*"
 
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
     declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
@@ -498,8 +498,7 @@ setMCVersion() {
         esac
     fi
 
-    echo "Using the ${MC_REPO:-$MC_DEFAULT_REPO} repository"
-    echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo determined by $MC_VERSION_SOURCE"
+    echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo (determined by $MC_VERSION_SOURCE)"
     [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
     debug "MC_VERSION=$MC_VERSION, MC_REPO=${MC_REPO:-$MC_DEFAULT_REPO}, MC_PKG=$MC_PKG, MC_RPM=$MC_RPM"
 }
@@ -613,33 +612,26 @@ installPackage() {
 installMesa() {
     debug "Running: ${FUNCNAME[0]}"
 
+    swap_or_install_freeworld_package() {
+        local pkg=$1
+        local freeworld_pkg="${pkg}-freeworld"
+
+        if ! "${PKG_QUERY[@]}" "$freeworld_pkg" &>/dev/null; then
+            if "${PKG_QUERY[@]}" "$pkg" &>/dev/null; then
+                if ! execute sudo dnf swap -y "$pkg" "$freeworld_pkg"; then
+                    err "Package swap failed for $pkg!"
+                fi
+            else
+                execute "${PKG_INSTALL[@]}" "$freeworld_pkg"
+            fi
+        fi
+    }
+
     # Currently only necessary in Fedora/CentOS
     case $ID in
         fedora|centos)
-            if ! "${PKG_QUERY[@]}" mesa-va-drivers-freeworld &>/dev/null; then
-                if "${PKG_QUERY[@]}" mesa-va-drivers &>/dev/null; then
-                    if ! execute sudo dnf swap -y \
-                        mesa-va-drivers \
-                        mesa-va-drivers-freeworld; then
-                        err "Package swap failed!"
-                        return 1
-                    fi
-                else
-                    "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld
-                fi
-            fi
-            if ! "${PKG_QUERY[@]}" mesa-vdpau-drivers-freeworld &>/dev/null; then
-                if "${PKG_QUERY[@]}" mesa-vdpau-drivers &>/dev/null; then
-                    if ! execute sudo dnf swap -y \
-                        mesa-vdpau-drivers \
-                        mesa-vdpau-drivers-freeworld; then
-                        err "Package swap failed!"
-                        return 1
-                    fi
-                else
-                    "${PKG_INSTALL[@]}" mesa-va-drivers-freeworld mesa-vdpau-drivers-freeworld
-                fi
-            fi
+            swap_or_install_freeworld_package "mesa-va-drivers"
+            swap_or_install_freeworld_package "mesa-vdpau-drivers"
             ;;
     esac
 }
@@ -1149,9 +1141,7 @@ restoreLicense() {
 
         for f in "$RESTOREFILE" "$newest"; do
             if [[ -f $f ]]; then
-                if execute "mediacenter$MC_MVERSION" "/RestoreFromFile" "$f"; then
-                    return 0
-                fi
+                execute "mediacenter$MC_MVERSION" "/RestoreFromFile" "$f"
             fi
         done
     fi
