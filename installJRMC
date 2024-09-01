@@ -307,6 +307,7 @@ parseInput() {
             --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
             --arch | --betapass | --restorefile | --outputdir)
                 if  [[ $ID != "unknown" ]]; then
+                    debug "Automatically setting --install repo"
                     REPO_INSTALL_SWITCH=1
                 fi
                 ;;
