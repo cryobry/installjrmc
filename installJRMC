@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Install JRiver Media Center and associated services
-# See installJRMC --help or printHelp() below
+# See installJRMC --help or printHelp() below for usage
 #
 # Copyright (c) 2021-2024 Bryan C. Roessler
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
 #
-# TODO (v1.1)
+# TODO (v2)
 #   1. Interactive mode
 #   2. Additional containerization (createrepo and rpmbuild)
 #   3. Tests
@@ -18,7 +18,7 @@ shopt -s extglob
 
 declare -g SCRIPTVERSION="1.2.1-dev"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
-declare -g MC_VERSION="33.0.13" # Do find all replace
+declare -g MC_VERSION="33.0.15" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION 
 
 printHelp() {
@@ -176,10 +176,6 @@ init() {
             ;;
         linuxmint|neon|zorin|*ubuntu*)
             ID="ubuntu"
-            if [[ ${VERSION_ID%.*} -ge 24 ]]; then
-                debug "Switching to noble repo for *buntu 24"
-                declare -g MC_REPO='noble'
-            fi
             ;;
         *suse*)
             ID="suse"
@@ -210,7 +206,35 @@ init() {
             fi
     esac
 
-    [[ $ID != "unknown" ]] && debug "Using host platform: $ID $VERSION_ID"
+    # Select the correct repo if unspecified
+    if [[ -z $MC_REPO ]]; then
+        case $ID in
+            debian|ubuntu)
+                if [[ -n $VERSION_CODENAME ]]; then
+                    MC_DEFAULT_REPO="$VERSION_CODENAME"
+                fi
+                ;;
+        esac
+        # For when users try to install legacy versions
+        if [[ -n $USER_MC_VERSION ]]; then
+            case $MC_MVERSION in
+                2[0-6])
+                    MC_DEFAULT_REPO="jessie"
+                    ;;
+                2[7-9]|30)
+                    MC_DEFAULT_REPO="buster"
+                    ;;
+                # After this point, things get messy with
+                # multiple repos for same version
+                31)
+                    MC_DEFAULT_REPO="bullseye"
+                    ;;
+            esac
+        fi
+    fi
+
+    debug "Using host platform: $ID $VERSION_ID"
+    debug "Using MC repository: ${MC_REPO:-$MC_DEFAULT_REPO}"
 
     # Abstract distro-specific package manager commands 
     case $ID in
@@ -276,13 +300,23 @@ parseInput() {
     declare -g USER="${SUDO_USER:-$USER}"
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
-    if [[ $# -eq 0 ]] || 
-    [[ $# -eq 1 && " $1 " =~ ^( --debug | -d | -y | --yes | --auto )$ ]] &&
-    [[ $ID != "unknown" ]]; then
+    if [[ $# -eq 0 && $ID != "unknown" ]]; then
         REPO_INSTALL_SWITCH=1
-    elif [[ $# -eq 1 && " $1 " =~ ^( --compat )$ ]]; then
-        BUILD_SWITCH=1
-        LOCAL_INSTALL_SWITCH=1
+    elif [[ $# -eq 1 || $# -eq 2 ]]; then
+        case "$1" in
+            --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
+            --arch | --betapass | --restorefile | --outputdir)
+                if  [[ $ID != "unknown" ]]; then
+                    REPO_INSTALL_SWITCH=1
+                fi
+                ;;
+            --compat)
+                if [[ $# -eq 1 ]]; then
+                    BUILD_SWITCH=1
+                    LOCAL_INSTALL_SWITCH=1
+                fi
+                ;;
+        esac
     fi
 
     long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
@@ -409,7 +443,6 @@ parseInput() {
 
 #######################################
 # Uses several methods to determine the latest JRiver MC version
-# TODO but how to determine build distro `$MC_REPO=bullseye`?
 #######################################
 setMCVersion() {
     debug "Running: ${FUNCNAME[0]}"
@@ -418,6 +451,7 @@ setMCVersion() {
     declare -g MC_PKG MC_RPM
     declare cnt
 
+    # Determine the latest MC version
     # User input
     if [[ -n $USER_MC_VERSION ]]; then
         MC_VERSION_SOURCE="user input"
@@ -446,23 +480,8 @@ setMCVersion() {
         err "Warning! Using hardcoded version number"
     fi
     
-    # Set major version var
+    # Set major version number and other variables
     MC_MVERSION="${MC_VERSION%%.*}"
-
-    # Set legacy MC repos automatically based on the major version number (if not passed by --mcrepo)
-    # Users can override with --mcrepo
-    case $MC_MVERSION in
-        2[0-6])
-            MC_DEFAULT_REPO="jessie"
-            ;;
-        2[7-9]|30)
-            MC_DEFAULT_REPO="buster"
-            ;;
-        3[1-3])
-            MC_DEFAULT_REPO="bullseye"
-            ;;
-    esac
-
     MC_PKG="mediacenter$MC_MVERSION"
     MC_RPM="$OUTPUTDIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
     MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
@@ -908,7 +927,7 @@ installMCDeb() {
         execute tar xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
-        sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
+        # sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
         [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] &&
         ! grep -q zorin /etc/os-release && # TODO ugly ZorinOS workaround
         sed -i 's/libva2/libva1/g' "control"
@@ -1382,12 +1401,10 @@ service_jriver-xvnc() {
     if (( NOVNCAUTH )); then
         start_cmd+=(
             -name "jriver$NEXT_DISPLAY" 
-            -SecurityTypes None
-        )
+            -SecurityTypes None)
     else
         start_cmd+=(
-            -rfbauth "$HOME/.vnc/jrmc_passwd"
-        )
+            -rfbauth "$HOME/.vnc/jrmc_passwd")
     fi
 
     sudo bash -c "cat <<-EOF > $SERVICE_FNAME
@@ -1537,94 +1554,6 @@ service_jriver-createrepo() {
 
 
 #######################################
-# CONTAINERS
-#######################################
-# container_jriver-createrepo() {
-#     :
-# }
-
-
-# container_jriver-xvnc() {
-#     :
-# }
-
-
-# container_jriver-mediacenter() {
-
-#     installPackage buildah podman
-
-#     if ! CNT=$(buildah from debian:$DEBIANBASE-slim); then
-#         echo "Bad base image for container, skipping"
-#         return 1
-#     fi
-
-#     brc() { buildah run "$CNT" bash -c "$*"; }
-
-#     brc "add-pkg gnupg2 libxss1 wmctrl xdotool ca-certificates inotify-tools libgbm1 ffmpeg"
-
-#     # Install JRiver
-#     brc "
-#     add-pkg ca-certificates gnupg &&
-#     add-pkg --virtual build-dependencies wget &&
-#     wget -qO- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | tee /etc/apt/trusted.gpg.d/jriver.asc &&
-#     wget -O /etc/apt/sources.list.d/mediacenter${MC_MVERSION}.list http://dist.jriver.com/latest/mediacenter/mediacenter${MC_MVERSION}.list &&
-#     apt update &&
-#     add-pkg mediacenter${MC_MVERSION} &&
-#     del-pkg build-dependencies
-#     "
-
-#     buildah config "$CNT" \
-#         --author "bryanroessler@gmail.com" \
-#         --label maintainer="$MAINTAINER" \
-#         --env TZ="$TZ" \
-#         --workingdir /app \
-#         --cmd "mediacenter$MC_MVERSION"
-
-
-#     # EXPOSE 5800 5900 52100 52101 52199 1900/udp
-
-#     podman_create_cmd=(
-#         podman create 
-#         --name "mediacenter$MC_MVERSION"
-#     )
-
-#     podman_create_cmd+=(-v "$HOME/.jriver:/root/.jriver")
-#     podman_create_cmd+=(-v "$DOWNLOAD_ROOT:/downloads:z")
-#     podman_create_cmd+=(-v "$MONITOR_ROOT/nzbs:/nzbs")
-#     podman_create_cmd+=(-p "${CONTAINER[HOST_PORT]}:${CONTAINER[CONTAINER_PORT]}")
-
-#     # mkcdirs() {
-#     #     declare dir
-#     #     for dir in "$@"; do
-#     #         if [[ ! -d "$dir" ]]; then 
-#     #             if ! mkdir -p "$dir"; then
-#     #                 err "Could not create directory $dir, check your permissions"
-#     #             fi
-#     #         fi
-#     #         if ! chcon -t container_file_t -R "$dir"; then
-#     #             err "Could not set container_file_t attribute for $dir, check your permissions"
-#     #         fi
-#     #     done
-#     # }
-
-#     # mkcdirs "$HOME/.jriver"
-
-
-#     brc sh -s <<-EOF
-# 		wget -q "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" -O- | apt-key add - &>/dev/null
-# 	EOF
-
-#     brc wget "http://dist.jriver.com/latest/mediacenter/mediacenter$MC_MVERSION.list" -O "/etc/apt/sources.list.d/mediacenter$MC_MVERSION.list"
-
-#     brc apt update -y -q0
-
-#     brc add-pkg "mediacenter$MC_MVERSION"
-
-#     brc del-pkg .build-deps
-# }
-
-
-#######################################
 # Detects if MC is installed on btrfs and disables CoW
 #######################################
 disableCoW() {
@@ -1642,25 +1571,6 @@ disableCoW() {
         fi
     done
 }
-
-
-#######################################
-# Migrate major versions
-#######################################
-# migrateLibrary() {
-#     debug "Running: ${FUNCNAME[0]}"
-
-#     declare mc_user_path="$HOME/.jriver"
-#     declare current_config_path="$mc_user_path/Media Center $MC_MVERSION"
-#     declare previous_config_path="$mc_user_path/Media Center $(( MC_MVERSION - 1 ))"
-
-#     if [[ ! -d $current_config_path ]] &&
-#     [[ -d $previous_config_path ]] &&
-#     mkdir -p "$current_config_path"; then
-#         echo "Migrating $previous_config_path to $current_config_path"
-#         cp -fa "$previous_config_path"/* "$current_config_path"
-#     fi
-# }
 
 
 #######################################
@@ -1736,18 +1646,12 @@ uninstall() {
 }
 
 
-tests() {
-    # To test on Mint/16.04: sudo apt install -y spice-vdagent ca-certificates git; export GIT_SSL_NO_VERIFY=1
-    : # TODO
-}
-
-
 main() {
     debug "Running: ${FUNCNAME[0]} $*"
 
-    init
-
     parseInput "$@"
+
+    init
 
     debug "Debugging on"
     debug "installJRMC version: $SCRIPTVERSION"
@@ -1786,13 +1690,13 @@ main() {
             fi
             if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
                 installPackage --no-install-check \
-                "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                    "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
         fedora)
             if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
                 installPackage --no-install-check \
-                "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+                    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
     esac
