@@ -190,8 +190,11 @@ init() {
 
     # Match the MC repo to the system
     if [[ $ID == debian || $ID == ubuntu ]]; then
+        echo "Ubuntu codename: $UBUNTU_CODENAME"
+        echo "Version codename: $VERSION_CODENAME"
         MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
     fi
+
     # Change the repo for user-specified legacy versions
     if [[ -n $USER_MC_VERSION ]]; then
         case $MC_MVERSION in
