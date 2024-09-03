@@ -19,7 +19,8 @@ shopt -s extglob
 declare -g SCRIPT_VERSION="1.3.0-dev"
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -g MC_VERSION="33.0.15" # Do find all replace
-declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION 
+declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION
+declare -ig SELF_UPDATE=1
 
 print_help() {
     debug "Running: ${FUNCNAME[0]}"
@@ -249,27 +250,27 @@ init() {
 parse_input() {
     debug "Running: ${FUNCNAME[0]} $*"
 
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH COMPAT_SWITCH TEST_SWITCH
-    declare -g LOCAL_INSTALL_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH
-    declare -g YES_SWITCH USER_MC_VERSION
-    declare -g MJR_RESTORE_FILE BETAPASS SERVICE_TYPE
-    declare -g VNCPASS USER_DISPLAY
-    declare -g NO_SELF_UPDATE
-    declare -g MC_REPO
+    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
+        COMPAT_SWITCH TEST_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
+        YES_SWITCH USER_MC_VERSION MJR_RESTORE_FILE BETAPASS SERVICE_TYPE \
+        VNCPASS USER_DISPLAY MC_REPO
     declare -ga SERVICES CONTAINERS
-    declare long_opts short_opts input
+    local long_opts short_opts input
 
     # Defaults
-    declare -g BUILD_TARGET="$ID"
-    declare -g REPO_TARGET="$ID"
-    declare -g CREATEREPO_USER="$USER"
+    declare -g \
+        BUILD_TARGET="$ID" \
+        REPO_TARGET="$ID" \
+        CREATEREPO_USER="$USER" \
+        OUTPUT_DIR="$SCRIPT_DIR/output" \
+        CREATEREPO_WEBROOT="/var/www/jriver" \
+        USER="${SUDO_USER:-$USER}"
+
     declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
     declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-    declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
-    declare -g CREATEREPO_WEBROOT="/var/www/jriver"
-    declare -g USER="${SUDO_USER:-$USER}"
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
+    # Set some defaults if zero or one arguments are passed
     if [[ $# -eq 0 && $ID != "unknown" ]]; then
         debug "Automatically setting --install repo"
         REPO_INSTALL_SWITCH=1
@@ -377,7 +378,7 @@ parse_input() {
                     BUILD_SWITCH=1
                     ;;
                 --no-self-update)
-                    NO_SELF_UPDATE=1
+                    SELF_UPDATE=0
                     ;;
                 --container|-c)
                     shift && CONTAINERS+=("$1")
@@ -424,7 +425,7 @@ set_mc_version() {
 
     declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT
     declare -g MC_PKG MC_RPM
-    declare cnt
+    local cnt
 
     # Determine the latest MC version
     # User input
@@ -432,22 +433,22 @@ set_mc_version() {
         MC_VERSION_SOURCE="user input"
         MC_VERSION="$USER_MC_VERSION"
     # Containerized package manager
-    elif install_package --silent buildah &&
-    cnt=$(buildah from --quiet alpine:edge 2>/dev/null) &&
-    buildah run "$cnt" -- sh -c \
-        "apk add apt" &>/dev/null &&
-    buildah run "$cnt" -- sh -c \
-        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main' > /etc/apt/sources.list 2>&1" &>/dev/null && # we are only using this to parse the repo so just use the default
-    buildah run "$cnt" -- sh -c \
-        "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null &&
-    MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null &&
-    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    elif install_package --silent buildah \
+    && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
+    && buildah run "$cnt" -- sh -c \
+        "apk add apt" &>/dev/null \
+    && buildah run "$cnt" -- sh -c \
+        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main' > /etc/apt/sources.list 2>&1" &>/dev/null \
+    && buildah run "$cnt" -- sh -c \
+        "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null \
+    && MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null \
+    && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         MC_VERSION_SOURCE="containerized package manager"
         execute buildah rm "$cnt"
     # Webscrape
-    elif install_package --silent wget &&
-    MC_VERSION=$(wget -qO- "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) &&
-    [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    elif install_package --silent wget \
+    && MC_VERSION=$(wget -qO- "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
+    && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
         MC_VERSION_SOURCE="webscrape"
     # Hardcoded
     else
@@ -493,9 +494,9 @@ install_package() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
     declare -a pkg_array install_flags
-    declare long_opts input pkg
-    declare no_install_check allow_downgrades silent refresh no_gpg_check
     declare -A pkg_aliases
+    local long_opts input pkg no_install_check \
+        allow_downgrades silent refresh no_gpg_check
 
     long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
 
@@ -592,9 +593,12 @@ install_mesa_freeworld() {
 install_mc_repo() {
     debug "Running: ${FUNCNAME[0]}"
 
+    local deb_repo_file="/etc/apt/sources.list.d/jriver.list"
+    local rpm_repo_file="/etc/yum.repos.d/jriver.repo"
+
     case $ID in
         fedora|centos)
-            sudo bash -c "cat <<-EOF > /etc/yum.repos.d/jriver.repo
+            sudo bash -c "cat <<-EOF > $rpm_repo_file
 				[jriver]
 				name=JRiver Media Center repo by BryanC
 				baseurl=https://repos.bryanroessler.com/jriver
@@ -604,14 +608,12 @@ install_mc_repo() {
             install_mesa_freeworld
             ;;
         debian|ubuntu)
-            declare repo_dir="/etc/apt/sources.list.d"
-            [[ -d $repo_dir ]] || execute sudo mkdir -p "$repo_dir"
-            # Remove existing MC repositories
-            execute sudo rm -rf "$repo_dir"/mediacenter*.list
             install_package wget
-            sudo bash -c "cat <<-EOF > $repo_dir/jriver.list
+            debug "Adding MC repository to $deb_repo_file"
+            sudo bash -c "cat <<-EOF > $deb_repo_file
 				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main
 			EOF"
+            debug "Installing JRiver Media Center RPM key"
             wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
                 sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
             ;;
@@ -681,8 +683,8 @@ acquire_deb() {
 build_rpm() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare i rpmbuild_cmd
-    declare -a requires recommends
+    local i rpmbuild_cmd
+    local -a requires recommends
 
     # skip rebuilding the rpm if it already exists
     if [[ -f $MC_RPM ]]; then
@@ -864,10 +866,12 @@ install_mc_deb() {
         execute tar xJf "control.tar.xz"
         # Remove minimum version specifiers from control file
         sed -i 's/ ([^)]*)//g' "control"
-        # sed -i 's/([^)]*)//g' "control" # TODO MC DEB package error
-        [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] &&
-        ! grep -q zorin /etc/os-release && # TODO ugly ZorinOS workaround
-        sed -i 's/libva2/libva1/g' "control"
+
+        # TODO ugly ZorinOS workaround
+        [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
+        && ! grep -q zorin /etc/os-release \
+        && sed -i 's/libva2/libva1/g' "control"
+
         execute tar -cJf "control.tar.xz" "control" "postinst"
         declare -g MC_DEB="${MC_DEB/.deb/.compat.deb}"
         execute ar rcs "$MC_DEB" "debian-binary" "control.tar.xz" "data.tar.xz"
@@ -902,7 +906,7 @@ install_mc_rpm() {
 install_mc_generic() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a raw_files
+    local -a raw_files
 
     echo "Using generic installation method!"
 
@@ -986,7 +990,7 @@ install_mc_arch() {
 run_createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -a cr_cmd
+    local -a cr_cmd
 
     install_package createrepo_c
 
@@ -1033,9 +1037,9 @@ run_createrepo() {
 symlink_ssl_certs() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare mc_cert_link="$MC_ROOT/ca-certificates.crt"
-    declare target_cert f
-    declare -a source_certs=(
+    local target_cert f
+    local mc_cert_link="$MC_ROOT/ca-certificates.crt"
+    local -a source_certs=(
         "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" 
         "/var/lib/ca-certificates/ca-bundle.pem")
 
@@ -1060,11 +1064,11 @@ symlink_ssl_certs() {
 restore_license() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare f newest
+    local f newest mjrfiles
 
     # Glob mjr files from common directories
     shopt -s nullglob
-    declare -a mjrfiles=(
+    mjrfiles=(
         "$SCRIPT_DIR"/*.mjr 
         "$OUTPUT_DIR"/*.mjr 
         "$HOME"/[dD]ownloads/*.mjr
@@ -1104,12 +1108,12 @@ restore_license() {
 open_firewall() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    declare port
-    declare service="$1"
+    local port
+    local service="$1"
     shift
-    declare -a f_ports=("$@") # for firewall-cmd
-    declare u_ports="$*"
-    declare u_ports="${u_ports// /|}" # concatenate
+    local -a f_ports=("$@") # for firewall-cmd
+    local u_ports="$*"
+    u_ports="${u_ports// /|}" # concatenate
     u_ports="${u_ports//-/\:}" # for ufw
 
     if command -v firewall-cmd &>/dev/null; then
@@ -1147,7 +1151,7 @@ open_firewall() {
 set_vnc_pass() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare vncpassfile="$HOME/.vnc/jrmc_passwd"
+    local vncpassfile="$HOME/.vnc/jrmc_passwd"
 
     [[ -d ${vncpassfile%/*} ]] || execute mkdir -p "${vncpassfile%/*}"
 
@@ -1207,10 +1211,10 @@ set_service_vars() {
     declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
     declare -g USER_STRING DISPLAY_STRING GRAPHICAL_TARGET
     declare -ga RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
-    declare -a systemctl_prefix
-    declare service_name="$1"
-    declare service_type="${SERVICE_TYPE:-${2:-system}}"
-    declare service_dir="/usr/lib/systemd/$service_type"
+    local -a systemctl_prefix
+    local service_name="$1"
+    local service_type="${SERVICE_TYPE:-${2:-system}}"
+    local service_dir="/usr/lib/systemd/$service_type"
 
     if [[ $USER == "root" && $service_type == "user" ]]; then
         err "Trying to install user service as root"
@@ -1294,8 +1298,8 @@ service_jriver-mediacenter() {
 
     open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 
-    "${RELOAD[@]}" &&
-    "${ENABLE[@]}" "$SERVICE_NAME"
+    "${RELOAD[@]}" \
+    && "${ENABLE[@]}" "$SERVICE_NAME"
 }
 
 
@@ -1320,7 +1324,7 @@ service_jriver-xvnc() {
 
     set_service_vars "${FUNCNAME[0]##*_}" "system"
     set_display_vars
-    declare -a start_cmd
+    local -a start_cmd
     declare -g PORT=$(( NEXT_DISPLAY_NUM + 5900 ))
 
     install_package tigervnc-server
@@ -1390,7 +1394,7 @@ service_jriver-x11vnc() {
     set_service_vars "${FUNCNAME[0]##*_}" "user"
     set_display_vars
 
-    declare -a start_cmd
+    local -a start_cmd
     declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
 
     install_package x11vnc
@@ -1442,9 +1446,9 @@ service_jriver-x11vnc() {
 
     open_firewall "jriver-x11vnc" "$PORT/tcp"
 
-    "${RELOAD[@]}" &&
-    "${ENABLE[@]}" "$SERVICE_NAME" &&
-    echo "x11vnc running on localhost:$PORT"
+    "${RELOAD[@]}" \
+    && "${ENABLE[@]}" "$SERVICE_NAME" \
+    && echo "x11vnc running on localhost:$PORT"
 }
 
 
@@ -1485,8 +1489,8 @@ service_jriver-createrepo() {
 		WantedBy=timers.target
 	EOF"
 
-    "${RELOAD[@]}" &&
-    "${ENABLE[@]}" "$TIMER_NAME"
+    "${RELOAD[@]}" \
+    && "${ENABLE[@]}" "$TIMER_NAME"
 }
 
 
@@ -1496,14 +1500,14 @@ service_jriver-createrepo() {
 disable_btrfs_cow() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare dir
-    declare mc_user_path="$HOME/.jriver"
+    local dir
+    local mc_user_path="$HOME/.jriver"
 
     for dir in "$MC_ROOT" "$mc_user_path"; do
         [[ -d $dir ]] || execute mkdir -p "$dir"
-        if [[ $(stat -f -c %T "$dir") == "btrfs" ]] &&
-        ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C &&
-        execute sudo chattr +C "$dir"; then
+        if [[ $(stat -f -c %T "$dir") == "btrfs" ]] \
+        && ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C \
+        && execute sudo chattr +C "$dir"; then
             echo "Disabled btrfs CoW for $dir directory"
         fi
     done
@@ -1516,7 +1520,7 @@ disable_btrfs_cow() {
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare service unit f i
+    local service unit f i
 
     echo "Stopping and removing all Media Center services"
     for service in $(compgen -A "function" "service"); do
@@ -1589,41 +1593,37 @@ uninstall() {
 update_self() {
     debug "Running: ${FUNCNAME[0]} $*"
 
-    declare script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-    declare tmp
-    tmp=$(mktemp)
-
-    # Download the latest version of installJRMC using curl or wget
-    if command -v curl > /dev/null; then
-        curl -s -L -o "$tmp" "$script_url"
-    elif command -v wget > /dev/null; then
-        wget -q -O "$tmp" "$script_url"
-    else
-        return 1
-    fi
-
-    # Check if the downloaded file is different from the current script
-    if ! cmp -s "$tmp" "$SCRIPT_PATH"; then
-        echo "New version of installJRMC found. Updating..."
-        execute mv "$tmp" "$SCRIPT_PATH"
-        execute chmod +x "$SCRIPT_PATH"
-        echo "Update complete. Restarting script"
-        exec "$SCRIPT_PATH" "$@" "--no-self-update"
-    else
-        echo "Already up to date."
-    fi
-
-    rm -f "$tmp"
-}
-
-
-
-update_self() {
-    debug "Running: ${FUNCNAME[0]} $*"
-
     local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-    local tmp
-    tmp=$(mktemp)
+    local tmp; tmp=$(mktemp)
+
+    # Check if we're in a git directory and if it's the installJRMC repository
+    if git rev-parse --is-inside-work-tree &>/dev/null; then
+        local git_remote_url
+        git_remote_url=$(git config --get remote.origin.url)
+        if [[ "$git_remote_url" == *"bryan/installJRMC"* ]]; then
+            echo "installJRMC git repository detected. Running git pull..."
+
+            # Get the current checksum of the script
+            declare before_pull_checksum
+            before_pull_checksum=$(git rev-parse HEAD:"$SCRIPT_PATH")
+
+            # Perform git pull
+            git pull || return 1
+
+            # Get the new checksum after the pull
+            declare after_pull_checksum
+            after_pull_checksum=$(git rev-parse HEAD:"$SCRIPT_PATH")
+
+            # Check if the script has changed
+            if [[ "$before_pull_checksum" != "$after_pull_checksum" ]]; then
+                echo "installJRMC script updated. Restarting script..."
+                exec "$SCRIPT_PATH" "$@" "--no-self-update"
+            else
+                echo "installJRMC script is already up to date."
+                return 0
+            fi
+        fi
+    fi
 
     # Download the latest version of the script
     if command -v curl &>/dev/null; then
@@ -1651,6 +1651,7 @@ update_self() {
 
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
+    # Save and execute the new script if the remote version is newer
     if [[ $local_version < $remote_version ]]; then
         echo "Newer version of installJRMC found. Updating..."
         execute mv "$tmp" "$SCRIPT_PATH"
@@ -1660,6 +1661,7 @@ update_self() {
 
     execute rm -f "$tmp"
 }
+
 
 
 
@@ -1674,7 +1676,7 @@ main() {
     debug "installJRMC version: $SCRIPT_VERSION"
     # ((DEBUG)) && declare -p
 
-    ((NO_SELF_UPDATE)) || update_self "$@"
+    ((SELF_UPDATE)) && update_self "$@"
 
     if ((TEST_SWITCH)); then 
         echo "Running tests, all other options are skipped"
@@ -1740,8 +1742,8 @@ main() {
         install_package "wget"
         [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
         acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
-        if [[ $BUILD_TARGET =~ (centos|fedora|suse) ||
-        $REPO_TARGET =~ (centos|fedora|suse) ]]; then
+        if [[ $BUILD_TARGET =~ (centos|fedora|suse) \
+        || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
             install_package "dpkg" "rpm-build"
             [[ -d $OUTPUT_DIR/SPECS ]] || execute mkdir -p "$OUTPUT_DIR/SPECS"
             build_rpm
