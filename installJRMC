@@ -189,8 +189,9 @@ init() {
     esac
 
     # Match the MC repo to the system
-    [[ $ID == debian || $ID == ubuntu ]] && [[ -n $VERSION_CODENAME ]] && MC_DEFAULT_REPO="$VERSION_CODENAME"
-
+    if [[ $ID == debian || $ID == ubuntu ]]; then
+        MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
+    fi
     # Change the repo for user-specified legacy versions
     if [[ -n $USER_MC_VERSION ]]; then
         case $MC_MVERSION in
@@ -475,7 +476,6 @@ set_mc_version() {
     fi
 
     echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo (determined by $MC_VERSION_SOURCE)"
-    [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
     return 0
 }
 
@@ -1660,7 +1660,6 @@ update_self() {
 
     rm -f "$tmp"
 }
-
 
 
 main() {
