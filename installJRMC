@@ -1617,6 +1617,52 @@ update_self() {
 }
 
 
+
+update_self() {
+    debug "Running: ${FUNCNAME[0]} $*"
+
+    local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
+    local tmp
+    tmp=$(mktemp)
+
+    # Download the latest version of the script
+    if command -v curl &>/dev/null; then
+        curl -s -L -o "$tmp" "$script_url"
+    elif command -v wget &>/dev/null; then
+        wget -q -O "$tmp" "$script_url"
+    else
+        return 1
+    fi
+
+    # Extract and normalize version from a script
+    extract_version() {
+        local version_line
+        version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
+        version_line=${version_line#*=}
+        version_line=${version_line#\"}
+        version_line=${version_line%-dev\"}
+        version_line=${version_line%\"}
+        echo "$version_line"
+    }
+
+    # Compare versions
+    local_version=$(extract_version "$SCRIPT_PATH")
+    remote_version=$(extract_version "$tmp")
+
+    [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
+
+    if [[ $local_version < $remote_version ]]; then
+        echo "Newer version of installJRMC found. Updating..."
+        execute mv "$tmp" "$SCRIPT_PATH"
+        execute chmod +x "$SCRIPT_PATH"
+        exec "$SCRIPT_PATH" "$@" "--no-self-update"
+    fi
+
+    execute rm -f "$tmp"
+}
+
+
+
 main() {
     debug "Running: ${FUNCNAME[0]} $*"
 
