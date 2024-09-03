@@ -1604,6 +1604,8 @@ update_self() {
     local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
     local tmp; tmp=$(mktemp)
 
+    echo "Checking for installJRMC update"
+
     # Function to extract and normalize version from a script
     extract_version() {
         local version_line
