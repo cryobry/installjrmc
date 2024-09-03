@@ -1654,9 +1654,9 @@ update_self() {
     local remote_version
     remote_version=$(extract_version "$tmp")
 
-    debug HERE
-
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
+
+    echo "$remote_version, $local_version"
 
     if [[ $local_version < $remote_version ]]; then
         echo "Newer version of installJRMC found. Updating..."
