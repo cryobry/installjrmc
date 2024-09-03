@@ -476,7 +476,7 @@ set_mc_version() {
 
     echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo (determined by $MC_VERSION_SOURCE)"
     [[ $MC_VERSION_SOURCE == "user input" ]] || echo "To override, use --mcversion"
-    debug "MC_VERSION=$MC_VERSION, MC_REPO=${MC_REPO:-$MC_DEFAULT_REPO}, MC_PKG=$MC_PKG, MC_RPM=$MC_RPM"
+    return 0
 }
 
 
@@ -493,12 +493,11 @@ set_mc_version() {
 install_package() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
-    declare -a pkg_array install_flags
-    declare -A pkg_aliases
-    local long_opts input pkg no_install_check \
-        allow_downgrades silent refresh no_gpg_check
-
-    long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
+    local -a pkg_array install_flags
+    local -A pkg_aliases
+    local input pkg
+    local no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
+    local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
 
     input=$(getopt -o +s -l "$long_opts" -- "$@") || { err "Incorrect options provided"; exit 1; }
     eval set -- "$input"
@@ -515,27 +514,33 @@ install_package() {
         shift
     done
 
-    # Package aliases
+    # Define package aliases based on the distribution
     case $ID in
         debian|ubuntu)
-            pkg_aliases["rpm-build"]="rpm"
-            pkg_aliases["createrepo_c"]="createrepo"
-            pkg_aliases["tigervnc-server"]="tigervnc-standalone-server"
+            pkg_aliases=(
+                ["rpm-build"]="rpm"
+                ["createrepo_c"]="createrepo"
+                ["tigervnc-server"]="tigervnc-standalone-server"
+            )
             ;;
     esac
 
-    # Filter installed packages
+    # Filter out already installed packages
     for pkg in "$@"; do
-        [[ -v pkg_aliases[$pkg] ]] && { debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"; pkg=${pkg_aliases[$pkg]}; }
-        if (( no_install_check )) || 
-           ! (command -v "$pkg" &>/dev/null || "${PKG_QUERY[@]}" "$pkg" &>/dev/null); then
+        if [[ -v pkg_aliases[$pkg] ]]; then
+            debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"
+            pkg=${pkg_aliases[$pkg]}
+        fi
+        if (( no_install_check )) \
+        || ! { command -v "$pkg" &>/dev/null \
+        || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
             pkg_array+=("$pkg")
         else
             debug "$pkg already installed, skipping installation"
         fi
     done
 
-    # Generate distro-specific install flags
+    # Generate installation flags based on the distribution
     case $ID in
         debian|ubuntu)
             (( allow_downgrades )) && install_flags+=(--allow-downgrades)
@@ -550,10 +555,10 @@ install_package() {
             ;;
     esac
 
-    # Install packages from package array
-    if [[ ${#pkg_array[@]} -ge 1 ]]; then
+    # Install packages if any need installation
+    if [[ ${#pkg_array[@]} -gt 0 ]]; then
         if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then       
-            (( silent )) || err "Failed to install ${pkg_array[*]}. Attempting to continue"
+            (( silent )) || err "Failed to install ${pkg_array[*]}."
             return 1
         fi
     fi
@@ -1034,7 +1039,7 @@ run_createrepo() {
 #######################################
 # Symlink certificates if they do not exist in default location
 #######################################
-symlink_ssl_certs() {
+link_ssl_certs() {
     debug "Running: ${FUNCNAME[0]}"
 
     local target_cert f
@@ -1588,54 +1593,15 @@ uninstall() {
 
 
 #######################################
-# Updates and re-executes this script
+# Checks for installJRMC update and re-executes, if necessary
 #######################################
 update_self() {
     debug "Running: ${FUNCNAME[0]} $*"
 
     local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-    local tmp
-    tmp=$(mktemp)
+    local tmp; tmp=$(mktemp)
 
-    # Check if we're in a git directory and if it's the installJRMC repository
-    if git rev-parse --is-inside-work-tree &>/dev/null; then
-        local git_remote_url
-        git_remote_url=$(git config --get remote.origin.url)
-        if [[ "$git_remote_url" == *"bryan/installJRMC"* ]]; then
-            echo "installJRMC git repository detected. Running git pull..."
-
-            # Get the current commit hash of the script's directory
-            local before_pull_hash
-            before_pull_hash=$(git rev-parse HEAD)
-
-            # Perform git pull
-            git pull || return 1
-
-            # Get the new commit hash after the pull
-            local after_pull_hash
-            after_pull_hash=$(git rev-parse HEAD)
-
-            # Check if the commit hash has changed
-            if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
-                echo "installJRMC script updated. Restarting script..."
-                exec "$SCRIPT_PATH" "$@" "--no-self-update"
-            else
-                echo "installJRMC script is already up to date."
-                return 0
-            fi
-        fi
-    fi
-
-    # Download the latest version of the script
-    if command -v curl &>/dev/null; then
-        curl -s -L -o "$tmp" "$script_url"
-    elif command -v wget &>/dev/null; then
-        wget -q -O "$tmp" "$script_url"
-    else
-        return 1
-    fi
-
-    # Extract and normalize version from a script
+    # Function to extract and normalize version from a script
     extract_version() {
         local version_line
         version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
@@ -1646,13 +1612,45 @@ update_self() {
         echo "$version_line"
     }
 
-    # Compare versions
+    # Check if we're in a git directory and if it's the installJRMC repository
+    if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
+    && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"bryan/installJRMC"* ]]; then
+        debug "installJRMC git repository detected. Running git pull..."
+
+        # Get the current commit hash
+        local before_pull_hash
+        before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+
+        if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
+            return 0
+        fi
+
+        local after_pull_hash
+        after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+        if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
+            echo "installJRMC repository updated. Restarting script..."
+            exec "$SCRIPT_PATH" "$@" "--no-self-update"
+        fi
+    fi
+
+    # Download the latest version of the script
+    install_package --silent wget
+    if command -v wget &>/dev/null; then
+        wget -q -O "$tmp" "$script_url"
+    elif command -v curl &>/dev/null; then
+        curl -s -L -o "$tmp" "$script_url"
+    else
+        return 1
+    fi
+
+    # Compare versions and update if necessary
+    local local_version
     local_version=$(extract_version "$SCRIPT_PATH")
+    local remote_version
     remote_version=$(extract_version "$tmp")
 
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
-    # Save and execute the new script if the remote version is newer
     if [[ $local_version < $remote_version ]]; then
         echo "Newer version of installJRMC found. Updating..."
         execute mv "$tmp" "$SCRIPT_PATH"
@@ -1660,8 +1658,9 @@ update_self() {
         exec "$SCRIPT_PATH" "$@" "--no-self-update"
     fi
 
-    execute rm -f "$tmp"
+    rm -f "$tmp"
 }
+
 
 
 main() {
@@ -1697,7 +1696,7 @@ main() {
     # Install external repos
     case $ID in
         ubuntu)
-            if ! grep ^deb /etc/apt/sources.list|grep -q universe; then
+            if ! grep ^deb /etc/apt/sources.list | grep -q universe; then
                 echo "Adding universe repository"
                 if ! execute sudo add-apt-repository -y universe; then
                     err "Adding universe repository failed"
@@ -1726,7 +1725,7 @@ main() {
         echo "Installing JRiver Media Center from remote repository"
         if install_mc_repo; then
             echo "JRiver Media Center installed successfully from remote repository"
-            symlink_ssl_certs
+            link_ssl_certs
             # migrateLibrary
             restore_license
             open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
@@ -1756,7 +1755,7 @@ main() {
             err "JRiver Media Center local package installation failed"
             return 1
         fi
-        symlink_ssl_certs
+        link_ssl_certs
         # migrateLibrary
         restore_license
         open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
