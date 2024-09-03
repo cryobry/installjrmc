@@ -1641,9 +1641,9 @@ update_self() {
     # Download the latest version of the script
     install_package --silent wget
     if command -v wget &>/dev/null; then
-        wget -q -O "$tmp" "$script_url"
+        execute wget -q -O "$tmp" "$script_url"
     elif command -v curl &>/dev/null; then
-        curl -s -L -o "$tmp" "$script_url"
+        execute curl -s -L -o "$tmp" "$script_url"
     else
         return 1
     fi
@@ -1653,6 +1653,8 @@ update_self() {
     local_version=$(extract_version "$SCRIPT_PATH")
     local remote_version
     remote_version=$(extract_version "$tmp")
+
+    debug HERE
 
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
