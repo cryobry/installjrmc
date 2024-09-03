@@ -1594,7 +1594,8 @@ update_self() {
     debug "Running: ${FUNCNAME[0]} $*"
 
     local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-    local tmp; tmp=$(mktemp)
+    local tmp
+    tmp=$(mktemp)
 
     # Check if we're in a git directory and if it's the installJRMC repository
     if git rev-parse --is-inside-work-tree &>/dev/null; then
@@ -1603,19 +1604,19 @@ update_self() {
         if [[ "$git_remote_url" == *"bryan/installJRMC"* ]]; then
             echo "installJRMC git repository detected. Running git pull..."
 
-            # Get the current checksum of the script
-            declare before_pull_checksum
-            before_pull_checksum=$(git rev-parse HEAD:"$SCRIPT_PATH")
+            # Get the current commit hash of the script's directory
+            local before_pull_hash
+            before_pull_hash=$(git rev-parse HEAD)
 
             # Perform git pull
             git pull || return 1
 
-            # Get the new checksum after the pull
-            declare after_pull_checksum
-            after_pull_checksum=$(git rev-parse HEAD:"$SCRIPT_PATH")
+            # Get the new commit hash after the pull
+            local after_pull_hash
+            after_pull_hash=$(git rev-parse HEAD)
 
-            # Check if the script has changed
-            if [[ "$before_pull_checksum" != "$after_pull_checksum" ]]; then
+            # Check if the commit hash has changed
+            if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
                 echo "installJRMC script updated. Restarting script..."
                 exec "$SCRIPT_PATH" "$@" "--no-self-update"
             else
@@ -1661,8 +1662,6 @@ update_self() {
 
     execute rm -f "$tmp"
 }
-
-
 
 
 main() {
