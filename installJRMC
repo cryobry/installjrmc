@@ -1610,10 +1610,9 @@ update_self() {
     extract_version() {
         local version_line
         version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
-        version_line=${version_line#*=}
-        version_line=${version_line#\"}
-        version_line=${version_line%-dev\"}
+        version_line=${version_line#*=\"}
         version_line=${version_line%\"}
+        version_line=${version_line%-dev}
         echo "$version_line"
     }
 
