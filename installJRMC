@@ -1627,8 +1627,6 @@ update_self() {
         fi
     fi
 
-    echo HERE2
-
     # Download the latest version of the script
     install_package --silent wget
     if command -v wget &>/dev/null; then
@@ -1639,24 +1637,26 @@ update_self() {
         return 1
     fi
 
-    echo HERE3
+    # Extract and normalize versions inline without subshells
+    local local_version=""
+    while IFS= read -r line; do
+        case "$line" in
+            *SCRIPT_VERSION=*) local_version=${line#*=}; break;;
+        esac
+    done < "$SCRIPT_PATH"
+    local_version=${local_version#\"}  # Remove leading '"'
+    local_version=${local_version%\"}  # Remove trailing '"'
+    local_version=${local_version%-dev}  # Remove '-dev' suffix
 
-    declare -p
-
-    # Extract and normalize versions inline
-    local local_version
-    local_version=$(grep -m 1 'SCRIPT_VERSION=' "$SCRIPT_PATH")
-    local_version=${local_version#*=}
-    local_version=${local_version#\"}
-    local_version=${local_version%\"}
-    local_version=${local_version%-dev}
-
-    local remote_version
-    remote_version=$(grep -m 1 'SCRIPT_VERSION=' "$tmp")
-    remote_version=${remote_version#*=}
-    remote_version=${remote_version#\"}
-    remote_version=${remote_version%\"}
-    remote_version=${remote_version%-dev}
+    local remote_version=""
+    while IFS= read -r line; do
+        case "$line" in
+            *SCRIPT_VERSION=*) remote_version=${line#*=}; break;;
+        esac
+    done < "$tmp"
+    remote_version=${remote_version#\"}  # Remove leading '"'
+    remote_version=${remote_version%\"}  # Remove trailing '"'
+    remote_version=${remote_version%-dev}  # Remove '-dev' suffix
 
     echo HERE4
 
@@ -1675,6 +1675,7 @@ update_self() {
 
     rm -f "$tmp"
 }
+
 
 
 
