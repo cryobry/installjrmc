@@ -1648,18 +1648,15 @@ update_self() {
         return 1
     fi
 
-    # Compare versions and update if necessary
-    local local_version
-    local_version=$(extract_version "$SCRIPT_PATH")
+    # Get latest version number
     local remote_version
     remote_version=$(extract_version "$tmp")
-
-    debug HERE
-
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
-    if [[ $local_version < $remote_version ]]; then
-        echo "Newer version of installJRMC found. Updating..."
+    # Compare versions and update if necessary
+    if [[ $SCRIPT_VERSION < $remote_version ]]; then
+        echo "Current installJRMC version: $SCRIPT_VERSION"
+        echo "Latest installJRMC version: $remote_version. Updating..."
         execute mv "$tmp" "$SCRIPT_PATH"
         execute chmod +x "$SCRIPT_PATH"
         exec "$SCRIPT_PATH" "$@" "--no-self-update"
