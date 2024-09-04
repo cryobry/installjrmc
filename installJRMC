@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPTVERSION="1.2.2"
+declare -g SCRIPT_VERSION="1.2.2"
 declare -g BOARDURL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -g MC_VERSION="33.0.15" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION 
@@ -411,7 +411,7 @@ parseInput() {
                     YES_SWITCH=1
                     ;;
                 --version|-v)
-                    echo "Version: $SCRIPTVERSION"
+                    echo "Version: $SCRIPT_VERSION"
                     exit 0
                     ;;
                 --debug|-d|--verbose)
@@ -1654,7 +1654,7 @@ main() {
     init
 
     debug "Debugging on"
-    debug "installJRMC version: $SCRIPTVERSION"
+    debug "installJRMC version: $SCRIPT_VERSION"
 
     if ((TEST_SWITCH)); then 
         echo "Running tests, all other options are skipped"
