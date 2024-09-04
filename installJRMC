@@ -1617,6 +1617,8 @@ update_self() {
         echo "$version_line"
     }
 
+    echo HERE
+
     # Check if we're in a git directory and if it's the installJRMC repository
     if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
     && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"bryan/installJRMC"* ]]; then
@@ -1638,6 +1640,8 @@ update_self() {
         fi
     fi
 
+    echo HERE2
+
     # Download the latest version of the script
     install_package --silent wget
     if command -v wget &>/dev/null; then
@@ -1647,6 +1651,8 @@ update_self() {
     else
         return 1
     fi
+
+    echo HERE3
 
     # Compare versions and update if necessary
     local local_version
