@@ -1653,7 +1653,8 @@ update_self() {
     local_version=${local_version%-dev}
 
     local remote_version
-    grep -m 1 'SCRIPT_VERSION=' "$SCRIPT_PATH"
+    cat $tmp
+    grep -m 1 'SCRIPT_VERSION=' "$tmp"
     remote_version=$(grep -m 1 'SCRIPT_VERSION=' "$tmp")
     remote_version=${remote_version#*=}
     remote_version=${remote_version#\"}
