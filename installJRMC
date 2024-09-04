@@ -1606,6 +1606,17 @@ update_self() {
 
     echo "Checking for installJRMC update"
 
+    # Function to extract and normalize version from a script
+    extract_version() {
+        local version_line
+        version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
+        version_line=${version_line#*=}
+        version_line=${version_line#\"}
+        version_line=${version_line%-dev\"}
+        version_line=${version_line%\"}
+        echo "$version_line"
+    }
+
     # Check if we're in a git directory and if it's the installJRMC repository
     if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
     && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"bryan/installJRMC"* ]]; then
@@ -1627,8 +1638,6 @@ update_self() {
         fi
     fi
 
-    echo HERE2
-
     # Download the latest version of the script
     install_package --silent wget
     if command -v wget &>/dev/null; then
@@ -1639,35 +1648,15 @@ update_self() {
         return 1
     fi
 
-    echo HERE3
-
-    declare -p
-
-    # Extract and normalize versions using grep
+    # Compare versions and update if necessary
     local local_version
-    grep -m 1 'SCRIPT_VERSION=' "$SCRIPT_PATH"
-    local_version=$(grep -m 1 'SCRIPT_VERSION=' "$SCRIPT_PATH")
-    local_version=${local_version#*=}
-    local_version=${local_version#\"}
-    local_version=${local_version%\"}
-    local_version=${local_version%-dev}
-
+    local_version=$(extract_version "$SCRIPT_PATH")
     local remote_version
-    cat $tmp
-    grep -m 1 'SCRIPT_VERSION=' "$tmp"
-    remote_version=$(grep -m 1 'SCRIPT_VERSION=' "$tmp")
-    remote_version=${remote_version#*=}
-    remote_version=${remote_version#\"}
-    remote_version=${remote_version%\"}
-    remote_version=${remote_version%-dev}
+    remote_version=$(extract_version "$tmp")
 
-    echo "$remote_version, $local_version"
-
+    debug HERE
 
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
-
-    
-    echo HERE5
 
     if [[ $local_version < $remote_version ]]; then
         echo "Newer version of installJRMC found. Updating..."
@@ -1678,8 +1667,6 @@ update_self() {
 
     rm -f "$tmp"
 }
-
-
 
 
 main() {
