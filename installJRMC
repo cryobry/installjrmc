@@ -1654,15 +1654,21 @@ update_self() {
 
     echo HERE3
 
+    declare -p
+
     # Compare versions and update if necessary
     local local_version
     local_version=$(extract_version "$SCRIPT_PATH")
     local remote_version
     remote_version=$(extract_version "$tmp")
 
+    echo HERE4
+
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
     echo "$remote_version, $local_version"
+
+    echo HERE5
 
     if [[ $local_version < $remote_version ]]; then
         echo "Newer version of installJRMC found. Updating..."
