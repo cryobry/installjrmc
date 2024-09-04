@@ -1607,14 +1607,16 @@ update_self() {
     echo "Checking for installJRMC update"
 
     # Function to extract and normalize version from a script
-    extract_version() {
-        local version_line
-        version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
-        version_line=${version_line#*=\"}
-        version_line=${version_line%\"}
-        version_line=${version_line%-dev}
-        echo "$version_line"
-    }
+extract_version() {
+    local version_line
+    version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
+    version_line=${version_line#*=}  # Remove everything before and including '='
+    version_line=${version_line#\"}  # Remove leading '"'
+    version_line=${version_line%\"}  # Remove trailing '"'
+    version_line=${version_line%-dev}  # Remove '-dev' suffix if present
+    echo "$version_line"
+}
+
 
     echo HERE
 
