@@ -190,8 +190,6 @@ init() {
 
     # Match the MC repo to the system
     if [[ $ID == debian || $ID == ubuntu ]]; then
-        echo "Ubuntu codename: $UBUNTU_CODENAME"
-        echo "Version codename: $VERSION_CODENAME"
         MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
     fi
 
@@ -1604,7 +1602,7 @@ update_self() {
     local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
     local tmp; tmp=$(mktemp)
 
-    echo "Checking for installJRMC update"
+    debug "Checking for installJRMC update"
 
     # Function to extract and normalize version from a script
     extract_version() {
