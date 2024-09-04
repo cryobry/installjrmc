@@ -1640,6 +1640,7 @@ update_self() {
     # Extract and normalize versions inline without subshells
     local local_version=""
     while IFS= read -r line; do
+        echo $line
         case "$line" in
             *SCRIPT_VERSION=*) local_version=${line#*=}; break;;
         esac
