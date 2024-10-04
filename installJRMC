@@ -1736,8 +1736,10 @@ main() {
         install_package "wget"
         [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
         acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
-        if [[ $BUILD_TARGET =~ (centos|fedora|suse) \
-        || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
+
+        declare -p
+
+        if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
             install_package "dpkg" "rpm-build"
             [[ -d $OUTPUT_DIR/SPECS ]] || execute mkdir -p "$OUTPUT_DIR/SPECS"
             build_rpm
