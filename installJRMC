@@ -260,6 +260,8 @@ parse_input() {
     declare -ga SERVICES CONTAINERS
     local long_opts short_opts input
 
+    declare -p ID BUILD_TARGET
+
     declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
     declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
     declare -g BUILD_TARGET="$ID"
@@ -269,6 +271,8 @@ parse_input() {
     declare -g CREATEREPO_WEBROOT="/var/www/jriver"
     declare -g USER="${SUDO_USER:-$USER}"
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
+
+    declare -p ID BUILD_TARGET
 
     # Set some defaults if zero or one arguments are passed
     if [[ $# -eq 0 && $ID != "unknown" ]]; then
@@ -1735,7 +1739,7 @@ main() {
         [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
         acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
 
-        declare -p
+        declare -p ID BUILD_TARGET
 
         if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
             install_package "dpkg" "rpm-build"
