@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.3.4-dev"
+declare -g SCRIPT_VERSION="1.3.4"
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -g MC_VERSION="33.0.20" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION
@@ -1724,12 +1724,12 @@ main() {
             fi
             ;;
         suse)
-            if ! zypper repos | grep -q "X11_XOrg"; then
-                echo "Installing the X11 repository"
-                execute sudo zypper  --non-interactive --quiet addrepo \
-                    "https://download.opensuse.org/repositories/X11:/XOrg/$OS_NAME/X11:XOrg.repo"
-                execute sudo zypper  --non-interactive --quiet refresh
-            fi
+            # if ! zypper repos | grep -q "X11_XOrg"; then
+            #     echo "Installing the X11 repository"
+            #     execute sudo zypper  --non-interactive --quiet addrepo \
+            #         "https://download.opensuse.org/repositories/X11:/XOrg/$OS_NAME/X11:XOrg.repo"
+            #     execute sudo zypper  --non-interactive --quiet refresh
+            # fi
             ;;
     esac
 
