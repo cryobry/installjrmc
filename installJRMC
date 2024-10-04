@@ -139,7 +139,7 @@ init() {
     (( EUID == 0 )) && err "Running as root user"
 
     if [[ -f /etc/os-release ]]; then
-        source "/etc/os-release"
+        source /etc/os-release
     else
         err "/etc/os-release not found"
         err "Your OS is unsupported"
@@ -155,6 +155,10 @@ init() {
     esac
 
     debug "Detected host platform: $ID $VERSION_ID $ARCH"
+
+    # Set defaults
+    BUILD_TARGET="${BUILD_TARGET:-$ID}"
+    REPO_TARGET="${REPO_TARGET:-$ID}"
 
     # Normalize ID and set distro-specific vars
     case $ID in
@@ -256,23 +260,16 @@ parse_input() {
     declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
         COMPAT_SWITCH TEST_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
         YES_SWITCH USER_MC_VERSION MJR_RESTORE_FILE BETAPASS SERVICE_TYPE \
-        VNCPASS USER_DISPLAY MC_REPO
+        VNCPASS USER_DISPLAY MC_REPO BUILD_TARGET REPO_TARGET
     declare -ga SERVICES CONTAINERS
     local long_opts short_opts input
-
-    declare -p ID BUILD_TARGET
-
     declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
     declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-    declare -g BUILD_TARGET="$ID"
-    declare -g REPO_TARGET="$ID"
     declare -g CREATEREPO_USER="$USER"
     declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
     declare -g CREATEREPO_WEBROOT="/var/www/jriver"
     declare -g USER="${SUDO_USER:-$USER}"
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
-
-    declare -p ID BUILD_TARGET
 
     # Set some defaults if zero or one arguments are passed
     if [[ $# -eq 0 && $ID != "unknown" ]]; then
@@ -1738,8 +1735,6 @@ main() {
         install_package "wget"
         [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
         acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
-
-        declare -p ID BUILD_TARGET
 
         if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
             install_package "dpkg" "rpm-build"
