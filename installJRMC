@@ -1674,7 +1674,6 @@ main() {
 
     debug "Debugging on"
     debug "installJRMC version: $SCRIPT_VERSION"
-    declare -p
 
     ((SELF_UPDATE)) && update_self "$@"
 
@@ -1685,6 +1684,7 @@ main() {
     fi
 
     set_mc_version
+    ((DEBUG)) && declare -p
 
     if (( UNINSTALL_SWITCH )); then
         if ask_ok "Do you really want to uninstall JRiver Media Center?"; then
