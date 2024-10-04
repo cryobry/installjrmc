@@ -228,7 +228,7 @@ init() {
             PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
             PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
             PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL() { install_mc_rpm; }
+            PKG_INSTALL_LOCAL() { install_mc_suse; }
             ;;
         arch)
             PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
@@ -905,6 +905,16 @@ install_mc_rpm() {
 
 
 #######################################
+# Installs Media Center RPM package on SUSE
+#######################################
+install_mc_suse() {
+    debug "Running: ${FUNCNAME[0]}"
+    
+    install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
+}
+
+
+#######################################
 # Installs Media Center manually
 #######################################
 install_mc_generic() {
@@ -912,7 +922,7 @@ install_mc_generic() {
 
     local -a raw_files
 
-    echo "Using generic installation method!"
+    echo "Using generic installation method"
 
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
