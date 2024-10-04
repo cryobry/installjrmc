@@ -158,10 +158,6 @@ init() {
 
     debug "Detected host platform: $ID $VERSION_ID $ARCH"
 
-    # Set defaults
-    BUILD_TARGET="${BUILD_TARGET:-$ID}"
-    REPO_TARGET="${REPO_TARGET:-$ID}"
-
     # Normalize ID and set distro-specific vars
     case $ID in
         debian|arch) ;;
@@ -194,6 +190,10 @@ init() {
                 LOCAL_INSTALL_SWITCH=1
             fi
     esac
+
+    # Set defaults
+    BUILD_TARGET="${BUILD_TARGET:-$ID}"
+    REPO_TARGET="${REPO_TARGET:-$ID}"
 
     # Match the MC repo to the system
     if [[ $ID == debian || $ID == ubuntu ]]; then
