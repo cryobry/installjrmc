@@ -131,7 +131,7 @@ execute() {
 init() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID RPM_MGR ARCH
+    declare -g ID RPM_MGR ARCH OS_NAME
     declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
 
     echo "Starting installJRMC"
@@ -146,6 +146,8 @@ init() {
         print_help
         exit 1
     fi
+
+    OS_NAME="${NAME// /_}"
 
     # Detect architecture and translate to MC convention
     ARCH=$(uname -m)
@@ -1710,14 +1712,23 @@ main() {
                 install_package epel-release
             fi
             if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
+                echo "Installing the RPMFusion repository"
                 install_package --no-install-check \
                     "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
             fi
             ;;
         fedora)
             if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
+                echo "Installing the RPMFusion repository"
                 install_package --no-install-check \
                     "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+            fi
+            ;;
+        suse)
+            if ! zypper repos | grep -q "X11:XOrg"; then
+                echo "Installing the X11 repository"
+                execute sudo zypper  --non-interactive --quiet addrepo \
+                    "https://download.opensuse.org/repositories/X11:/XOrg/$OS_NAME/X11:XOrg.repo"
             fi
             ;;
     esac
