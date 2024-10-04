@@ -651,20 +651,27 @@ install_mc_repo() {
 acquire_deb() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_DEB="$OUTPUT_DIR/SOURCES/MediaCenter-$MC_VERSION-$ARCH.deb"
+    local fname="MediaCenter-$MC_VERSION-$ARCH.deb"
+    declare -g MC_DEB="$OUTPUT_DIR/SOURCES/$fname"
+
     debug "MC_DEB=$MC_DEB"
 
     # If deb file already exists, skip download
     if [[ -f $MC_DEB ]]; then
-        echo "Using existing DEB: $MC_DEB"
+        if [[ $(stat -c%s "$MC_DEB") -lt 10000000 ]]; then
+            echo "Removing existing DEB under 10MB: $MC_DEB"
+            execute rm "$MC_DEB"
+        else
+            echo "Using existing DEB: $MC_DEB"
+        fi
         return 0
     fi
 
     # Define the repositories to check
     local repos=(
-        "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MC_VERSION-$ARCH.deb"
-        "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MC_VERSION-$ARCH.deb"
-        "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MC_VERSION-$ARCH.deb"
+        "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/$fname"
+        "https://files.jriver-cdn.com/mediacenter/test/$fname"
+        "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/$fname"
     )
 
     # Loop through the repositories and attempt to download
