@@ -260,7 +260,8 @@ parse_input() {
     declare -ga SERVICES CONTAINERS
     local long_opts short_opts input
 
-    # Defaults
+    declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
+    declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
     declare -g \
         BUILD_TARGET="$ID" \
         REPO_TARGET="$ID" \
@@ -268,12 +269,8 @@ parse_input() {
         OUTPUT_DIR="$SCRIPT_DIR/output" \
         CREATEREPO_WEBROOT="/var/www/jriver" \
         USER="${SUDO_USER:-$USER}"
-
-    declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
-    declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+    
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
-
-    declare -p
 
     # Set some defaults if zero or one arguments are passed
     if [[ $# -eq 0 && $ID != "unknown" ]]; then
