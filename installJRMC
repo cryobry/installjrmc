@@ -664,16 +664,15 @@ acquire_deb() {
 
     # Define the repositories to check
     local repos=(
-        "beta/$BETAPASS"
-        "latest"
-        "test"
+        "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/latest/MediaCenter-$MC_VERSION-$ARCH.deb"
+        "https://files.jriver-cdn.com/mediacenter/test/MediaCenter-$MC_VERSION-$ARCH.deb"
+        "https://files.jriver-cdn.com/mediacenter/channels/v$MVERSION/beta/$BETAPASS/MediaCenter-$MC_VERSION-$ARCH.deb"
     )
 
     # Loop through the repositories and attempt to download
     for repo in "${repos[@]}"; do
-        echo "Checking $repo repo for DEB package"
-        if execute wget --quiet --output-document "$MC_DEB" \
-            "https://files.jriver-cdn.com/mediacenter/channels/v$MC_VERSION/$repo/MediaCenter-$MC_VERSION-$ARCH.deb"; then
+        echo "Checking $repo for DEB package"
+        if execute wget --quiet --output-document "$MC_DEB" "$repo"; then
             echo "Found!"
             break
         fi
