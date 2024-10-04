@@ -262,14 +262,12 @@ parse_input() {
 
     declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
     declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-    declare -g \
-        BUILD_TARGET="$ID" \
-        REPO_TARGET="$ID" \
-        CREATEREPO_USER="$USER" \
-        OUTPUT_DIR="$SCRIPT_DIR/output" \
-        CREATEREPO_WEBROOT="/var/www/jriver" \
-        USER="${SUDO_USER:-$USER}"
-    
+    declare -g BUILD_TARGET="$ID"
+    declare -g REPO_TARGET="$ID"
+    declare -g CREATEREPO_USER="$USER"
+    declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
+    declare -g CREATEREPO_WEBROOT="/var/www/jriver"
+    declare -g USER="${SUDO_USER:-$USER}"
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
     # Set some defaults if zero or one arguments are passed
