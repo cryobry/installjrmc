@@ -273,6 +273,8 @@ parse_input() {
     declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
     declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
+    declare -p
+
     # Set some defaults if zero or one arguments are passed
     if [[ $# -eq 0 && $ID != "unknown" ]]; then
         debug "Automatically setting --install repo"
