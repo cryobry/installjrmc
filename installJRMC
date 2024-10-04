@@ -1674,7 +1674,7 @@ main() {
 
     debug "Debugging on"
     debug "installJRMC version: $SCRIPT_VERSION"
-    # ((DEBUG)) && declare -p
+    ((DEBUG)) && declare -p
 
     ((SELF_UPDATE)) && update_self "$@"
 
