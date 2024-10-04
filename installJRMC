@@ -1724,7 +1724,7 @@ main() {
             fi
             ;;
         suse)
-            if ! zypper repos | grep -q "X11:XOrg"; then
+            if ! zypper repos | grep -q "X11_XOrg"; then
                 echo "Installing the X11 repository"
                 execute sudo zypper  --non-interactive --quiet addrepo \
                     "https://download.opensuse.org/repositories/X11:/XOrg/$OS_NAME/X11:XOrg.repo"
