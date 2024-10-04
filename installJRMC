@@ -680,7 +680,7 @@ acquire_deb() {
     for repo in "${repos[@]}"; do
         echo "Checking $repo for DEB package"
         if execute wget --quiet --output-document "$MC_DEB" "$repo"; then
-            echo "Found!"
+            echo "Found"
             break
         fi
     done
@@ -1671,7 +1671,6 @@ main() {
     debug "Running: ${FUNCNAME[0]} $*"
 
     parse_input "$@"
-
     init
 
     debug "Debugging on"
@@ -1729,6 +1728,7 @@ main() {
                 echo "Installing the X11 repository"
                 execute sudo zypper  --non-interactive --quiet addrepo \
                     "https://download.opensuse.org/repositories/X11:/XOrg/$OS_NAME/X11:XOrg.repo"
+                execute sudo zypper  --non-interactive --quiet refresh
             fi
             ;;
     esac
@@ -1751,7 +1751,6 @@ main() {
     if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
         install_package "wget"
         [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
-        ((DEBUG)) && declare -p
         acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
 
         if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
