@@ -652,7 +652,7 @@ acquire_deb() {
 build_rpm() {
     debug "Running: ${FUNCNAME[0]}"
 
-    local i rpmbuild_cmd
+    local i rpmbuild_cmd stub
     local -a requires recommends
 
     # skip rebuilding the rpm if it already exists
@@ -752,6 +752,13 @@ build_rpm() {
         requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
     fi
 
+    # Exclude MC stub executable <= MC31
+    if [[ $MC_MVERSION -le 31 ]]; then
+        stub=""
+    else
+        stub="%{_bindir}/mc$MC_MVERSION"
+    fi
+
     # Create spec file
     cat <<-EOF > "$OUTPUT_DIR/SPECS/mediacenter.spec"
 		Name:    mediacenter$MC_MVERSION
@@ -793,7 +800,7 @@ build_rpm() {
 
 		%files
 		%{_bindir}/mediacenter$MC_MVERSION
-		%{_bindir}/mc$MC_MVERSION
+		$stub
 		%{_libdir}/jriver
 		%{_datadir}
 		%exclude %{_datadir}/applications/media_center_packageinstaller_$MC_MVERSION.desktop
