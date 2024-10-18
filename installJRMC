@@ -455,10 +455,10 @@ set_mc_version() {
 
 # @description Installs a package using the system package manager
 # @arg $1 array One or more package names
-# @arg --no-install-check Do not check if package is already installed
-# @arg --no-gpg-check Disable GPG checks for RPM based distros
-# @arg --allow-downgrades Useful for installing specific MC versions
-# @arg --silent | -s Do not print errors (useful for optional packages)
+# @option --no-install-check Do not check if package is already installed
+# @option --no-gpg-check Disable GPG checks for RPM based distros
+# @option --allow-downgrades Useful for installing specific MC versions
+# @option --silent | -s Do not print errors (useful for optional packages)
 install_package() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
@@ -607,7 +607,6 @@ install_mc_repo() {
         return 1
     fi
 }
-
 
 # @description Acquires the source DEB package from JRiver
 acquire_deb() {
@@ -1203,7 +1202,7 @@ set_service_vars() {
     fi
 }
 
-
+# @section Services
 # @description Starts and enables (at startup) a JRiver Media Center service
 # @arg $1 string Passes arguments as startup options to /usr/bin/mediacenter??
 service_jriver-mediacenter() {
@@ -1731,4 +1730,3 @@ execute() {
 [[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
 
 main "$@"
-
