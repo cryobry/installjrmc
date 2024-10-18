@@ -18,7 +18,7 @@ shopt -s extglob
 
 declare -g SCRIPT_VERSION="1.3.5-dev"
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
-declare -g MC_VERSION="33.0.20" # Do find all replace
+declare -g MC_VERSION="33.0.30" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION
 declare -ig SELF_UPDATE=1 # set to 0 to disable automatic self-update
 
@@ -104,130 +104,6 @@ print_help() {
 		    mediacenter-xvnc
 		    createrepo
 	EOF
-}
-
-# @description Perform OS detection and fallback
-# Generate OS-specific functions
-init() {
-    debug "Running: ${FUNCNAME[0]}"
-
-    declare -g ID RPM_MGR ARCH NAME
-    declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
-
-    echo "Starting installJRMC"
-    (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
-    (( EUID == 0 )) && err "Running as root user"
-
-    if [[ -f /etc/os-release ]]; then
-        source /etc/os-release
-    else
-        err "/etc/os-release not found"
-        err "Your OS is unsupported"
-        print_help
-        exit 1
-    fi
-
-    # Detect architecture and translate to MC convention
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64) ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
-    esac
-
-    debug "Detected host platform: $ID $VERSION_ID $ARCH"
-
-    # Normalize ID and set distro-specific vars
-    case $ID in
-        debian|arch) ;;
-        centos|fedora)
-            RPM_MGR=$(command -v dnf &>/dev/null && echo "dnf" || echo "yum")
-            ;;
-        rhel|almalinux) ID="centos" ;;
-        linuxmint|neon|zorin|*ubuntu*) ID="ubuntu" ;;
-        *suse*) ID="suse" ;;
-        raspbian) ID="debian" ;;
-        *)
-            err "Auto-detecting distro, this is unreliable and --compat may be required"
-            if command -v dnf &>/dev/null; then
-                ID="fedora"
-                RPM_MGR="dnf"
-            elif command -v yum &>/dev/null; then
-                ID="centos"
-                RPM_MGR="yum"
-                COMPAT_SWITCH=1
-            elif command -v apt-get &>/dev/null; then
-                ID="ubuntu"
-            elif command -v pacman &>/dev/null; then
-                ID="arch"
-            else
-                err "OS detection failed!"
-                ask_ok "Continue with manual installation?" || exit 1
-                ID="unknown"
-                REPO_INSTALL_SWITCH=0
-                BUILD_SWITCH=1
-                LOCAL_INSTALL_SWITCH=1
-            fi
-    esac
-
-    # Set defaults
-    BUILD_TARGET="${BUILD_TARGET:-$ID}"
-    REPO_TARGET="${REPO_TARGET:-$ID}"
-
-    # Match the MC repo to the system
-    if [[ $ID == debian || $ID == ubuntu ]]; then
-        MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
-    fi
-
-    # Change the repo for user-specified legacy versions
-    if [[ -n $USER_MC_VERSION ]]; then
-        case $MC_MVERSION in
-            2[0-6]) MC_DEFAULT_REPO="jessie" ;;
-            2[7-9]|30) MC_DEFAULT_REPO="buster" ;;
-            31) MC_DEFAULT_REPO="bullseye" ;;
-            # After this point, things get messy with multiple repos for the same version
-        esac
-    fi
-
-    debug "Using host platform: $ID $VERSION_ID"
-    debug "Using MC repository: ${MC_REPO:-$MC_DEFAULT_REPO}"
-
-    # Set distro-specific package manager commands 
-    case $ID in
-        fedora|centos)
-            PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
-            PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
-            PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
-            PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL() { install_mc_rhel; }
-            ;;
-        debian|ubuntu)
-            PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
-            PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
-            PKG_UPDATE=(execute sudo apt-get update -y -q0)
-            PKG_QUERY=(dpkg -s)
-            PKG_INSTALL_LOCAL() { install_mc_deb; }
-            ;;
-        suse)
-            PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
-            PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
-            PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
-            PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL() { install_mc_suse; }
-            ;;
-        arch)
-            PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
-            PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
-            PKG_UPDATE=(execute sudo pacman -Syy)
-            PKG_QUERY=(sudo pacman -Qs)
-            PKG_INSTALL_LOCAL() { install_mc_arch; }
-            ;;
-        unknown)
-            PKG_INSTALL=(:)
-            PKG_REMOVE=(:)
-            PKG_UPDATE=(:)
-            PKG_QUERY=(:)
-            PKG_INSTALL_LOCAL() { install_mc_generic; }
-    esac
 }
 
 # @description Parses user input and sets sensible defaults
@@ -392,6 +268,130 @@ parse_input() {
         err "Incorrect options provided"
         print_help && exit 1
     fi
+}
+
+# @description Perform OS detection and fallback
+# Generate OS-specific functions
+init() {
+    debug "Running: ${FUNCNAME[0]}"
+
+    declare -g ID RPM_MGR ARCH NAME
+    declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
+
+    echo "Starting installJRMC"
+    (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
+    (( EUID == 0 )) && err "Running as root user"
+
+    if [[ -f /etc/os-release ]]; then
+        source /etc/os-release
+    else
+        err "/etc/os-release not found"
+        err "Your OS is unsupported"
+        print_help
+        exit 1
+    fi
+
+    # Detect architecture and translate to MC convention
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+    esac
+
+    debug "Detected host platform: $ID $VERSION_ID $ARCH"
+
+    # Normalize ID and set distro-specific vars
+    case $ID in
+        debian|arch) ;;
+        centos|fedora)
+            RPM_MGR=$(command -v dnf &>/dev/null && echo "dnf" || echo "yum")
+            ;;
+        rhel|almalinux) ID="centos" ;;
+        linuxmint|neon|zorin|*ubuntu*) ID="ubuntu" ;;
+        *suse*) ID="suse" ;;
+        raspbian) ID="debian" ;;
+        *)
+            err "Auto-detecting distro, this is unreliable and --compat may be required"
+            if command -v dnf &>/dev/null; then
+                ID="fedora"
+                RPM_MGR="dnf"
+            elif command -v yum &>/dev/null; then
+                ID="centos"
+                RPM_MGR="yum"
+                COMPAT_SWITCH=1
+            elif command -v apt-get &>/dev/null; then
+                ID="ubuntu"
+            elif command -v pacman &>/dev/null; then
+                ID="arch"
+            else
+                err "OS detection failed!"
+                ask_ok "Continue with manual installation?" || exit 1
+                ID="unknown"
+                REPO_INSTALL_SWITCH=0
+                BUILD_SWITCH=1
+                LOCAL_INSTALL_SWITCH=1
+            fi
+    esac
+
+    # Set defaults
+    BUILD_TARGET="${BUILD_TARGET:-$ID}"
+    REPO_TARGET="${REPO_TARGET:-$ID}"
+
+    # Match the MC repo to the system
+    if [[ $ID == debian || $ID == ubuntu ]]; then
+        MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
+    fi
+
+    # Change the repo for user-specified legacy versions
+    if [[ -n $USER_MC_VERSION ]]; then
+        case $MC_MVERSION in
+            2[0-6]) MC_DEFAULT_REPO="jessie" ;;
+            2[7-9]|30) MC_DEFAULT_REPO="buster" ;;
+            31) MC_DEFAULT_REPO="bullseye" ;;
+            # After this point, things get messy with multiple repos for the same version
+        esac
+    fi
+
+    debug "Using host platform: $ID $VERSION_ID"
+    debug "Using MC repository: ${MC_REPO:-$MC_DEFAULT_REPO}"
+
+    # Set distro-specific package manager commands 
+    case $ID in
+        fedora|centos)
+            PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
+            PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
+            PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
+            PKG_QUERY=(rpm -q)
+            PKG_INSTALL_LOCAL() { install_mc_rhel; }
+            ;;
+        debian|ubuntu)
+            PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
+            PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
+            PKG_UPDATE=(execute sudo apt-get update -y -q0)
+            PKG_QUERY=(dpkg -s)
+            PKG_INSTALL_LOCAL() { install_mc_deb; }
+            ;;
+        suse)
+            PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
+            PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
+            PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
+            PKG_QUERY=(rpm -q)
+            PKG_INSTALL_LOCAL() { install_mc_suse; }
+            ;;
+        arch)
+            PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
+            PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
+            PKG_UPDATE=(execute sudo pacman -Syy)
+            PKG_QUERY=(sudo pacman -Qs)
+            PKG_INSTALL_LOCAL() { install_mc_arch; }
+            ;;
+        unknown)
+            PKG_INSTALL=(:)
+            PKG_REMOVE=(:)
+            PKG_UPDATE=(:)
+            PKG_QUERY=(:)
+            PKG_INSTALL_LOCAL() { install_mc_generic; }
+    esac
 }
 
 # @description Determines the latest JRiver MC version using several fallback methods 
