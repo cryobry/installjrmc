@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Install JRiver Media Center and associated services
-# See installJRMC --help or print_help() below for usage
+# @file installJRMC
+# @brief Install JRiver Media Center and associated services
+# @description See installJRMC --help or print_help() below for usage
 #
 # Copyright (c) 2021-2024 Bryan C. Roessler
 # This software is released under the Apache License.
@@ -17,440 +18,440 @@
 shopt -s extglob
 
 declare -g SCRIPT_VERSION="1.3.5-dev"
-declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
-declare -g MC_VERSION="33.0.30" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION
+declare -g MC_VERSION="33.0.30" # Do find all replace
+declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -ig SELF_UPDATE=1 # set to 0 to disable automatic self-update
 
 # @description Print help text
 print_help() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    cat <<-EOF
+  cat <<-EOF
 		USAGE:
-		    installJRMC [[OPTION] [VALUE]]...
+		  installJRMC [[OPTION] [VALUE]]...
 
-		    If no options (excluding -d or --debug) are provided installJRMC defaults to '--install repo'.
+		  If no options (excluding -d or --debug) are provided installJRMC defaults to '--install repo'.
 
 		OPTIONS
-		    --install, -i repo|local
-		        repo: Install MC from repository, updates are handled by the system package manager
-		        local: Build and install MC package locally from official source release
-		    --build[=suse|fedora|centos]
-		        Build RPM from source DEB but do not install
-		        Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
-		    --compat
-		        Build/install MC locally without minimum dependency version requirements
-		    --mcversion VERSION
-		        Specify the MC version, ex. "$MC_VERSION" (default: latest version)
-		    --arch VERSION
-		        Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
-		    --mcrepo REPO
-		        Specify the MC repository, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
-		    --outputdir PATH
-		        Generate rpmbuild output in this directory (default: ./output)
-		    --restorefile MJR_RESTORE_FILE
-		        Restore file location for automatic license registration
-		    --betapass PASSWORD
-		        Enter beta team password for access to beta builds
-		    --service, -s SERVICE
-		        See SERVICES section below for a list of possible services to install
-		      --service-type user|system
-		          Starts services at boot (system) or at user login (user) (default: per service, see SERVICES)
-		    --container, -c CONTAINER (TODO: Under construction)
-		        See CONTAINERS section below for a list of possible services to install
-		    --createrepo[=suse|fedora|centos]
-		        Build rpm, copy to webroot, and run createrepo. 
-		        Use in conjunction with --build=TARGET for crossbuilding repos
-		        Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
-		        --createrepo-webroot PATH
-		            Specify the webroot directory to install the repo (default: /var/www/jriver)
-		        --createrepo-user USER
-		            Specify the web server user if it differs from \$USER
-		    --no-self-update
-		        Disable automatic self-update
-		    --uninstall, -u
-		        Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
-		    --yes, -y, --auto
-		        Always assume yes for questions
-		    --version, -v
-		        Print this script version and exit
-		    --debug, -d
-		        Print debug output
-		    --help, -h
-		        Print help dialog and exit
+		  --install, -i repo|local
+		    repo: Install MC from repository, updates are handled by the system package manager
+		    local: Build and install MC package locally from official source release
+		  --build[=suse|fedora|centos]
+		    Build RPM from source DEB but do not install
+		    Optionally, specify a target distro for cross-building (ex. --build=suse, note the '=')
+		  --compat
+		    Build/install MC locally without minimum dependency version requirements
+		  --mcversion VERSION
+		    Specify the MC version, ex. "$MC_VERSION" (default: latest version)
+		  --arch VERSION
+		    Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
+		  --mcrepo REPO
+		    Specify the MC repository, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
+		  --outputdir PATH
+		    Generate rpmbuild output in this directory (default: ./output)
+		  --restorefile MJR_RESTORE_FILE
+		    Restore file location for automatic license registration
+		  --betapass PASSWORD
+		    Enter beta team password for access to beta builds
+		  --service, -s SERVICE
+		    See SERVICES section below for a list of possible services to install
+		    --service-type user|system
+		      Starts services at boot (system) or at user login (user) (default: per service, see SERVICES)
+		  --container, -c CONTAINER (TODO: Under construction)
+		    See CONTAINERS section below for a list of possible services to install
+		  --createrepo[=suse|fedora|centos]
+		    Build rpm, copy to webroot, and run createrepo. 
+		    Use in conjunction with --build=TARGET for crossbuilding repos
+		    Optionally, specify a target distro for non-native repo (ex. --createrepo=fedora, note the '=')
+		    --createrepo-webroot PATH
+		      Specify the webroot directory to install the repo (default: /var/www/jriver)
+		    --createrepo-user USER
+		      Specify the web server user if it differs from \$USER
+		  --no-self-update
+		    Disable automatic self-update
+		  --uninstall, -u
+		    Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
+		  --yes, -y, --auto
+		    Always assume yes for questions
+		  --version, -v
+		    Print this script version and exit
+		  --debug, -d
+		    Print debug output
+		  --help, -h
+		    Print help dialog and exit
 
 		SERVICES
-		    jriver-mediaserver (default --service-type=user)
-		        Enable and start a mediaserver systemd service (requires an existing X server)
-		    jriver-mediacenter (user)
-		        Enable and start a mediacenter systemd service (requires an existing X server)
-		    jriver-x11vnc (user)
-		        Enable and start x11vnc for the local desktop (requires an existing X server)
-		        Usually combined with jriver-mediaserver or jriver-mediacenter services
-		        --vncpass and --display are optional (see below)
-		    jriver-xvnc (system)
-		        Enable and start a new Xvnc session running JRiver Media Center
-		        --vncpass PASSWORD
-		            Set the vnc password for x11vnc/Xvnc access. If no password is set, installJRMC
-		            will either use existing password stored in \$HOME/.vnc/jrmc_passwd or use no password
-		        --display DISPLAY
-		            Display to use for x11vnc/Xvnc (default: The current display (x11vnc) or the
-		            current display incremented by 1 (Xvnc))
-		    jriver-createrepo (system)
-		        Install hourly service to build latest MC RPM and run createrepo
+		  jriver-mediaserver (default --service-type=user)
+		    Enable and start a mediaserver systemd service (requires an existing X server)
+		  jriver-mediacenter (user)
+		    Enable and start a mediacenter systemd service (requires an existing X server)
+		  jriver-x11vnc (user)
+		    Enable and start x11vnc for the local desktop (requires an existing X server)
+		    Usually combined with jriver-mediaserver or jriver-mediacenter services
+		    --vncpass and --display are optional (see below)
+		  jriver-xvnc (system)
+		    Enable and start a new Xvnc session running JRiver Media Center
+		    --vncpass PASSWORD
+		      Set the vnc password for x11vnc/Xvnc access. If no password is set, installJRMC
+		      will either use existing password stored in \$HOME/.vnc/jrmc_passwd or use no password
+		    --display DISPLAY
+		      Display to use for x11vnc/Xvnc (default: The current display (x11vnc) or the
+		      current display incremented by 1 (Xvnc))
+		  jriver-createrepo (system)
+		    Install hourly service to build latest MC RPM and run createrepo
 
 		CONTAINERS (TODO: Under construction)
-		    mediacenter-xvnc
-		    createrepo
+		  mediacenter-xvnc
+		  createrepo
 	EOF
 }
 
 # @description Parses user input and sets sensible defaults
 parse_input() {
-    debug "Running: ${FUNCNAME[0]} $*"
+  debug "Running: ${FUNCNAME[0]} $*"
 
-    declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
-        COMPAT_SWITCH TEST_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
-        YES_SWITCH USER_MC_VERSION MJR_RESTORE_FILE BETAPASS SERVICE_TYPE \
-        VNCPASS USER_DISPLAY MC_REPO BUILD_TARGET REPO_TARGET
-    declare -ga SERVICES CONTAINERS
-    local long_opts short_opts input
-    declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
-    declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-    declare -g CREATEREPO_USER="$USER"
-    declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
-    declare -g CREATEREPO_WEBROOT="/var/www/jriver"
-    declare -g USER="${SUDO_USER:-$USER}"
-    declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
+  declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
+    COMPAT_SWITCH TEST_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
+    YES_SWITCH USER_MC_VERSION MJR_RESTORE_FILE BETAPASS SERVICE_TYPE \
+    VNCPASS USER_DISPLAY MC_REPO BUILD_TARGET REPO_TARGET
+  declare -ga SERVICES CONTAINERS
+  local long_opts short_opts input
+  declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
+  declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+  declare -g CREATEREPO_USER="$USER"
+  declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
+  declare -g CREATEREPO_WEBROOT="/var/www/jriver"
+  declare -g USER="${SUDO_USER:-$USER}"
+  declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
 
-    # Set some defaults if zero or one arguments are passed
-    if [[ $# -eq 0 && $ID != "unknown" ]]; then
-        debug "Automatically setting --install repo"
-        REPO_INSTALL_SWITCH=1
-    elif [[ $# -eq 1 || $# -eq 2 ]]; then
-        case "$1" in
-            --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
-            --arch | --betapass | --restorefile | --outputdir | --no-self-update)
-                if  [[ $ID != "unknown" ]]; then
-                    debug "Automatically setting --install repo"
-                    REPO_INSTALL_SWITCH=1
-                fi
-                ;;
-            --compat)
-                if [[ $# -eq 1 ]]; then
-                    BUILD_SWITCH=1
-                    LOCAL_INSTALL_SWITCH=1
-                fi
-                ;;
-        esac
-    fi
+  # Set some defaults if zero or one arguments are passed
+  if [[ $# -eq 0 && $ID != "unknown" ]]; then
+    debug "Automatically setting --install repo"
+    REPO_INSTALL_SWITCH=1
+  elif [[ $# -eq 1 || $# -eq 2 ]]; then
+    case "$1" in
+      --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
+      --arch | --betapass | --restorefile | --outputdir | --no-self-update)
+        if  [[ $ID != "unknown" ]]; then
+          debug "Automatically setting --install repo"
+          REPO_INSTALL_SWITCH=1
+        fi
+        ;;
+      --compat)
+        if [[ $# -eq 1 ]]; then
+          BUILD_SWITCH=1
+          LOCAL_INSTALL_SWITCH=1
+        fi
+        ;;
+    esac
+  fi
 
-    long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
-    long_opts+="restorefile:,betapass:,"
-    long_opts+="service-type:,service:,services:,"
-    long_opts+="version,debug,verbose,help,uninstall,tests,yes,auto,no-self-update,"
-    long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
-    long_opts+="vncpass:,display:,container:"
-    short_opts="+i:b::s:c:uyvdh"
+  long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
+  long_opts+="restorefile:,betapass:,"
+  long_opts+="service-type:,service:,services:,"
+  long_opts+="version,debug,verbose,help,uninstall,tests,yes,auto,no-self-update,"
+  long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
+  long_opts+="vncpass:,display:,container:"
+  short_opts="+i:b::s:c:uyvdh"
 
-    # Reset DEBUG and catch with getopt
-    declare -g DEBUG=0
+  # Reset DEBUG and catch with getopt
+  declare -g DEBUG=0
 
-    if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
-        eval set -- "$input"
-        while true; do
-            case $1 in
-                --install|-i)
-                    shift
-                    case $1 in
-                        local|rpm)
-                            BUILD_SWITCH=1
-                            LOCAL_INSTALL_SWITCH=1
-                            ;;
-                        repo|remote)
-                            REPO_INSTALL_SWITCH=1
-                            ;;
-                    esac
-                    ;;
-                --build|-b)
-                    BUILD_SWITCH=1
-                    shift && BUILD_TARGET="$1"
-                    ;;
-                --outputdir)
-                    shift && OUTPUT_DIR="$1"
-                    ;;
-                --mcversion)
-                    shift
-                    if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-                        USER_MC_VERSION="$1"
-                    else
-                        err "Bad --mcversion"
-                        print_help
-                        exit 1
-                    fi
-                    ;;
-                --arch)
-                    shift
-                    echo "Switching from $ARCH to $1 architecture"
-                    ARCH="$1"
-                    ;;
-                --mcrepo)
-                    shift && MC_REPO="$1"
-                    ;;
-                --restorefile)
-                    shift && MJR_RESTORE_FILE="$1"
-                    ;;
-                --betapass)
-                    shift && BETAPASS="$1"
-                    ;;
-                --service-type)
-                    shift && SERVICE_TYPE="$1"
-                    ;;
-                --service|-s|--services)
-                    shift && SERVICES+=("$1")
-                    ;;
-                --createrepo)
-                    BUILD_SWITCH=1
-                    CREATEREPO_SWITCH=1
-                    shift && REPO_TARGET="$1" && BUILD_TARGET="$1"
-                    ;;
-                --createrepo-webroot)
-                    shift && CREATEREPO_WEBROOT="$1"
-                    ;;
-                --createrepo-user)
-                    shift && CREATEREPO_USER="$1"
-                    ;;
-                --vncpass)
-                    shift && VNCPASS="$1"
-                    ;;
-                --display)
-                    shift && USER_DISPLAY="$1"
-                    ;;
-                --compat)
-                    COMPAT_SWITCH=1
-                    BUILD_SWITCH=1
-                    ;;
-                --no-self-update)
-                    SELF_UPDATE=0
-                    ;;
-                --container|-c)
-                    shift && CONTAINERS+=("$1")
-                    ;;
-                --yes|-y|--auto)
-                    YES_SWITCH=1
-                    ;;
-                --version|-v)
-                    echo "Version: $SCRIPT_VERSION"
-                    exit 0
-                    ;;
-                --debug|-d|--verbose)
-                    DEBUG=1
-                    ;;
-                --help|-h)
-                    print_help 
-                    exit
-                    ;;
-                --uninstall|-u)
-                    UNINSTALL_SWITCH=1
-                    ;;
-                --tests)
-                    TEST_SWITCH=1
-                    ;;
-                --)
-                    shift
-                    break
-                    ;;
-            esac
-            shift
-        done
-    else
-        err "Incorrect options provided"
-        print_help && exit 1
-    fi
+  if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
+    eval set -- "$input"
+    while true; do
+      case $1 in
+        --install|-i)
+          shift
+          case $1 in
+            local|rpm)
+              BUILD_SWITCH=1
+              LOCAL_INSTALL_SWITCH=1
+              ;;
+            repo|remote)
+              REPO_INSTALL_SWITCH=1
+              ;;
+          esac
+          ;;
+        --build|-b)
+          BUILD_SWITCH=1
+          shift && BUILD_TARGET="$1"
+          ;;
+        --outputdir)
+          shift && OUTPUT_DIR="$1"
+          ;;
+        --mcversion)
+          shift
+          if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+            USER_MC_VERSION="$1"
+          else
+            err "Bad --mcversion"
+            print_help
+            exit 1
+          fi
+          ;;
+        --arch)
+          shift
+          echo "Switching from $ARCH to $1 architecture"
+          ARCH="$1"
+          ;;
+        --mcrepo)
+          shift && MC_REPO="$1"
+          ;;
+        --restorefile)
+          shift && MJR_RESTORE_FILE="$1"
+          ;;
+        --betapass)
+          shift && BETAPASS="$1"
+          ;;
+        --service-type)
+          shift && SERVICE_TYPE="$1"
+          ;;
+        --service|-s|--services)
+          shift && SERVICES+=("$1")
+          ;;
+        --createrepo)
+          BUILD_SWITCH=1
+          CREATEREPO_SWITCH=1
+          shift && REPO_TARGET="$1" && BUILD_TARGET="$1"
+          ;;
+        --createrepo-webroot)
+          shift && CREATEREPO_WEBROOT="$1"
+          ;;
+        --createrepo-user)
+          shift && CREATEREPO_USER="$1"
+          ;;
+        --vncpass)
+          shift && VNCPASS="$1"
+          ;;
+        --display)
+          shift && USER_DISPLAY="$1"
+          ;;
+        --compat)
+          COMPAT_SWITCH=1
+          BUILD_SWITCH=1
+          ;;
+        --no-self-update)
+          SELF_UPDATE=0
+          ;;
+        --container|-c)
+          shift && CONTAINERS+=("$1")
+          ;;
+        --yes|-y|--auto)
+          YES_SWITCH=1
+          ;;
+        --version|-v)
+          echo "Version: $SCRIPT_VERSION"
+          exit 0
+          ;;
+        --debug|-d|--verbose)
+          DEBUG=1
+          ;;
+        --help|-h)
+          print_help 
+          exit
+          ;;
+        --uninstall|-u)
+          UNINSTALL_SWITCH=1
+          ;;
+        --tests)
+          TEST_SWITCH=1
+          ;;
+        --)
+          shift
+          break
+          ;;
+      esac
+      shift
+    done
+  else
+    err "Incorrect options provided"
+    print_help && exit 1
+  fi
 }
 
 # @description Perform OS detection and fallback
 # Generate OS-specific functions
 init() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID RPM_MGR ARCH NAME
-    declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
+  declare -g ID RPM_MGR ARCH NAME
+  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
 
-    echo "Starting installJRMC"
-    (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
-    (( EUID == 0 )) && err "Running as root user"
+  echo "Starting installJRMC"
+  (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
+  (( EUID == 0 )) && err "Running as root user"
 
-    if [[ -f /etc/os-release ]]; then
-        source /etc/os-release
-    else
-        err "/etc/os-release not found"
-        err "Your OS is unsupported"
-        print_help
-        exit 1
-    fi
+  if [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+  else
+    err "/etc/os-release not found"
+    err "Your OS is unsupported"
+    print_help
+    exit 1
+  fi
 
-    # Detect architecture and translate to MC convention
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64) ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
+  # Detect architecture and translate to MC convention
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+  esac
+
+  debug "Detected host platform: $ID $VERSION_ID $ARCH"
+
+  # Normalize ID and set distro-specific vars
+  case $ID in
+    debian|arch) ;;
+    centos|fedora)
+      RPM_MGR=$(command -v dnf &>/dev/null && echo "dnf" || echo "yum")
+      ;;
+    rhel|almalinux) ID="centos" ;;
+    linuxmint|neon|zorin|*ubuntu*) ID="ubuntu" ;;
+    *suse*) ID="suse" ;;
+    raspbian) ID="debian" ;;
+    *)
+      err "Auto-detecting distro, this is unreliable and --compat may be required"
+      if command -v dnf &>/dev/null; then
+        ID="fedora"
+        RPM_MGR="dnf"
+      elif command -v yum &>/dev/null; then
+        ID="centos"
+        RPM_MGR="yum"
+        COMPAT_SWITCH=1
+      elif command -v apt-get &>/dev/null; then
+        ID="ubuntu"
+      elif command -v pacman &>/dev/null; then
+        ID="arch"
+      else
+        err "OS detection failed!"
+        ask_ok "Continue with manual installation?" || exit 1
+        ID="unknown"
+        REPO_INSTALL_SWITCH=0
+        BUILD_SWITCH=1
+        LOCAL_INSTALL_SWITCH=1
+      fi
+  esac
+
+  # Set defaults
+  BUILD_TARGET="${BUILD_TARGET:-$ID}"
+  REPO_TARGET="${REPO_TARGET:-$ID}"
+
+  # Match the MC repo to the system
+  if [[ $ID == debian || $ID == ubuntu ]]; then
+    MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
+  fi
+
+  # Change the repo for user-specified legacy versions
+  if [[ -n $USER_MC_VERSION ]]; then
+    case $MC_MVERSION in
+      2[0-6]) MC_DEFAULT_REPO="jessie" ;;
+      2[7-9]|30) MC_DEFAULT_REPO="buster" ;;
+      31) MC_DEFAULT_REPO="bullseye" ;;
+      # After this point, things get messy with multiple repos for the same version
     esac
+  fi
 
-    debug "Detected host platform: $ID $VERSION_ID $ARCH"
+  debug "Using host platform: $ID $VERSION_ID"
+  debug "Using MC repository: ${MC_REPO:-$MC_DEFAULT_REPO}"
 
-    # Normalize ID and set distro-specific vars
-    case $ID in
-        debian|arch) ;;
-        centos|fedora)
-            RPM_MGR=$(command -v dnf &>/dev/null && echo "dnf" || echo "yum")
-            ;;
-        rhel|almalinux) ID="centos" ;;
-        linuxmint|neon|zorin|*ubuntu*) ID="ubuntu" ;;
-        *suse*) ID="suse" ;;
-        raspbian) ID="debian" ;;
-        *)
-            err "Auto-detecting distro, this is unreliable and --compat may be required"
-            if command -v dnf &>/dev/null; then
-                ID="fedora"
-                RPM_MGR="dnf"
-            elif command -v yum &>/dev/null; then
-                ID="centos"
-                RPM_MGR="yum"
-                COMPAT_SWITCH=1
-            elif command -v apt-get &>/dev/null; then
-                ID="ubuntu"
-            elif command -v pacman &>/dev/null; then
-                ID="arch"
-            else
-                err "OS detection failed!"
-                ask_ok "Continue with manual installation?" || exit 1
-                ID="unknown"
-                REPO_INSTALL_SWITCH=0
-                BUILD_SWITCH=1
-                LOCAL_INSTALL_SWITCH=1
-            fi
-    esac
-
-    # Set defaults
-    BUILD_TARGET="${BUILD_TARGET:-$ID}"
-    REPO_TARGET="${REPO_TARGET:-$ID}"
-
-    # Match the MC repo to the system
-    if [[ $ID == debian || $ID == ubuntu ]]; then
-        MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
-    fi
-
-    # Change the repo for user-specified legacy versions
-    if [[ -n $USER_MC_VERSION ]]; then
-        case $MC_MVERSION in
-            2[0-6]) MC_DEFAULT_REPO="jessie" ;;
-            2[7-9]|30) MC_DEFAULT_REPO="buster" ;;
-            31) MC_DEFAULT_REPO="bullseye" ;;
-            # After this point, things get messy with multiple repos for the same version
-        esac
-    fi
-
-    debug "Using host platform: $ID $VERSION_ID"
-    debug "Using MC repository: ${MC_REPO:-$MC_DEFAULT_REPO}"
-
-    # Set distro-specific package manager commands 
-    case $ID in
-        fedora|centos)
-            PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
-            PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
-            PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
-            PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL() { install_mc_rhel; }
-            ;;
-        debian|ubuntu)
-            PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
-            PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
-            PKG_UPDATE=(execute sudo apt-get update -y -q0)
-            PKG_QUERY=(dpkg -s)
-            PKG_INSTALL_LOCAL() { install_mc_deb; }
-            ;;
-        suse)
-            PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
-            PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
-            PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
-            PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL() { install_mc_suse; }
-            ;;
-        arch)
-            PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
-            PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
-            PKG_UPDATE=(execute sudo pacman -Syy)
-            PKG_QUERY=(sudo pacman -Qs)
-            PKG_INSTALL_LOCAL() { install_mc_arch; }
-            ;;
-        unknown)
-            PKG_INSTALL=(:)
-            PKG_REMOVE=(:)
-            PKG_UPDATE=(:)
-            PKG_QUERY=(:)
-            PKG_INSTALL_LOCAL() { install_mc_generic; }
-    esac
+  # Set distro-specific package manager commands 
+  case $ID in
+    fedora|centos)
+      PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
+      PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
+      PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
+      PKG_QUERY=(rpm -q)
+      PKG_INSTALL_LOCAL() { install_mc_rhel; }
+      ;;
+    debian|ubuntu)
+      PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
+      PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
+      PKG_UPDATE=(execute sudo apt-get update -y -q0)
+      PKG_QUERY=(dpkg -s)
+      PKG_INSTALL_LOCAL() { install_mc_deb; }
+      ;;
+    suse)
+      PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
+      PKG_REMOVE=(execute sudo zypper --non-interactive --quiet remove --clean-deps)
+      PKG_UPDATE=(execute sudo zypper --non-interactive --quiet refresh jriver)
+      PKG_QUERY=(rpm -q)
+      PKG_INSTALL_LOCAL() { install_mc_suse; }
+      ;;
+    arch)
+      PKG_INSTALL=(execute sudo pacman -Sy --noconfirm)
+      PKG_REMOVE=(execute sudo pacman -Rs --noconfirm)
+      PKG_UPDATE=(execute sudo pacman -Syy)
+      PKG_QUERY=(sudo pacman -Qs)
+      PKG_INSTALL_LOCAL() { install_mc_arch; }
+      ;;
+    unknown)
+      PKG_INSTALL=(:)
+      PKG_REMOVE=(:)
+      PKG_UPDATE=(:)
+      PKG_QUERY=(:)
+      PKG_INSTALL_LOCAL() { install_mc_generic; }
+  esac
 }
 
 # @description Determines the latest JRiver MC version using several fallback methods 
 set_mc_version() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT
-    declare -g MC_PKG MC_RPM
-    local cnt
+  declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT
+  declare -g MC_PKG MC_RPM
+  local cnt
 
-    # Determine the latest MC version
-    # User input
-    if [[ -n $USER_MC_VERSION ]]; then
-        MC_VERSION_SOURCE="user input"
-        MC_VERSION="$USER_MC_VERSION"
-    # Containerized package manager
-    elif install_package --silent buildah \
-    && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
-    && buildah run "$cnt" -- sh -c \
-        "apk add apt" &>/dev/null \
-    && buildah run "$cnt" -- sh -c \
-        "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main' > /etc/apt/sources.list 2>&1" &>/dev/null \
-    && buildah run "$cnt" -- sh -c \
-        "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null \
-    && MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null \
-    && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MC_VERSION_SOURCE="containerized package manager"
-        execute buildah rm "$cnt"
-    # Webscrape
-    elif install_package --silent wget \
-    && MC_VERSION=$(wget -qO- "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
-    && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-        MC_VERSION_SOURCE="webscrape"
-    # Hardcoded
-    else
-        MC_VERSION_SOURCE="hardcoded"
-        err "Warning! Using hardcoded version number"
-    fi
-    
-    # Set major version number and other variables
-    MC_MVERSION="${MC_VERSION%%.*}"
-    MC_PKG="mediacenter$MC_MVERSION"
-    MC_RPM="$OUTPUT_DIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
-    MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
+  # Determine the latest MC version
+  # User input
+  if [[ -n $USER_MC_VERSION ]]; then
+    MC_VERSION_SOURCE="user input"
+    MC_VERSION="$USER_MC_VERSION"
+  # Containerized package manager
+  elif install_package --silent buildah \
+  && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
+  && buildah run "$cnt" -- sh -c \
+    "apk add apt" &>/dev/null \
+  && buildah run "$cnt" -- sh -c \
+    "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main' > /etc/apt/sources.list 2>&1" &>/dev/null \
+  && buildah run "$cnt" -- sh -c \
+    "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null \
+  && MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null \
+  && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    MC_VERSION_SOURCE="containerized package manager"
+    execute buildah rm "$cnt"
+  # Webscrape
+  elif install_package --silent wget \
+  && MC_VERSION=$(wget -qO- "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
+  && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+    MC_VERSION_SOURCE="webscrape"
+  # Hardcoded
+  else
+    MC_VERSION_SOURCE="hardcoded"
+    err "Warning! Using hardcoded version number"
+  fi
+  
+  # Set major version number and other variables
+  MC_MVERSION="${MC_VERSION%%.*}"
+  MC_PKG="mediacenter$MC_MVERSION"
+  MC_RPM="$OUTPUT_DIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
+  MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
 
-    if [[ $MC_VERSION_SOURCE == "user input" ]]; then
-        # Append explicit package version when user provides --mcversion
-        case $ID in
-            fedora|centos|suse)
-                MC_PKG+="-$MC_VERSION"
-                ;;
-            debian|ubuntu)
-                MC_PKG+="=$MC_VERSION"
-                ;;
-        esac
-    fi
+  if [[ $MC_VERSION_SOURCE == "user input" ]]; then
+    # Append explicit package version when user provides --mcversion
+    case $ID in
+      fedora|centos|suse)
+        MC_PKG+="-$MC_VERSION"
+        ;;
+      debian|ubuntu)
+        MC_PKG+="=$MC_VERSION"
+        ;;
+    esac
+  fi
 
-    echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo (determined by $MC_VERSION_SOURCE)"
-    return 0
+  echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo (determined by $MC_VERSION_SOURCE)"
+  return 0
 }
 
 # @description Installs a package using the system package manager
@@ -460,307 +461,307 @@ set_mc_version() {
 # @option --allow-downgrades Useful for installing specific MC versions
 # @option --silent | -s Do not print errors (useful for optional packages)
 install_package() {
-    debug "Running: ${FUNCNAME[0]}" "$@"
+  debug "Running: ${FUNCNAME[0]}" "$@"
 
-    local -a pkg_array install_flags
-    local -A pkg_aliases
-    local input pkg
-    local no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
-    local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
+  local -a pkg_array install_flags
+  local -A pkg_aliases
+  local input pkg
+  local no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
+  local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
 
-    input=$(getopt -o +s -l "$long_opts" -- "$@") || { err "Incorrect options provided"; exit 1; }
-    eval set -- "$input"
-    
-    while true; do
-        case $1 in
-            --no-install-check) no_install_check=1 ;;
-            --allow-downgrades) allow_downgrades=1 ;;
-            --no-gpg-check) no_gpg_check=1 ;;
-            --refresh) refresh=1 ;;
-            --silent|-s) silent=1 ;;
-            --) shift; break ;;
-        esac
-        shift
-    done
-
-    # Define package aliases based on the distribution
-    case $ID in
-        debian|ubuntu)
-            pkg_aliases=(
-                ["rpm-build"]="rpm"
-                ["createrepo_c"]="createrepo"
-                ["tigervnc-server"]="tigervnc-standalone-server"
-            )
-            ;;
+  input=$(getopt -o +s -l "$long_opts" -- "$@") || { err "Incorrect options provided"; exit 1; }
+  eval set -- "$input"
+  
+  while true; do
+    case $1 in
+      --no-install-check) no_install_check=1 ;;
+      --allow-downgrades) allow_downgrades=1 ;;
+      --no-gpg-check) no_gpg_check=1 ;;
+      --refresh) refresh=1 ;;
+      --silent|-s) silent=1 ;;
+      --) shift; break ;;
     esac
+    shift
+  done
 
-    # Filter out already installed packages
-    for pkg in "$@"; do
-        if [[ -v pkg_aliases[$pkg] ]]; then
-            debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"
-            pkg=${pkg_aliases[$pkg]}
-        fi
-        if (( no_install_check )) \
-        || ! { command -v "$pkg" &>/dev/null \
-        || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
-            pkg_array+=("$pkg")
-        else
-            debug "$pkg already installed, skipping installation"
-        fi
-    done
+  # Define package aliases based on the distribution
+  case $ID in
+    debian|ubuntu)
+      pkg_aliases=(
+        ["rpm-build"]="rpm"
+        ["createrepo_c"]="createrepo"
+        ["tigervnc-server"]="tigervnc-standalone-server"
+      )
+      ;;
+  esac
 
-    # Generate installation flags based on the distribution
-    case $ID in
-        debian|ubuntu)
-            (( allow_downgrades )) && install_flags+=(--allow-downgrades)
-            ;;
-        fedora|centos)
-            (( allow_downgrades )) && install_flags+=(--allowerasing)
-            (( no_gpg_check )) && install_flags+=(--nogpgcheck)
-            (( refresh )) && install_flags+=(--refresh)
-            ;;
-        suse)
-            (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
-            ;;
-    esac
-
-    # Install packages if any need installation
-    if [[ ${#pkg_array[@]} -gt 0 ]]; then
-        if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then       
-            (( silent )) || err "Failed to install ${pkg_array[*]}."
-            return 1
-        fi
+  # Filter out already installed packages
+  for pkg in "$@"; do
+    if [[ -v pkg_aliases[$pkg] ]]; then
+      debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"
+      pkg=${pkg_aliases[$pkg]}
     fi
-    return 0
+    if (( no_install_check )) \
+    || ! { command -v "$pkg" &>/dev/null \
+    || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
+      pkg_array+=("$pkg")
+    else
+      debug "$pkg already installed, skipping installation"
+    fi
+  done
+
+  # Generate installation flags based on the distribution
+  case $ID in
+    debian|ubuntu)
+      (( allow_downgrades )) && install_flags+=(--allow-downgrades)
+      ;;
+    fedora|centos)
+      (( allow_downgrades )) && install_flags+=(--allowerasing)
+      (( no_gpg_check )) && install_flags+=(--nogpgcheck)
+      (( refresh )) && install_flags+=(--refresh)
+      ;;
+    suse)
+      (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
+      ;;
+  esac
+
+  # Install packages if any need installation
+  if [[ ${#pkg_array[@]} -gt 0 ]]; then
+    if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
+      (( silent )) || err "Failed to install ${pkg_array[*]}."
+      return 1
+    fi
+  fi
+  return 0
 }
 
 
 # @description Installs mesa-va-drivers-freeworld
 install_mesa_freeworld() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    swap_or_install_freeworld_package() {
-        local pkg=$1
-        local freeworld_pkg="${pkg}-freeworld"
+  swap_or_install_freeworld_package() {
+    local pkg=$1
+    local freeworld_pkg="${pkg}-freeworld"
 
-        if ! "${PKG_QUERY[@]}" "$freeworld_pkg" &>/dev/null; then
-            if "${PKG_QUERY[@]}" "$pkg" &>/dev/null; then
-                if ! execute sudo dnf swap -y "$pkg" "$freeworld_pkg"; then
-                    err "Package swap failed for $pkg!"
-                fi
-            else
-                execute "${PKG_INSTALL[@]}" "$freeworld_pkg"
-            fi
+    if ! "${PKG_QUERY[@]}" "$freeworld_pkg" &>/dev/null; then
+      if "${PKG_QUERY[@]}" "$pkg" &>/dev/null; then
+        if ! execute sudo dnf swap -y "$pkg" "$freeworld_pkg"; then
+          err "Package swap failed for $pkg!"
         fi
-    }
+      else
+        execute "${PKG_INSTALL[@]}" "$freeworld_pkg"
+      fi
+    fi
+  }
 
-    swap_or_install_freeworld_package "mesa-va-drivers"
-    swap_or_install_freeworld_package "mesa-vdpau-drivers"
+  swap_or_install_freeworld_package "mesa-va-drivers"
+  swap_or_install_freeworld_package "mesa-vdpau-drivers"
 }
 
 # @description Installs JRiver Media Center from a remote repository
 install_mc_repo() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local deb_repo_file="/etc/apt/sources.list.d/jriver.list"
-    local rpm_repo_file="/etc/yum.repos.d/jriver.repo"
+  local deb_repo_file="/etc/apt/sources.list.d/jriver.list"
+  local rpm_repo_file="/etc/yum.repos.d/jriver.repo"
 
-    case $ID in
-        fedora|centos)
-            sudo bash -c "cat <<-EOF > $rpm_repo_file
+  case $ID in
+    fedora|centos)
+      sudo bash -c "cat <<-EOF > $rpm_repo_file
 				[jriver]
 				name=JRiver Media Center repo by BryanC
 				baseurl=https://repos.bryanroessler.com/jriver
 				gpgcheck=0
 			EOF"
-            # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
-            install_mesa_freeworld
-            ;;
-        debian|ubuntu)
-            install_package wget
-            debug "Adding MC repository to $deb_repo_file"
-            sudo bash -c "cat <<-EOF > $deb_repo_file
+      # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
+      install_mesa_freeworld
+      ;;
+    debian|ubuntu)
+      install_package wget
+      debug "Adding MC repository to $deb_repo_file"
+      sudo bash -c "cat <<-EOF > $deb_repo_file
 				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main
 			EOF"
-            debug "Installing JRiver Media Center RPM key"
-            wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
-                sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
-            ;;
-        *)
-            err "An MC repository for $ID is not yet available"
-            err "Use --install local to install MC on $ID"
-            return 1
-            ;;
-    esac
+      debug "Installing JRiver Media Center RPM key"
+      wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
+        sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
+      ;;
+    *)
+      err "An MC repository for $ID is not yet available"
+      err "Use --install local to install MC on $ID"
+      return 1
+      ;;
+  esac
 
-    if ! "${PKG_UPDATE[@]}"; then
-        err "Package update failed!"
-        return 1
-    fi
+  if ! "${PKG_UPDATE[@]}"; then
+    err "Package update failed!"
+    return 1
+  fi
 
-    if ! install_package \
-        --no-install-check \
-        --allow-downgrades \
-        --no-gpg-check \
-        "$MC_PKG"; then
-        err "Package install failed!"
-        return 1
-    fi
+  if ! install_package \
+    --no-install-check \
+    --allow-downgrades \
+    --no-gpg-check \
+    "$MC_PKG"; then
+    err "Package install failed!"
+    return 1
+  fi
 }
 
 # @description Acquires the source DEB package from JRiver
 acquire_deb() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local fname="MediaCenter-$MC_VERSION-$ARCH.deb"
-    declare -g MC_DEB="$OUTPUT_DIR/SOURCES/$fname"
+  local fname="MediaCenter-$MC_VERSION-$ARCH.deb"
+  declare -g MC_DEB="$OUTPUT_DIR/SOURCES/$fname"
 
-    debug "MC_DEB=$MC_DEB"
+  debug "MC_DEB=$MC_DEB"
 
-    # If deb file already exists, skip download
-    if [[ -f $MC_DEB ]]; then
-        if [[ $(stat -c%s "$MC_DEB") -lt 10000000 ]]; then
-            echo "Removing existing DEB under 10MB: $MC_DEB"
-            execute rm "$MC_DEB"
-        else
-            echo "Using existing DEB: $MC_DEB"
-        fi
-        return 0
+  # If deb file already exists, skip download
+  if [[ -f $MC_DEB ]]; then
+    if [[ $(stat -c%s "$MC_DEB") -lt 10000000 ]]; then
+      echo "Removing existing DEB under 10MB: $MC_DEB"
+      execute rm "$MC_DEB"
+    else
+      echo "Using existing DEB: $MC_DEB"
     fi
+    return 0
+  fi
 
-    # Define the repositories to check
-    local repos=(
-        "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/$fname"
-        "https://files.jriver-cdn.com/mediacenter/test/$fname"
-        "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/$fname"
-    )
+  # Define the repositories to check
+  local repos=(
+    "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/$fname"
+    "https://files.jriver-cdn.com/mediacenter/test/$fname"
+    "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/$fname"
+  )
 
-    # Loop through the repositories and attempt to download
-    for repo in "${repos[@]}"; do
-        echo "Checking $repo for DEB package"
-        if execute wget --quiet --output-document "$MC_DEB" "$repo"; then
-            echo "Found"
-            break
-        fi
-    done
+  # Loop through the repositories and attempt to download
+  for repo in "${repos[@]}"; do
+    echo "Checking $repo for DEB package"
+    if execute wget --quiet --output-document "$MC_DEB" "$repo"; then
+      echo "Found"
+      break
+    fi
+  done
 
-    [[ -f $MC_DEB ]]
+  [[ -f $MC_DEB ]]
 }
 
 # @description Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
 build_rpm() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local i rpmbuild_cmd stub
-    local -a requires recommends
+  local i rpmbuild_cmd stub
+  local -a requires recommends
 
-    # skip rebuilding the rpm if it already exists
-    if [[ -f $MC_RPM ]]; then
-        echo "$MC_RPM already exists. Skipping build step"
-        return 0
-    fi
+  # skip rebuilding the rpm if it already exists
+  if [[ -f $MC_RPM ]]; then
+    echo "$MC_RPM already exists. Skipping build step"
+    return 0
+  fi
 
-    # Load deb dependencies into array
-    IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MC_DEB" Depends)"
-    IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$MC_DEB" Recommends)"
+  # Load deb dependencies into array
+  IFS=',' read -ra requires <<< "$(dpkg-deb -f "$MC_DEB" Depends)"
+  IFS=',' read -ra recommends <<< "$(dpkg-deb -f "$MC_DEB" Recommends)"
 
-    # Clean up formatting
-    requires=("${requires[@]%%|*}")
-    requires=("${requires[@]/?:/}")
-    requires=("${requires[@]# }")
-    requires=("${requires[@]% }")
-    requires=("${requires[@]//\(/}")
-    requires=("${requires[@]//)/}")
-    recommends=("${recommends[@]%%|*}")
-    recommends=("${recommends[@]/?:/}")
-    recommends=("${recommends[@]# }")
-    recommends=("${recommends[@]% }")
-    recommends=("${recommends[@]//\(/}")
-    recommends=("${recommends[@]//)/}")
+  # Clean up formatting
+  requires=("${requires[@]%%|*}")
+  requires=("${requires[@]/?:/}")
+  requires=("${requires[@]# }")
+  requires=("${requires[@]% }")
+  requires=("${requires[@]//\(/}")
+  requires=("${requires[@]//)/}")
+  recommends=("${recommends[@]%%|*}")
+  recommends=("${recommends[@]/?:/}")
+  recommends=("${recommends[@]# }")
+  recommends=("${recommends[@]% }")
+  recommends=("${recommends[@]//\(/}")
+  recommends=("${recommends[@]//)/}")
 
-    # Translate package names
-    case $BUILD_TARGET in
-        fedora|centos)
-            requires=("${requires[@]/libc6/glibc}")
-            requires=("${requires[@]/libasound2/alsa-lib}")
-            requires=("${requires[@]/libuuid1/libuuid}")
-            requires=("${requires[@]/libx11-6/libX11}")
-            requires=("${requires[@]/libxext6/libXext}")
-            requires=("${requires[@]/libxcb1*/libxcb}") # TODO Remove minimum version for MC31 (*)
-            requires=("${requires[@]/libxdmcp6/libXdmcp}")
-            requires=("${requires[@]/libstdc++6/libstdc++}")
-            requires=("${requires[@]/libgtk-3-0/gtk3}")
-            requires=("${requires[@]/libgl1/mesa-libGL}")
-            requires=("${requires[@]/libpango-1.0-0/pango}")
-            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
-            requires=("${requires[@]/libpangox-1.0-0/pango}")
-            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
-            requires=("${requires[@]/libnss3/nss}")
-            requires=("${requires[@]/libnspr4/nspr}")
-            requires=("${requires[@]/libgomp1/libgomp}")
-            requires=("${requires[@]/libfribidi0/fribidi}")
-            requires=("${requires[@]/libfontconfig1/fontconfig}")
-            requires=("${requires[@]/libfreetype6/freetype}")
-            requires=("${requires[@]/libharfbuzz0b/harfbuzz}")
-            requires=("${requires[@]/libgbm1/mesa-libgbm}")
-            requires=("${requires[@]/libva2/libva}")
-            requires=("${requires[@]/libva-drm2/libva}")
-            requires=("${requires[@]/libepoxy0/libepoxy}")
-            requires=("${requires[@]/liblcms2-2/lcms2}")
-            requires=("${requires[@]/libvulkan1/vulkan-loader}")
-            requires=("${requires[@]/libepoxy0/libepoxy}")
-            requires=("${requires[@]/python/python3}")
-            requires=("${requires[@]/libwebkit2gtk*/webkit2gtk4.0}")
-            recommends+=(mesa-va-drivers-freeworld)
-            ;;
-        suse)
-            requires=("${requires[@]/libc6/glibc}")
-            requires=("${requires[@]/libasound2/alsa-lib}")
-            requires=("${requires[@]/libx11-6/libX11-6}")
-            requires=("${requires[@]/libxext6/libXext6}")
-            requires=("${requires[@]/libxdmcp6/libXdmcp6}")
-            requires=("${requires[@]/libgtk-3-0/gtk3}")
-            requires=("${requires[@]/libgl1/Mesa-libGL1}")
-            requires=("${requires[@]/libpango-1.0-0/pango}")
-            requires=("${requires[@]/libpangoft2-1.0-0/pango}")
-            requires=("${requires[@]/libpangox-1.0-0/pango}")
-            requires=("${requires[@]/libpangoxft-1.0-0/pango}")
-            requires=("${requires[@]/libnss3/mozilla-nss}")
-            requires=("${requires[@]/libnspr4/mozilla-nspr}")
-            requires=("${requires[@]/libfribidi0/fribidi}")
-            requires=("${requires[@]/libfontconfig1/fontconfig}")
-            requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
-            requires=("${requires[@]/libwebkit2gtk*/libwebkit2gtk-4_0-37}")
-            for i in "${!requires[@]}"; do
-                [[ ${requires[$i]} == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
-            done
-            recommends+=(libvulkan_intel)
-            recommends+=(libvulkan_radeon)
-            ;;
-    esac
+  # Translate package names
+  case $BUILD_TARGET in
+    fedora|centos)
+      requires=("${requires[@]/libc6/glibc}")
+      requires=("${requires[@]/libasound2/alsa-lib}")
+      requires=("${requires[@]/libuuid1/libuuid}")
+      requires=("${requires[@]/libx11-6/libX11}")
+      requires=("${requires[@]/libxext6/libXext}")
+      requires=("${requires[@]/libxcb1*/libxcb}") # TODO Remove minimum version for MC31 (*)
+      requires=("${requires[@]/libxdmcp6/libXdmcp}")
+      requires=("${requires[@]/libstdc++6/libstdc++}")
+      requires=("${requires[@]/libgtk-3-0/gtk3}")
+      requires=("${requires[@]/libgl1/mesa-libGL}")
+      requires=("${requires[@]/libpango-1.0-0/pango}")
+      requires=("${requires[@]/libpangoft2-1.0-0/pango}")
+      requires=("${requires[@]/libpangox-1.0-0/pango}")
+      requires=("${requires[@]/libpangoxft-1.0-0/pango}")
+      requires=("${requires[@]/libnss3/nss}")
+      requires=("${requires[@]/libnspr4/nspr}")
+      requires=("${requires[@]/libgomp1/libgomp}")
+      requires=("${requires[@]/libfribidi0/fribidi}")
+      requires=("${requires[@]/libfontconfig1/fontconfig}")
+      requires=("${requires[@]/libfreetype6/freetype}")
+      requires=("${requires[@]/libharfbuzz0b/harfbuzz}")
+      requires=("${requires[@]/libgbm1/mesa-libgbm}")
+      requires=("${requires[@]/libva2/libva}")
+      requires=("${requires[@]/libva-drm2/libva}")
+      requires=("${requires[@]/libepoxy0/libepoxy}")
+      requires=("${requires[@]/liblcms2-2/lcms2}")
+      requires=("${requires[@]/libvulkan1/vulkan-loader}")
+      requires=("${requires[@]/libepoxy0/libepoxy}")
+      requires=("${requires[@]/python/python3}")
+      requires=("${requires[@]/libwebkit2gtk*/webkit2gtk4.0}")
+      recommends+=(mesa-va-drivers-freeworld)
+      ;;
+    suse)
+      requires=("${requires[@]/libc6/glibc}")
+      requires=("${requires[@]/libasound2/alsa-lib}")
+      requires=("${requires[@]/libx11-6/libX11-6}")
+      requires=("${requires[@]/libxext6/libXext6}")
+      requires=("${requires[@]/libxdmcp6/libXdmcp6}")
+      requires=("${requires[@]/libgtk-3-0/gtk3}")
+      requires=("${requires[@]/libgl1/Mesa-libGL1}")
+      requires=("${requires[@]/libpango-1.0-0/pango}")
+      requires=("${requires[@]/libpangoft2-1.0-0/pango}")
+      requires=("${requires[@]/libpangox-1.0-0/pango}")
+      requires=("${requires[@]/libpangoxft-1.0-0/pango}")
+      requires=("${requires[@]/libnss3/mozilla-nss}")
+      requires=("${requires[@]/libnspr4/mozilla-nspr}")
+      requires=("${requires[@]/libfribidi0/fribidi}")
+      requires=("${requires[@]/libfontconfig1/fontconfig}")
+      requires=("${requires[@]/libharfbuzz0b/libharfbuzz0}")
+      requires=("${requires[@]/libwebkit2gtk*/libwebkit2gtk-4_0-37}")
+      for i in "${!requires[@]}"; do
+        [[ ${requires[$i]} == "mesa-vulkan-drivers" ]] && unset -v 'requires[i]'
+      done
+      recommends+=(libvulkan_intel)
+      recommends+=(libvulkan_radeon)
+      ;;
+  esac
 
-    # Convert array to newline delim'd string (for heredoc)
-    printf -v requires "Requires: %s\n" "${requires[@]}"
-    printf -v recommends "Recommends: %s\n" "${recommends[@]}"
-    # Strip last newline
-    requires="${requires%?}" 
-    recommends="${recommends%?}"
+  # Convert array to newline delim'd string (for heredoc)
+  printf -v requires "Requires: %s\n" "${requires[@]}"
+  printf -v recommends "Recommends: %s\n" "${recommends[@]}"
+  # Strip last newline
+  requires="${requires%?}" 
+  recommends="${recommends%?}"
 
-    if (( COMPAT_SWITCH )); then
-        # Strip minimum versions
-        requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
-    fi
+  if (( COMPAT_SWITCH )); then
+    # Strip minimum versions
+    requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
+  fi
 
-    # Exclude MC stub executable <= MC31
-    if [[ $MC_MVERSION -le 31 ]]; then
-        stub=""
-    else
-        stub="%{_bindir}/mc$MC_MVERSION"
-    fi
+  # Exclude MC stub executable <= MC31
+  if [[ $MC_MVERSION -le 31 ]]; then
+    stub=""
+  else
+    stub="%{_bindir}/mc$MC_MVERSION"
+  fi
 
-    # Create spec file
-    cat <<-EOF > "$OUTPUT_DIR/SPECS/mediacenter.spec"
-		Name:    mediacenter$MC_MVERSION
+  # Create spec file
+  cat <<-EOF > "$OUTPUT_DIR/SPECS/mediacenter.spec"
+		Name:  mediacenter$MC_MVERSION
 		Version: $MC_VERSION
 		Release: 1
 		Summary: JRiver Media Center
@@ -806,112 +807,112 @@ build_rpm() {
 		/etc/security/limits.d/*
 	EOF
 
-    # Run rpmbuild
-    echo "Building MC $MC_VERSION RPM, this may take some time"
-    rpmbuild_cmd=(
-        rpmbuild 
-            --define="%_topdir $OUTPUT_DIR" 
-            --define="%_libdir /usr/lib" 
-            -bb
-            "$OUTPUT_DIR/SPECS/mediacenter.spec"
-    )
-    if execute "${rpmbuild_cmd[@]}" && [[ -f $MC_RPM ]] ; then
-        echo "Build successful. The RPM file is located at: $MC_RPM"
-    else
-        err "Build failed"
-        # For automation, let's remove the source DEB and reaquire it on next 
-        # run after failure in case it is corrupted or buggy
-        [[ -f $MC_DEB ]] && echo "Removing source DEB" && rm -f "$MC_DEB"
-        exit 1
-    fi
+  # Run rpmbuild
+  echo "Building MC $MC_VERSION RPM, this may take some time"
+  rpmbuild_cmd=(
+    rpmbuild 
+      --define="%_topdir $OUTPUT_DIR" 
+      --define="%_libdir /usr/lib" 
+      -bb
+      "$OUTPUT_DIR/SPECS/mediacenter.spec"
+  )
+  if execute "${rpmbuild_cmd[@]}" && [[ -f $MC_RPM ]] ; then
+    echo "Build successful. The RPM file is located at: $MC_RPM"
+  else
+    err "Build failed"
+    # For automation, let's remove the source DEB and reaquire it on next 
+    # run after failure in case it is corrupted or buggy
+    [[ -f $MC_DEB ]] && echo "Removing source DEB" && rm -f "$MC_DEB"
+    exit 1
+  fi
 }
 
 # @description Installs Media Center DEB package and optional compatability fixes
 install_mc_deb() {
-    debug "Running: ${FUNCNAME[0]}"    
+  debug "Running: ${FUNCNAME[0]}"  
 
-    if (( COMPAT_SWITCH )); then
-        declare extract_dir && extract_dir="$(mktemp -d)"
-        pushd "$extract_dir" &>/dev/null || return
-        command -v ar &>/dev/null || install_package binutils
-        execute ar x "$MC_DEB"
-        execute tar xJf "control.tar.xz"
-        # Remove minimum version specifiers from control file
-        sed -i 's/ ([^)]*)//g' "control"
+  if (( COMPAT_SWITCH )); then
+    declare extract_dir && extract_dir="$(mktemp -d)"
+    pushd "$extract_dir" &>/dev/null || return
+    command -v ar &>/dev/null || install_package binutils
+    execute ar x "$MC_DEB"
+    execute tar xJf "control.tar.xz"
+    # Remove minimum version specifiers from control file
+    sed -i 's/ ([^)]*)//g' "control"
 
-        # TODO ugly ZorinOS workaround
-        [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
-        && ! grep -q zorin /etc/os-release \
-        && sed -i 's/libva2/libva1/g' "control"
+    # TODO ugly ZorinOS workaround
+    [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
+    && ! grep -q zorin /etc/os-release \
+    && sed -i 's/libva2/libva1/g' "control"
 
-        execute tar -cJf "control.tar.xz" "control" "postinst"
-        declare -g MC_DEB="${MC_DEB/.deb/.compat.deb}"
-        execute ar rcs "$MC_DEB" "debian-binary" "control.tar.xz" "data.tar.xz"
-        popd &>/dev/null || return
-        execute rm -rf "$extract_dir"
-    fi
+    execute tar -cJf "control.tar.xz" "control" "postinst"
+    declare -g MC_DEB="${MC_DEB/.deb/.compat.deb}"
+    execute ar rcs "$MC_DEB" "debian-binary" "control.tar.xz" "data.tar.xz"
+    popd &>/dev/null || return
+    execute rm -rf "$extract_dir"
+  fi
 
-    install_package \
-        --no-install-check \
-        --no-gpg-check \
-        --allow-downgrades \
-        "$MC_DEB"
+  install_package \
+    --no-install-check \
+    --no-gpg-check \
+    --allow-downgrades \
+    "$MC_DEB"
 }
 
 
 # @description Installs Media Center RPM package on RHEL distros
 install_mc_rhel() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    # Install mesa-va-freeworld separately from the RPM for dnf swap
-    install_mesa_freeworld
-    
-    install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
+  # Install mesa-va-freeworld separately from the RPM for dnf swap
+  install_mesa_freeworld
+  
+  install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
 # @description Installs Media Center RPM package on SUSE
 install_mc_suse() {
-    debug "Running: ${FUNCNAME[0]}"
-    
-    install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
+  debug "Running: ${FUNCNAME[0]}"
+  
+  install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
 # @description Installs Media Center generically for unsupported OSes
 install_mc_generic() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local -a raw_files
-    local extract_dir
+  local -a raw_files
+  local extract_dir
 
-    echo "Using generic installation method"
+  echo "Using generic installation method"
 
-    extract_dir="$(mktemp -d)"
-    pushd "$extract_dir" &>/dev/null || return
-    execute ar x "$MC_DEB"
-    execute tar xJf "control.tar.xz"
-    echo "You must install the following dependencies manually:"
-    grep -i "Depends:" control
-    readarray -t raw_files < <(tar xJvf data.tar.xz)
-    # Output to log file
-    for f in "${raw_files[@]/#./}"; do
-        echo "$f" >> "$SCRIPT_DIR/.uninstall"
-    done
-    # Manually install files
-    for f in "${raw_files[@]}"; do
-        execute sudo cp -a "$f" "${f/#./}"
-    done
-    popd &>/dev/null || return
-    execute rm -rf "$extract_dir"
-    return 0
+  extract_dir="$(mktemp -d)"
+  pushd "$extract_dir" &>/dev/null || return
+  execute ar x "$MC_DEB"
+  execute tar xJf "control.tar.xz"
+  echo "You must install the following dependencies manually:"
+  grep -i "Depends:" control
+  readarray -t raw_files < <(tar xJvf data.tar.xz)
+  # Output to log file
+  for f in "${raw_files[@]/#./}"; do
+    echo "$f" >> "$SCRIPT_DIR/.uninstall"
+  done
+  # Manually install files
+  for f in "${raw_files[@]}"; do
+    execute sudo cp -a "$f" "${f/#./}"
+  done
+  popd &>/dev/null || return
+  execute rm -rf "$extract_dir"
+  return 0
 }
 
 # @description Installs Media Center Arch PKGBUILD
 install_mc_arch() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    [[ -d $OUTPUT_DIR/PKGBUILD ]] || execute mkdir -p "$OUTPUT_DIR/PKGBUILD"
+  [[ -d $OUTPUT_DIR/PKGBUILD ]] || execute mkdir -p "$OUTPUT_DIR/PKGBUILD"
 
-    cat <<-EOF > "$OUTPUT_DIR/PKGBUILD/mediacenter.pkgbuild"
+  cat <<-EOF > "$OUTPUT_DIR/PKGBUILD/mediacenter.pkgbuild"
 		pkgname=mediacenter$MC_MVERSION
 		pkgver=$MC_VERSION
 		pkgrel=1
@@ -936,281 +937,281 @@ install_mc_arch() {
 			bsdtar xf data.tar.xz -C "\$pkgdir"
 		}
 	EOF
-    
-    pushd "$OUTPUT_DIR/PKGBUILD" &>/dev/null || return
+  
+  pushd "$OUTPUT_DIR/PKGBUILD" &>/dev/null || return
 
-    if ! execute makepkg \
-        --install \
-        --syncdeps \
-        --clean \
-        --cleanbuild \
-        --skipinteg \
-        --force \
-        --noconfirm \
-        -p mediacenter.pkgbuild; then
-        echo "makepkg failed"
-        exit 1
-    fi
+  if ! execute makepkg \
+    --install \
+    --syncdeps \
+    --clean \
+    --cleanbuild \
+    --skipinteg \
+    --force \
+    --noconfirm \
+    -p mediacenter.pkgbuild; then
+    echo "makepkg failed"
+    exit 1
+  fi
 
-    popd &>/dev/null || return
+  popd &>/dev/null || return
 }
 
 # @description Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
 run_createrepo() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local -a cr_cmd
+  local -a cr_cmd
 
-    install_package createrepo_c
+  install_package createrepo_c
 
-    # Ensure the webroot exists
-    if [[ ! -d $CREATEREPO_WEBROOT ]]; then
-        if ! execute sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT"; then
-            if ! execute sudo mkdir -p "$CREATEREPO_WEBROOT" && 
-               ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
-                err "Could not create the createrepo-webroot path!"
-                err "Make sure that the webroot $CREATEREPO_WEBROOT is writable by user $CREATEREPO_USER"
-                err "Or change the repo ownership with --createrepo-user"
-                return 1
-            fi
-        fi
-    fi
-
-    # Copy built RPMs to webroot
-    if ! execute sudo cp -nf "$MC_RPM" "$CREATEREPO_WEBROOT" || 
-       ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
-        err "Could not copy $MC_RPM to $CREATEREPO_WEBROOT"
+  # Ensure the webroot exists
+  if [[ ! -d $CREATEREPO_WEBROOT ]]; then
+    if ! execute sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT"; then
+      if ! execute sudo mkdir -p "$CREATEREPO_WEBROOT" && 
+         ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
+        err "Could not create the createrepo-webroot path!"
+        err "Make sure that the webroot $CREATEREPO_WEBROOT is writable by user $CREATEREPO_USER"
+        err "Or change the repo ownership with --createrepo-user"
         return 1
+      fi
     fi
+  fi
 
-    # Run createrepo
-    cr_cmd=(sudo -u "$CREATEREPO_USER" createrepo -q "$CREATEREPO_WEBROOT")
+  # Copy built RPMs to webroot
+  if ! execute sudo cp -nf "$MC_RPM" "$CREATEREPO_WEBROOT" || 
+     ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
+    err "Could not copy $MC_RPM to $CREATEREPO_WEBROOT"
+    return 1
+  fi
+
+  # Run createrepo
+  cr_cmd=(sudo -u "$CREATEREPO_USER" createrepo -q "$CREATEREPO_WEBROOT")
+  [[ -d $CREATEREPO_WEBROOT/repodata ]] && cr_cmd+=(--update)
+  
+  if ! execute "${cr_cmd[@]}"; then
+    cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
     [[ -d $CREATEREPO_WEBROOT/repodata ]] && cr_cmd+=(--update)
     
-    if ! execute "${cr_cmd[@]}"; then
-        cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
-        [[ -d $CREATEREPO_WEBROOT/repodata ]] && cr_cmd+=(--update)
-        
-        if ! execute "${cr_cmd[@]}" || 
-           ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
-            err "createrepo failed"
-            return 1
-        fi
+    if ! execute "${cr_cmd[@]}" || 
+       ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
+      err "createrepo failed"
+      return 1
     fi
+  fi
 }
 
 # @description Symlink certificates if they do not exist in default location
 link_ssl_certs() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local target_cert f
-    local mc_cert_link="$MC_ROOT/ca-certificates.crt"
-    local -a source_certs=(
-        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" 
-        "/var/lib/ca-certificates/ca-bundle.pem")
+  local target_cert f
+  local mc_cert_link="$MC_ROOT/ca-certificates.crt"
+  local -a source_certs=(
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" 
+    "/var/lib/ca-certificates/ca-bundle.pem")
 
-    target_cert=$(readlink -f "$mc_cert_link")
-    [[ -f $target_cert ]] && return 0
+  target_cert=$(readlink -f "$mc_cert_link")
+  [[ -f $target_cert ]] && return 0
 
-    for f in "${source_certs[@]}"; do
-        if [[ -f $f ]]; then
-            if ! execute sudo ln -fs "$f" "$mc_cert_link"; then
-                err "Symlinking certificate failed"
-                return 1
-            fi
-            break
-        fi
-    done
+  for f in "${source_certs[@]}"; do
+    if [[ -f $f ]]; then
+      if ! execute sudo ln -fs "$f" "$mc_cert_link"; then
+        err "Symlinking certificate failed"
+        return 1
+      fi
+      break
+    fi
+  done
 }
 
 # @description Restore the mjr license file from MJR_RESTORE_FILE or other common locations
 restore_license() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local f newest mjrfiles
+  local f newest mjrfiles
 
-    # Glob mjr files from common directories
-    shopt -s nullglob
-    mjrfiles=(
-        "$SCRIPT_DIR"/*.mjr 
-        "$OUTPUT_DIR"/*.mjr 
-        "$HOME"/[dD]ownloads/*.mjr
-        "$HOME"/[dD]ocuments/*.mjr
-    )
-    shopt -u nullglob
+  # Glob mjr files from common directories
+  shopt -s nullglob
+  mjrfiles=(
+    "$SCRIPT_DIR"/*.mjr 
+    "$OUTPUT_DIR"/*.mjr 
+    "$HOME"/[dD]ownloads/*.mjr
+    "$HOME"/[dD]ocuments/*.mjr
+  )
+  shopt -u nullglob
 
-    if [[ ${#mjrfiles[@]} -gt 0 ]]; then
+  if [[ ${#mjrfiles[@]} -gt 0 ]]; then
 
-        debug "mjrfiles=(${mjrfiles[*]})"
+    debug "mjrfiles=(${mjrfiles[*]})"
 
-        # Sort globbed files by time, newest first
-        newest=${mjrfiles[0]}
-        for f in "${mjrfiles[@]}"; do
-            if [[ -f $f && $f -nt $newest ]]; then
-                newest=$f
-            fi
-        done
+    # Sort globbed files by time, newest first
+    newest=${mjrfiles[0]}
+    for f in "${mjrfiles[@]}"; do
+      if [[ -f $f && $f -nt $newest ]]; then
+        newest=$f
+      fi
+    done
 
-        debug "Latest mjrfile: $newest"
+    debug "Latest mjrfile: $newest"
 
-        for f in "$MJR_RESTORE_FILE" "$newest"; do
-            if [[ -f $f ]]; then
-                execute "mediacenter$MC_MVERSION" "/RestoreFromFile" "$f"
-            fi
-        done
-    fi
+    for f in "$MJR_RESTORE_FILE" "$newest"; do
+      if [[ -f $f ]]; then
+        execute "mediacenter$MC_MVERSION" "/RestoreFromFile" "$f"
+      fi
+    done
+  fi
 }
 
 # @description Opens ports using the system firewall tool
 # @arg $1 string Service name
 # @arg $2 array List of ports in firewall-cmd format
 open_firewall() {
-    debug "Running: ${FUNCNAME[0]}" "$*"
+  debug "Running: ${FUNCNAME[0]}" "$*"
 
-    local port
-    local service="$1"
-    shift
-    local -a f_ports=("$@") # for firewall-cmd
-    local u_ports="$*"
-    u_ports="${u_ports// /|}" # concatenate
-    u_ports="${u_ports//-/\:}" # for ufw
+  local port
+  local service="$1"
+  shift
+  local -a f_ports=("$@") # for firewall-cmd
+  local u_ports="$*"
+  u_ports="${u_ports// /|}" # concatenate
+  u_ports="${u_ports//-/\:}" # for ufw
 
-    if command -v firewall-cmd &>/dev/null; then
-        if ! sudo firewall-cmd --get-services | grep -q "$service"; then
-            execute sudo firewall-cmd --permanent "--new-service=$service"
-            execute sudo firewall-cmd --permanent "--service=$service" "--set-description=$service" installed by installJRMC
-            execute sudo firewall-cmd --permanent "--service=$service" "--set-short=$service"
-            for port in "${f_ports[@]}"; do
-                execute sudo firewall-cmd --permanent "--service=$service" "--add-port=$port"
-            done
-            execute sudo firewall-cmd --add-service "$service" --permanent
-            execute sudo firewall-cmd --reload
-        fi
-    elif command -v ufw &>/dev/null; then
-        sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
+  if command -v firewall-cmd &>/dev/null; then
+    if ! sudo firewall-cmd --get-services | grep -q "$service"; then
+      execute sudo firewall-cmd --permanent "--new-service=$service"
+      execute sudo firewall-cmd --permanent "--service=$service" "--set-description=$service" installed by installJRMC
+      execute sudo firewall-cmd --permanent "--service=$service" "--set-short=$service"
+      for port in "${f_ports[@]}"; do
+        execute sudo firewall-cmd --permanent "--service=$service" "--add-port=$port"
+      done
+      execute sudo firewall-cmd --add-service "$service" --permanent
+      execute sudo firewall-cmd --reload
+    fi
+  elif command -v ufw &>/dev/null; then
+    sudo bash -c "cat <<-EOF > /etc/ufw/applications.d/$service
 			[$service]
 			title=$service
 			description=$service installed by installJRMC
 			ports=$u_ports
 		EOF"
-        execute sudo ufw app update "$service"
-        execute sudo ufw allow "$service"
-    else
-        echo "Warning: Install firewall-cmd or ufw to open firewall ports"
-        return 1
-    fi
+    execute sudo ufw app update "$service"
+    execute sudo ufw allow "$service"
+  else
+    echo "Warning: Install firewall-cmd or ufw to open firewall ports"
+    return 1
+  fi
 }
 
 # @description Create the xvnc or x11vnc password file
 # @arg $1 string Service type (xvnc, x11vnc)
 set_vnc_pass() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local vncpassfile="$HOME/.vnc/jrmc_passwd"
+  local vncpassfile="$HOME/.vnc/jrmc_passwd"
 
-    [[ -d ${vncpassfile%/*} ]] || execute mkdir -p "${vncpassfile%/*}"
+  [[ -d ${vncpassfile%/*} ]] || execute mkdir -p "${vncpassfile%/*}"
 
-    if [[ -f $vncpassfile ]]; then
-        if [[ ! -v VNCPASS ]]; then
-            err "Refusing to overwrite existing $vncpassfile with an empty password"
-            err "Remove existing $vncpassfile or use --vncpass ''"
-            return 1
-        else
-            execute rm -f "$vncpassfile"
-        fi
-    fi
-
-    if [[ -v VNCPASS ]]; then
-        if [[ $1 == "xvnc" ]]; then
-            echo "$VNCPASS" | vncpasswd -f > "$vncpassfile"
-        elif [[ $1 == "x11vnc" ]]; then
-            execute x11vnc -storepasswd "$VNCPASS" "$vncpassfile"
-        fi
-        return $?
+  if [[ -f $vncpassfile ]]; then
+    if [[ ! -v VNCPASS ]]; then
+      err "Refusing to overwrite existing $vncpassfile with an empty password"
+      err "Remove existing $vncpassfile or use --vncpass ''"
+      return 1
     else
-        declare -g NOVNCAUTH=1
+      execute rm -f "$vncpassfile"
     fi
+  fi
+
+  if [[ -v VNCPASS ]]; then
+    if [[ $1 == "xvnc" ]]; then
+      echo "$VNCPASS" | vncpasswd -f > "$vncpassfile"
+    elif [[ $1 == "x11vnc" ]]; then
+      execute x11vnc -storepasswd "$VNCPASS" "$vncpassfile"
+    fi
+    return $?
+  else
+    declare -g NOVNCAUTH=1
+  fi
 }
 
 # @description Set display and port variables
 set_display_vars() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    declare -g THIS_DISPLAY THIS_DISPLAY_NUM NEXT_DISPLAY
+  declare -g THIS_DISPLAY THIS_DISPLAY_NUM NEXT_DISPLAY
 
-    # Check USER_DISPLAY, else environment DISPLAY, else set to :0
-    THIS_DISPLAY="${USER_DISPLAY:-${DISPLAY:-:0}}"
-    THIS_DISPLAY_NUM="${THIS_DISPLAY#*:}" # strip prefix
-    THIS_DISPLAY_NUM="${THIS_DISPLAY_NUM%%.*}" # strip suffix
-    # Increment each time we run this
-    if (( NEXT_DISPLAY_NUM )); then
-        declare -g NEXT_DISPLAY_NUM=$(( NEXT_DISPLAY_NUM + 1 ))
-    else
-        declare -g NEXT_DISPLAY_NUM=$(( THIS_DISPLAY_NUM + 1 ))
-    fi
-    NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
+  # Check USER_DISPLAY, else environment DISPLAY, else set to :0
+  THIS_DISPLAY="${USER_DISPLAY:-${DISPLAY:-:0}}"
+  THIS_DISPLAY_NUM="${THIS_DISPLAY#*:}" # strip prefix
+  THIS_DISPLAY_NUM="${THIS_DISPLAY_NUM%%.*}" # strip suffix
+  # Increment each time we run this
+  if (( NEXT_DISPLAY_NUM )); then
+    declare -g NEXT_DISPLAY_NUM=$(( NEXT_DISPLAY_NUM + 1 ))
+  else
+    declare -g NEXT_DISPLAY_NUM=$(( THIS_DISPLAY_NUM + 1 ))
+  fi
+  NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
 }
 
 # @description Create associated service variables based on service name
 # @arg $1 string Service name
 set_service_vars() {
-    debug "Running: ${FUNCNAME[0]}" "$*"
+  debug "Running: ${FUNCNAME[0]}" "$*"
 
-    declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
-    declare -g USER_STRING GRAPHICAL_TARGET
-    declare -ga RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
-    local -a systemctl_prefix
-    local service_name="$1"
-    local service_type="${SERVICE_TYPE:-${2:-system}}"
-    local service_dir="/usr/lib/systemd/$service_type"
+  declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
+  declare -g USER_STRING GRAPHICAL_TARGET
+  declare -ga RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
+  local -a systemctl_prefix
+  local service_name="$1"
+  local service_type="${SERVICE_TYPE:-${2:-system}}"
+  local service_dir="/usr/lib/systemd/$service_type"
 
-    if [[ $USER == "root" && $service_type == "user" ]]; then
-        err "Trying to install user service as root"
-        err "Use --service-type service and/or execute installJRMC as non-root user"
-        return 1
-    fi
+  if [[ $USER == "root" && $service_type == "user" ]]; then
+    err "Trying to install user service as root"
+    err "Use --service-type service and/or execute installJRMC as non-root user"
+    return 1
+  fi
 
-    if [[ $service_type == "system" ]]; then
-        systemctl_prefix=(sudo systemctl)
-        GRAPHICAL_TARGET="graphical.target"
-    elif [[ $service_type == "user" ]]; then
-        systemctl_prefix=(systemctl --user)
-        GRAPHICAL_TARGET="default.target"
-    fi
+  if [[ $service_type == "system" ]]; then
+    systemctl_prefix=(sudo systemctl)
+    GRAPHICAL_TARGET="graphical.target"
+  elif [[ $service_type == "user" ]]; then
+    systemctl_prefix=(systemctl --user)
+    GRAPHICAL_TARGET="default.target"
+  fi
 
-    # systemctl commands
-    RELOAD=(execute "${systemctl_prefix[@]}" daemon-reload)
-    ENABLE=(execute "${systemctl_prefix[@]}" enable --now)
-    DISABLE=(execute "${systemctl_prefix[@]}" disable --now)
-    IS_ENABLED=(execute "${systemctl_prefix[@]}" is-enabled -q)
-    IS_ACTIVE=(execute "${systemctl_prefix[@]}" is-active -q)
+  # systemctl commands
+  RELOAD=(execute "${systemctl_prefix[@]}" daemon-reload)
+  ENABLE=(execute "${systemctl_prefix[@]}" enable --now)
+  DISABLE=(execute "${systemctl_prefix[@]}" disable --now)
+  IS_ENABLED=(execute "${systemctl_prefix[@]}" is-enabled -q)
+  IS_ACTIVE=(execute "${systemctl_prefix[@]}" is-active -q)
 
-    [[ -d $service_dir ]] || execute sudo mkdir -p "$service_dir"
+  [[ -d $service_dir ]] || execute sudo mkdir -p "$service_dir"
 
-    if [[ $service_type == "system" && $USER != "root" ]]; then
-        SERVICE_FNAME="$service_dir/$service_name@.service"
-        TIMER_FNAME="$service_dir/$service_name@.timer"
-        SERVICE_NAME="$service_name@$USER.service"
-        TIMER_NAME="$service_name@$USER.timer"
-        USER_STRING="User=%I"
-    else
-        SERVICE_NAME="$service_name.service"
-        TIMER_NAME="$service_name.timer"
-        SERVICE_FNAME="$service_dir/$SERVICE_NAME"
-        TIMER_FNAME="$service_dir/${TIMER_NAME}"
-        USER_STRING=""
-    fi
+  if [[ $service_type == "system" && $USER != "root" ]]; then
+    SERVICE_FNAME="$service_dir/$service_name@.service"
+    TIMER_FNAME="$service_dir/$service_name@.timer"
+    SERVICE_NAME="$service_name@$USER.service"
+    TIMER_NAME="$service_name@$USER.timer"
+    USER_STRING="User=%I"
+  else
+    SERVICE_NAME="$service_name.service"
+    TIMER_NAME="$service_name.timer"
+    SERVICE_FNAME="$service_dir/$SERVICE_NAME"
+    TIMER_FNAME="$service_dir/${TIMER_NAME}"
+    USER_STRING=""
+  fi
 }
 
 # @section Services
 # @description Starts and enables (at startup) a JRiver Media Center service
 # @arg $1 string Passes arguments as startup options to /usr/bin/mediacenter??
 service_jriver-mediacenter() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    set_service_vars "${FUNCNAME[0]##*_}" "user"
+  set_service_vars "${FUNCNAME[0]##*_}" "user"
 
-    sudo bash -c "cat <<-EOF > $SERVICE_FNAME
+  sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=JRiver Media Center $MC_MVERSION
 		After=$GRAPHICAL_TARGET
@@ -1229,53 +1230,53 @@ service_jriver-mediacenter() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+  open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
 
-    "${RELOAD[@]}" \
-    && "${ENABLE[@]}" "$SERVICE_NAME"
+  "${RELOAD[@]}" \
+  && "${ENABLE[@]}" "$SERVICE_NAME"
 }
 
 # @description Starts and enables (at startup) a JRiver Media Server service
 service_jriver-mediaserver() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    set_service_vars "${FUNCNAME[0]##*_}" "user"
+  set_service_vars "${FUNCNAME[0]##*_}" "user"
 
-    service_jriver-mediacenter "/MediaServer"
+  service_jriver-mediacenter "/MediaServer"
 }
 
 # @description Starts and enables (at startup) JRiver Media Center in a new Xvnc session
 # TODO https://github.com/TigerVNC/tigervnc/blob/master/unix/vncserver/HOWTO.md
 service_jriver-xvnc() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    set_service_vars "${FUNCNAME[0]##*_}" "system"
-    set_display_vars
-    local -a start_cmd
-    declare -g PORT=$(( NEXT_DISPLAY_NUM + 5900 ))
+  set_service_vars "${FUNCNAME[0]##*_}" "system"
+  set_display_vars
+  local -a start_cmd
+  declare -g PORT=$(( NEXT_DISPLAY_NUM + 5900 ))
 
-    install_package tigervnc-server
+  install_package tigervnc-server
 
-    set_vnc_pass xvnc
+  set_vnc_pass xvnc
 
-    start_cmd=(
-        /usr/bin/vncserver "$NEXT_DISPLAY"
-        -geometry 1440x900 
-        -alwaysshared
-        -autokill
-        -xstartup "/usr/bin/mediacenter$MC_MVERSION"
-    )
+  start_cmd=(
+    /usr/bin/vncserver "$NEXT_DISPLAY"
+    -geometry 1440x900 
+    -alwaysshared
+    -autokill
+    -xstartup "/usr/bin/mediacenter$MC_MVERSION"
+  )
 
-    if (( NOVNCAUTH )); then
-        start_cmd+=(
-            -name "jriver$NEXT_DISPLAY" 
-            -SecurityTypes None)
-    else
-        start_cmd+=(
-            -rfbauth "$HOME/.vnc/jrmc_passwd")
-    fi
+  if (( NOVNCAUTH )); then
+    start_cmd+=(
+      -name "jriver$NEXT_DISPLAY" 
+      -SecurityTypes None)
+  else
+    start_cmd+=(
+      -rfbauth "$HOME/.vnc/jrmc_passwd")
+  fi
 
-    sudo bash -c "cat <<-EOF > $SERVICE_FNAME
+  sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Remote desktop service (VNC)
 		After=multi-user.target
@@ -1292,66 +1293,66 @@ service_jriver-xvnc() {
 		WantedBy=multi-user.target
 	EOF"
 
-    "${RELOAD[@]}"
+  "${RELOAD[@]}"
 
-    if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
-        err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
-        # Allow to increment 10 times before breaking
-        max=$(( THIS_DISPLAY_NUM + 10 ))
-        while [[ $NEXT_DISPLAY_NUM -lt $max ]]; do
-            echo "Incrementing DISPLAY and retrying"
-            service_jriver-xvnc && return
-        done
-        return 1
-    else
-        echo "Xvnc running on localhost:$PORT"
-        open_firewall "jriver-xvnc" "$PORT/tcp"
-        open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
-        return 0
-    fi
+  if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
+    err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
+    # Allow to increment 10 times before breaking
+    max=$(( THIS_DISPLAY_NUM + 10 ))
+    while [[ $NEXT_DISPLAY_NUM -lt $max ]]; do
+      echo "Incrementing DISPLAY and retrying"
+      service_jriver-xvnc && return
+    done
+    return 1
+  else
+    echo "Xvnc running on localhost:$PORT"
+    open_firewall "jriver-xvnc" "$PORT/tcp"
+    open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+    return 0
+  fi
 }
 
 # @description Starts and enables (at startup) x11vnc screen sharing for the local desktop
 service_jriver-x11vnc() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    set_service_vars "${FUNCNAME[0]##*_}" "user"
-    set_display_vars
+  set_service_vars "${FUNCNAME[0]##*_}" "user"
+  set_display_vars
 
-    local -a start_cmd
-    declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
+  local -a start_cmd
+  declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
 
-    install_package x11vnc
+  install_package x11vnc
 
-    set_vnc_pass x11vnc
+  set_vnc_pass x11vnc
 
-    # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
-    if [[ ! -f "$HOME/.Xauthority" ]]; then
-        [[ $XDG_SESSION_TYPE == "wayland" ]] && 
-        ask_ok "Unsupported Wayland session detected for x11vnc, continue?" || return 1
-        debug "Generating $HOME/.Xauthority"
-        execute touch "$HOME/.Xauthority"
-        execute chmod 644 "$HOME/.Xauthority"
-        xauth generate "$DISPLAY" . trusted
-        xauth add "$HOST$DISPLAY" . "$(xxd -l 16 -p /dev/urandom)"
-    fi
+  # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
+  if [[ ! -f "$HOME/.Xauthority" ]]; then
+    [[ $XDG_SESSION_TYPE == "wayland" ]] && 
+    ask_ok "Unsupported Wayland session detected for x11vnc, continue?" || return 1
+    debug "Generating $HOME/.Xauthority"
+    execute touch "$HOME/.Xauthority"
+    execute chmod 644 "$HOME/.Xauthority"
+    xauth generate "$DISPLAY" . trusted
+    xauth add "$HOST$DISPLAY" . "$(xxd -l 16 -p /dev/urandom)"
+  fi
 
-    start_cmd=(
-        /usr/bin/x11vnc 
-        -display "$DISPLAY"
-        -noscr
-        -auth guess
-        -forever
-        -bg
-    )
+  start_cmd=(
+    /usr/bin/x11vnc 
+    -display "$DISPLAY"
+    -noscr
+    -auth guess
+    -forever
+    -bg
+  )
 
-    if (( NOVNCAUTH )); then
-        start_cmd+=(-nopw)
-    else
-        start_cmd+=(-rfbauth "$HOME/.vnc/jrmc_passwd")
-    fi
+  if (( NOVNCAUTH )); then
+    start_cmd+=(-nopw)
+  else
+    start_cmd+=(-rfbauth "$HOME/.vnc/jrmc_passwd")
+  fi
 
-    sudo bash -c "cat <<-EOF > $SERVICE_FNAME
+  sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=x11vnc
 		After=$GRAPHICAL_TARGET
@@ -1368,25 +1369,25 @@ service_jriver-x11vnc() {
 		WantedBy=$GRAPHICAL_TARGET
 	EOF"
 
-    open_firewall "jriver-x11vnc" "$PORT/tcp"
+  open_firewall "jriver-x11vnc" "$PORT/tcp"
 
-    "${RELOAD[@]}" \
-    && "${ENABLE[@]}" "$SERVICE_NAME" \
-    && echo "x11vnc running on localhost:$PORT"
+  "${RELOAD[@]}" \
+  && "${ENABLE[@]}" "$SERVICE_NAME" \
+  && echo "x11vnc running on localhost:$PORT"
 }
 
 # @description Starts and enables (at startup) an hourly service to build the latest version of
 # JRiver Media Center RPM from the source DEB and create/update an RPM repository
 service_jriver-createrepo() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    if [[ $CREATEREPO_USER != "$USER" ]]; then
-        USER="root" set_service_vars "${FUNCNAME[0]##*_}" "system"
-    else
-        set_service_vars "${FUNCNAME[0]##*_}" "system"
-    fi
+  if [[ $CREATEREPO_USER != "$USER" ]]; then
+    USER="root" set_service_vars "${FUNCNAME[0]##*_}" "system"
+  else
+    set_service_vars "${FUNCNAME[0]##*_}" "system"
+  fi
 
-    sudo bash -c "cat <<-EOF > $SERVICE_FNAME
+  sudo bash -c "cat <<-EOF > $SERVICE_FNAME
 		[Unit]
 		Description=Builds JRiver Media Center RPM, moves it to the repo dir, and runs createrepo
 
@@ -1398,7 +1399,7 @@ service_jriver-createrepo() {
 		WantedBy=multi-user.target
 	EOF"
 
-    sudo bash -c "cat <<-EOF > $TIMER_FNAME
+  sudo bash -c "cat <<-EOF > $TIMER_FNAME
 		[Unit]
 		Description=Run JRiver MC rpmbuild hourly
 
@@ -1410,320 +1411,320 @@ service_jriver-createrepo() {
 		WantedBy=timers.target
 	EOF"
 
-    "${RELOAD[@]}" \
-    && "${ENABLE[@]}" "$TIMER_NAME"
+  "${RELOAD[@]}" \
+  && "${ENABLE[@]}" "$TIMER_NAME"
 }
 
 # @description Detects if MC is installed on btrfs and disables CoW
 disable_btrfs_cow() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local dir
-    local mc_user_path="$HOME/.jriver"
+  local dir
+  local mc_user_path="$HOME/.jriver"
 
-    for dir in "$MC_ROOT" "$mc_user_path"; do
-        [[ -d $dir ]] || execute mkdir -p "$dir"
-        if [[ $(stat -f -c %T "$dir") == "btrfs" ]] \
-        && ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C \
-        && execute sudo chattr +C "$dir"; then
-            echo "Disabled btrfs CoW for $dir directory"
-        fi
-    done
+  for dir in "$MC_ROOT" "$mc_user_path"; do
+    [[ -d $dir ]] || execute mkdir -p "$dir"
+    if [[ $(stat -f -c %T "$dir") == "btrfs" ]] \
+    && ! lsattr -d "$dir" | cut -f1 -d" " | grep -q C \
+    && execute sudo chattr +C "$dir"; then
+      echo "Disabled btrfs CoW for $dir directory"
+    fi
+  done
 }
 
 # @description Completely uninstalls MC, services, and firewall rules
 uninstall() {
-    debug "Running: ${FUNCNAME[0]}"
+  debug "Running: ${FUNCNAME[0]}"
 
-    local service unit f i
+  local service unit f i
 
-    echo "Stopping and removing all Media Center services"
-    for service in $(compgen -A "function" "service"); do
-        service="${service##service_}"
-        for i in user system; do
-            set_service_vars "$service" "$i"; 
-            for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
-                if "${IS_ACTIVE[@]}" "$unit" || 
-                "${IS_ENABLED[@]}" "$unit"; then
-                    "${DISABLE[@]}" "$unit"
-                fi
-            done
-            for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-                [[ -f $f ]] && 
-                execute sudo rm -f "$f"
-            done
-            "${RELOAD[@]}"
-            unset f
-        done
-        for f in /etc/systemd/system/jriver-*; do
-            execute sudo rm -f "$f"
-        done
-        unset f
+  echo "Stopping and removing all Media Center services"
+  for service in $(compgen -A "function" "service"); do
+    service="${service##service_}"
+    for i in user system; do
+      set_service_vars "$service" "$i"; 
+      for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
+        if "${IS_ACTIVE[@]}" "$unit" || 
+        "${IS_ENABLED[@]}" "$unit"; then
+          "${DISABLE[@]}" "$unit"
+        fi
+      done
+      for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
+        [[ -f $f ]] && 
+        execute sudo rm -f "$f"
+      done
+      "${RELOAD[@]}"
+      unset f
     done
+    for f in /etc/systemd/system/jriver-*; do
+      execute sudo rm -f "$f"
+    done
+    unset f
+  done
 
-    echo "Removing repo files"
-    execute sudo rm -rf \
-        "/etc/yum.repos.d/jriver.repo" \
-        /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
-    if [[ $ID == "suse" ]]; then
-        execute sudo zypper --non-interactive removerepo jriver
-    fi
+  echo "Removing repo files"
+  execute sudo rm -rf \
+    "/etc/yum.repos.d/jriver.repo" \
+    /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
+  if [[ $ID == "suse" ]]; then
+    execute sudo zypper --non-interactive removerepo jriver
+  fi
 
-    echo "Removing firewall rules"
-    if command -v firewall-cmd &>/dev/null; then
-        execute sudo firewall-cmd --permanent --remove-service=jriver
-        execute sudo firewall-cmd --permanent --delete-service=jriver
-        execute sudo firewall-cmd --reload
-    elif command -v ufw &>/dev/null; then
-        execute sudo ufw delete allow jriver
-        [[ -f "/etc/ufw/applications.d/jriver" ]] &&
-            execute sudo rm -f /etc/ufw/applications.d/jriver
-    fi
+  echo "Removing firewall rules"
+  if command -v firewall-cmd &>/dev/null; then
+    execute sudo firewall-cmd --permanent --remove-service=jriver
+    execute sudo firewall-cmd --permanent --delete-service=jriver
+    execute sudo firewall-cmd --reload
+  elif command -v ufw &>/dev/null; then
+    execute sudo ufw delete allow jriver
+    [[ -f "/etc/ufw/applications.d/jriver" ]] &&
+      execute sudo rm -f /etc/ufw/applications.d/jriver
+  fi
 
-    echo "Uninstalling JRiver Media Center package"
-    if "${PKG_REMOVE[@]}" "$MC_PKG"; then
-        echo "JRiver Media Center has been completely uninstalled"
-        echo "To remove your MC library: rm -rf $HOME/.jriver"
-    elif [[ $? -eq 100 ]]; then
-        err "JRiver Media Center package '$MC_PKG' is not present and was not uninstalled"
-    else
-        err "Could not remove Media Center package"
-    fi
+  echo "Uninstalling JRiver Media Center package"
+  if "${PKG_REMOVE[@]}" "$MC_PKG"; then
+    echo "JRiver Media Center has been completely uninstalled"
+    echo "To remove your MC library: rm -rf $HOME/.jriver"
+  elif [[ $? -eq 100 ]]; then
+    err "JRiver Media Center package '$MC_PKG' is not present and was not uninstalled"
+  else
+    err "Could not remove Media Center package"
+  fi
 
-    if [[ -f $SCRIPT_DIR/.uninstall ]]; then
-        echo "Removing files from .uninstall log"
-        while read -r p; do
-            [[ -d $p ]] && execute sudo rm -rf "$p"
-        done < "$SCRIPT_DIR/.uninstall"
-        mv "$SCRIPT_DIR/.uninstall" "$SCRIPT_DIR/.uninstall.bk"
-    fi
+  if [[ -f $SCRIPT_DIR/.uninstall ]]; then
+    echo "Removing files from .uninstall log"
+    while read -r p; do
+      [[ -d $p ]] && execute sudo rm -rf "$p"
+    done < "$SCRIPT_DIR/.uninstall"
+    mv "$SCRIPT_DIR/.uninstall" "$SCRIPT_DIR/.uninstall.bk"
+  fi
 
-    return 0
+  return 0
 }
 
 # @description Checks for installJRMC update and re-executes, if necessary
 update_self() {
-    debug "Running: ${FUNCNAME[0]} $*"
+  debug "Running: ${FUNCNAME[0]} $*"
 
-    local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-    local tmp; tmp=$(mktemp)
+  local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
+  local tmp; tmp=$(mktemp)
 
-    debug "Checking for installJRMC update"
+  debug "Checking for installJRMC update"
 
-    # Function to extract and normalize version from a script
-    extract_version() {
-        local version_line
-        version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
-        version_line=${version_line#*=}
-        version_line=${version_line#\"}
-        version_line=${version_line%-dev\"}
-        version_line=${version_line%\"}
-        echo "$version_line"
-    }
+  # Function to extract and normalize version from a script
+  extract_version() {
+    local version_line
+    version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
+    version_line=${version_line#*=}
+    version_line=${version_line#\"}
+    version_line=${version_line%-dev\"}
+    version_line=${version_line%\"}
+    echo "$version_line"
+  }
 
-    # Check if we're in a git directory and if it's the installJRMC repository
-    if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
-    && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"bryan/installJRMC"* ]]; then
-        debug "installJRMC git repository detected. Running git pull..."
+  # Check if we're in a git directory and if it's the installJRMC repository
+  if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
+  && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"bryan/installJRMC"* ]]; then
+    debug "installJRMC git repository detected. Running git pull..."
 
-        # Get the current commit hash
-        local before_pull_hash
-        before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+    # Get the current commit hash
+    local before_pull_hash
+    before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
 
-        if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
-            return 0
-        fi
-
-        local after_pull_hash
-        after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
-        if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
-            echo "installJRMC repository updated. Restarting script..."
-            exec "$SCRIPT_PATH" "$@" "--no-self-update"
-        fi
+    if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
+      return 0
     fi
 
-    # Download the latest version of the script
-    install_package --silent wget
-    if command -v wget &>/dev/null; then
-        execute wget -q -O "$tmp" "$script_url"
-    elif command -v curl &>/dev/null; then
-        execute curl -s -L -o "$tmp" "$script_url"
-    else
-        return 1
+    local after_pull_hash
+    after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+    if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
+      echo "installJRMC repository updated. Restarting script..."
+      exec "$SCRIPT_PATH" "$@" "--no-self-update"
     fi
+  fi
 
-    # Get latest version number
-    local remote_version
-    remote_version=$(extract_version "$tmp")
-    [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
+  # Download the latest version of the script
+  install_package --silent wget
+  if command -v wget &>/dev/null; then
+    execute wget -q -O "$tmp" "$script_url"
+  elif command -v curl &>/dev/null; then
+    execute curl -s -L -o "$tmp" "$script_url"
+  else
+    return 1
+  fi
 
-    # Compare versions and update if necessary
-    if [[ $SCRIPT_VERSION < $remote_version ]]; then
-        echo "Updating installJRMC $SCRIPT_VERSION to $remote_version"
-        execute mv "$tmp" "$SCRIPT_PATH"
-        execute chmod +x "$SCRIPT_PATH"
-        exec "$SCRIPT_PATH" "$@" "--no-self-update"
-    fi
+  # Get latest version number
+  local remote_version
+  remote_version=$(extract_version "$tmp")
+  [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
-    rm -f "$tmp"
+  # Compare versions and update if necessary
+  if [[ $SCRIPT_VERSION < $remote_version ]]; then
+    echo "Updating installJRMC $SCRIPT_VERSION to $remote_version"
+    execute mv "$tmp" "$SCRIPT_PATH"
+    execute chmod +x "$SCRIPT_PATH"
+    exec "$SCRIPT_PATH" "$@" "--no-self-update"
+  fi
+
+  rm -f "$tmp"
 }
 
 # @description installJRMC main function
 main() {
-    debug "Running: ${FUNCNAME[0]} $*"
+  debug "Running: ${FUNCNAME[0]} $*"
 
-    parse_input "$@"
-    init
+  parse_input "$@"
+  init
 
-    debug "Debugging on"
-    debug "installJRMC version: $SCRIPT_VERSION"
+  debug "Debugging on"
+  debug "installJRMC version: $SCRIPT_VERSION"
 
-    ((SELF_UPDATE)) && update_self "$@"
+  ((SELF_UPDATE)) && update_self "$@"
 
-    if ((TEST_SWITCH)); then 
-        echo "Running tests, all other options are skipped"
-        tests
-        exit
+  if ((TEST_SWITCH)); then 
+    echo "Running tests, all other options are skipped"
+    tests
+    exit
+  fi
+
+  set_mc_version
+
+  if (( UNINSTALL_SWITCH )); then
+    if ask_ok "Do you really want to uninstall JRiver Media Center?"; then
+      uninstall
+    else
+      echo "Uninstall canceled"
     fi
+    exit
+  fi
 
-    set_mc_version
+  # Install external repos
+  case $ID in
+    ubuntu)
+      if ! grep ^deb /etc/apt/sources.list | grep -q universe; then
+        echo "Adding universe repository"
+        if ! execute sudo add-apt-repository -y universe; then
+          err "Adding universe repository failed"
+        fi
+      fi
+      ;;
+    centos)
+      if ! command -v dpkg &>/dev/null; then
+        echo "Adding EPEL repository"
+        install_package epel-release
+      fi
+      if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
+        echo "Installing the RPMFusion repository"
+        install_package --no-install-check \
+          "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+      fi
+      ;;
+    fedora)
+      if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
+        echo "Installing the RPMFusion repository"
+        install_package --no-install-check \
+          "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+      fi
+      ;;
+    suse)
+      # if ! zypper repos | grep -q "X11_XOrg"; then
+      #   echo "Installing the X11 repository"
+      #   execute sudo zypper  --non-interactive --quiet addrepo \
+      #     "https://download.opensuse.org/repositories/X11:/XOrg/${NAME// /_}/X11:XOrg.repo"
+      #   execute sudo zypper  --non-interactive --quiet refresh
+      # fi
+      ;;
+  esac
 
-    if (( UNINSTALL_SWITCH )); then
-        if ask_ok "Do you really want to uninstall JRiver Media Center?"; then
-            uninstall
+  if (( REPO_INSTALL_SWITCH )); then
+    echo "Installing JRiver Media Center from remote repository"
+    if install_mc_repo; then
+      echo "JRiver Media Center installed successfully from remote repository"
+      link_ssl_certs
+      restore_license
+      open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+      disable_btrfs_cow
+    else
+      err "JRiver Media Center installation from remote repository failed"
+      return 1
+    fi
+  fi
+
+  if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
+    install_package "wget"
+    [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
+    acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
+
+    if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
+      install_package "dpkg" "rpm-build"
+      [[ -d $OUTPUT_DIR/SPECS ]] || execute mkdir -p "$OUTPUT_DIR/SPECS"
+      build_rpm
+    fi
+  fi
+
+  if (( LOCAL_INSTALL_SWITCH )); then
+    if PKG_INSTALL_LOCAL; then
+      echo "JRiver Media Center installed successfully from local package"
+    else
+      err "JRiver Media Center local package installation failed"
+      return 1
+    fi
+    link_ssl_certs
+    restore_license
+    open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
+    disable_btrfs_cow
+  fi
+
+  if (( CREATEREPO_SWITCH )); then
+    if run_createrepo; then
+      echo "Successfully updated repo"
+    else
+      err "Repo creation failed"
+    fi
+  fi
+
+  if [[ ${#SERVICES[@]} -gt 0 ]]; then
+    declare service
+    for service in "${SERVICES[@]}"; do
+      if ! "service_$service"; then
+        if [[ $? -eq 127 ]]; then
+          err "Service $service does not exist, check service name"
         else
-            echo "Uninstall canceled"
+          err "Failed to create $service service"
         fi
-        exit
-    fi
+      else
+        echo "Started and enabled $service service"
+      fi
+    done
+    unset service
+  fi
 
-    # Install external repos
-    case $ID in
-        ubuntu)
-            if ! grep ^deb /etc/apt/sources.list | grep -q universe; then
-                echo "Adding universe repository"
-                if ! execute sudo add-apt-repository -y universe; then
-                    err "Adding universe repository failed"
-                fi
-            fi
-            ;;
-        centos)
-            if ! command -v dpkg &>/dev/null; then
-                echo "Adding EPEL repository"
-                install_package epel-release
-            fi
-            if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
-                echo "Installing the RPMFusion repository"
-                install_package --no-install-check \
-                    "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-            fi
-            ;;
-        fedora)
-            if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
-                echo "Installing the RPMFusion repository"
-                install_package --no-install-check \
-                    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-            fi
-            ;;
-        suse)
-            # if ! zypper repos | grep -q "X11_XOrg"; then
-            #     echo "Installing the X11 repository"
-            #     execute sudo zypper  --non-interactive --quiet addrepo \
-            #         "https://download.opensuse.org/repositories/X11:/XOrg/${NAME// /_}/X11:XOrg.repo"
-            #     execute sudo zypper  --non-interactive --quiet refresh
-            # fi
-            ;;
-    esac
-
-    if (( REPO_INSTALL_SWITCH )); then
-        echo "Installing JRiver Media Center from remote repository"
-        if install_mc_repo; then
-            echo "JRiver Media Center installed successfully from remote repository"
-            link_ssl_certs
-            restore_license
-            open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
-            disable_btrfs_cow
-        else
-            err "JRiver Media Center installation from remote repository failed"
-            return 1
-        fi
-    fi
-
-    if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
-        install_package "wget"
-        [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
-        acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
-
-        if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
-            install_package "dpkg" "rpm-build"
-            [[ -d $OUTPUT_DIR/SPECS ]] || execute mkdir -p "$OUTPUT_DIR/SPECS"
-            build_rpm
-        fi
-    fi
-
-    if (( LOCAL_INSTALL_SWITCH )); then
-        if PKG_INSTALL_LOCAL; then
-            echo "JRiver Media Center installed successfully from local package"
-        else
-            err "JRiver Media Center local package installation failed"
-            return 1
-        fi
-        link_ssl_certs
-        restore_license
-        open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
-        disable_btrfs_cow
-    fi
-
-    if (( CREATEREPO_SWITCH )); then
-        if run_createrepo; then
-            echo "Successfully updated repo"
-        else
-            err "Repo creation failed"
-        fi
-    fi
-
-    if [[ ${#SERVICES[@]} -gt 0 ]]; then
-        declare service
-        for service in "${SERVICES[@]}"; do
-            if ! "service_$service"; then
-                if [[ $? -eq 127 ]]; then
-                    err "Service $service does not exist, check service name"
-                else
-                    err "Failed to create $service service"
-                fi
-            else
-                echo "Started and enabled $service service"
-            fi
-        done
-        unset service
-    fi
-
-    # for _container in "${CONTAINERS[@]}"; do
-    #     if ! "_container_$_container"; then
-    #         if [[ $? -eq 127 ]]; then
-    #             err "Container $_container does not exist, check container name"
-    #         else
-    #             err "Failed to create container: $_container"
-    #         fi
-    #     fi
-    # done
+  # for _container in "${CONTAINERS[@]}"; do
+  #   if ! "_container_$_container"; then
+  #     if [[ $? -eq 127 ]]; then
+  #       err "Container $_container does not exist, check container name"
+  #     else
+  #       err "Failed to create container: $_container"
+  #     fi
+  #   fi
+  # done
 }
 
 # @section Helper functions
 debug() { (( DEBUG )) && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 ask_ok() {
-    declare response
-    (( YES_SWITCH )) && return 0
-    read -r -p "$* [y/N]: " response
-    [[ ${response,,} =~ ^(yes|y)$ ]]
+  declare response
+  (( YES_SWITCH )) && return 0
+  read -r -p "$* [y/N]: " response
+  [[ ${response,,} =~ ^(yes|y)$ ]]
 }
 execute() {
-    if debug "$*"; then
-        "$@"
-    else
-        "$@" &>/dev/null
-    fi
+  if debug "$*"; then
+    "$@"
+  else
+    "$@" &>/dev/null
+  fi
 }
 
 # Roughly turn debugging on, reparse in get_input() with getopt
