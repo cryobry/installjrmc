@@ -16,12 +16,13 @@
 
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.3.4"
+declare -g SCRIPT_VERSION="1.3.5-dev"
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -g MC_VERSION="33.0.20" # Do find all replace
 declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION
-declare -ig SELF_UPDATE=1
+declare -ig SELF_UPDATE=1 # set to 0 to disable automatic self-update
 
+# @description Print help text
 print_help() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -66,6 +67,8 @@ print_help() {
 		            Specify the webroot directory to install the repo (default: /var/www/jriver)
 		        --createrepo-user USER
 		            Specify the web server user if it differs from \$USER
+		    --no-self-update
+		        Disable automatic self-update
 		    --uninstall, -u
 		        Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
 		    --yes, -y, --auto
@@ -103,35 +106,12 @@ print_help() {
 	EOF
 }
 
-
-#######################################
-# Helpers
-#######################################
-debug() { (( DEBUG )) && echo "Debug: $*"; }
-err() { echo "Error: $*" >&2; }
-ask_ok() {
-    declare response
-    (( YES_SWITCH )) && return 0
-    read -r -p "$* [y/N]: " response
-    [[ ${response,,} =~ ^(yes|y)$ ]]
-}
-execute() {
-    if debug "$*"; then
-        "$@"
-    else
-        "$@" &>/dev/null
-    fi
-}
-
-
-#######################################
-# Perform OS detection and fallback
+# @description Perform OS detection and fallback
 # Generate OS-specific functions
-#######################################
 init() {
     debug "Running: ${FUNCNAME[0]}"
 
-    declare -g ID RPM_MGR ARCH OS_NAME
+    declare -g ID RPM_MGR ARCH NAME
     declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
 
     echo "Starting installJRMC"
@@ -146,8 +126,6 @@ init() {
         print_help
         exit 1
     fi
-
-    OS_NAME="${NAME// /_}"
 
     # Detect architecture and translate to MC convention
     ARCH=$(uname -m)
@@ -220,7 +198,7 @@ init() {
             PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
             PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
             PKG_QUERY=(rpm -q)
-            PKG_INSTALL_LOCAL() { install_mc_rpm; }
+            PKG_INSTALL_LOCAL() { install_mc_rhel; }
             ;;
         debian|ubuntu)
             PKG_INSTALL=(execute sudo apt-get -f install -y -q0)
@@ -252,10 +230,7 @@ init() {
     esac
 }
 
-
-#######################################
-# Parses user input and sets sensible defaults
-#######################################
+# @description Parses user input and sets sensible defaults
 parse_input() {
     debug "Running: ${FUNCNAME[0]} $*"
 
@@ -301,7 +276,7 @@ parse_input() {
     long_opts+="version,debug,verbose,help,uninstall,tests,yes,auto,no-self-update,"
     long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
     long_opts+="vncpass:,display:,container:"
-    short_opts="+i:vb::dhus:c:"
+    short_opts="+i:b::s:c:uyvdh"
 
     # Reset DEBUG and catch with getopt
     declare -g DEBUG=0
@@ -419,10 +394,7 @@ parse_input() {
     fi
 }
 
-
-#######################################
-# Uses several methods to determine the latest JRiver MC version
-#######################################
+# @description Determines the latest JRiver MC version using several fallback methods 
 set_mc_version() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -481,17 +453,12 @@ set_mc_version() {
     return 0
 }
 
-
-#######################################
-# Installs a package using the system package manager
-# Arguments:
-#   One or more package names
-# Options:
-#   --no-install-check: Do not check if package is already installed
-#   --no-gpg-check: Disable GPG checks for RPM based distros
-#   --allow-downgrades: Useful for installing specific MC versions
-#   --silent, -s: Do not print errors (useful for optional packages)
-#######################################
+# @description Installs a package using the system package manager
+# @arg $1 array One or more package names
+# @arg --no-install-check Do not check if package is already installed
+# @arg --no-gpg-check Disable GPG checks for RPM based distros
+# @arg --allow-downgrades Useful for installing specific MC versions
+# @arg --silent | -s Do not print errors (useful for optional packages)
 install_package() {
     debug "Running: ${FUNCNAME[0]}" "$@"
 
@@ -568,9 +535,7 @@ install_package() {
 }
 
 
-#######################################
-# Installs mesa-va-drivers-freeworld
-#######################################
+# @description Installs mesa-va-drivers-freeworld
 install_mesa_freeworld() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -593,10 +558,7 @@ install_mesa_freeworld() {
     swap_or_install_freeworld_package "mesa-vdpau-drivers"
 }
 
-
-#######################################
-# Installs JRiver Media Center from a remote repository
-#######################################
+# @description Installs JRiver Media Center from a remote repository
 install_mc_repo() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -647,9 +609,7 @@ install_mc_repo() {
 }
 
 
-#######################################
-# Acquires the source DEB package from JRiver
-#######################################
+# @description Acquires the source DEB package from JRiver
 acquire_deb() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -688,10 +648,7 @@ acquire_deb() {
     [[ -f $MC_DEB ]]
 }
 
-
-#######################################
-# Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
-#######################################
+# @description Creates a SPEC file and builds the RPM from the source DEB using rpmbuild
 build_rpm() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -863,10 +820,7 @@ build_rpm() {
     fi
 }
 
-
-#######################################
-# Installs Media Center DEB package and optional compatability fixes
-#######################################
+# @description Installs Media Center DEB package and optional compatability fixes
 install_mc_deb() {
     debug "Running: ${FUNCNAME[0]}"    
 
@@ -899,10 +853,8 @@ install_mc_deb() {
 }
 
 
-#######################################
-# Installs Media Center RPM package
-#######################################
-install_mc_rpm() {
+# @description Installs Media Center RPM package on RHEL distros
+install_mc_rhel() {
     debug "Running: ${FUNCNAME[0]}"
 
     # Install mesa-va-freeworld separately from the RPM for dnf swap
@@ -911,28 +863,23 @@ install_mc_rpm() {
     install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
-
-#######################################
-# Installs Media Center RPM package on SUSE
-#######################################
+# @description Installs Media Center RPM package on SUSE
 install_mc_suse() {
     debug "Running: ${FUNCNAME[0]}"
     
     install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
-
-#######################################
-# Installs Media Center manually
-#######################################
+# @description Installs Media Center generically for unsupported OSes
 install_mc_generic() {
     debug "Running: ${FUNCNAME[0]}"
 
     local -a raw_files
+    local extract_dir
 
     echo "Using generic installation method"
 
-    declare extract_dir && extract_dir="$(mktemp -d)"
+    extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
     execute ar x "$MC_DEB"
     execute tar xJf "control.tar.xz"
@@ -952,10 +899,7 @@ install_mc_generic() {
     return 0
 }
 
-
-#######################################
-# Installs local Media Center PKGBUILD
-#######################################
+# @description Installs Media Center Arch PKGBUILD
 install_mc_arch() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1005,10 +949,7 @@ install_mc_arch() {
     popd &>/dev/null || return
 }
 
-
-#######################################
-# Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
-#######################################
+# @description Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
 run_createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1052,10 +993,7 @@ run_createrepo() {
     fi
 }
 
-
-#######################################
-# Symlink certificates if they do not exist in default location
-#######################################
+# @description Symlink certificates if they do not exist in default location
 link_ssl_certs() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1079,10 +1017,7 @@ link_ssl_certs() {
     done
 }
 
-
-#######################################
-# Restore the mjr license file from MJR_RESTORE_FILE or other common locations
-#######################################
+# @description Restore the mjr license file from MJR_RESTORE_FILE or other common locations
 restore_license() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1120,15 +1055,11 @@ restore_license() {
     fi
 }
 
-
-#######################################
-# Opens ports using the system firewall tool
-# Arguments:
-#   1. Service name
-#   2. List of ports in firewall-cmd format
-#######################################
+# @description Opens ports using the system firewall tool
+# @arg $1 string Service name
+# @arg $2 array List of ports in firewall-cmd format
 open_firewall() {
-    debug "Running: ${FUNCNAME[0]}" "$@"
+    debug "Running: ${FUNCNAME[0]}" "$*"
 
     local port
     local service="$1"
@@ -1164,12 +1095,8 @@ open_firewall() {
     fi
 }
 
-
-#######################################
-# Create the xvnc or x11vnc password file
-# Arguments:
-#   Service type (xvnc, x11vnc)
-#######################################
+# @description Create the xvnc or x11vnc password file
+# @arg $1 string Service type (xvnc, x11vnc)
 set_vnc_pass() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1199,10 +1126,7 @@ set_vnc_pass() {
     fi
 }
 
-
-#######################################
-# Set display and port variables
-#######################################
+# @description Set display and port variables
 set_display_vars() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1221,12 +1145,8 @@ set_display_vars() {
     NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
 }
 
-
-#######################################
-# Create associated service variables based on service name
-# Arguments
-#   Pre-defined service name
-#######################################
+# @description Create associated service variables based on service name
+# @arg $1 string Service name
 set_service_vars() {
     debug "Running: ${FUNCNAME[0]}" "$*"
 
@@ -1277,11 +1197,8 @@ set_service_vars() {
 }
 
 
-#######################################
-# Starts and enables (at startup) a JRiver Media Center service
-# Arguments:
-#   Passes arguments as startup options to /usr/bin/mediacenter??
-#######################################
+# @description Starts and enables (at startup) a JRiver Media Center service
+# @arg $1 string Passes arguments as startup options to /usr/bin/mediacenter??
 service_jriver-mediacenter() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1312,10 +1229,7 @@ service_jriver-mediacenter() {
     && "${ENABLE[@]}" "$SERVICE_NAME"
 }
 
-
-#######################################
-# Starts and enables (at startup) a JRiver Media Server service
-#######################################
+# @description Starts and enables (at startup) a JRiver Media Server service
 service_jriver-mediaserver() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1324,11 +1238,8 @@ service_jriver-mediaserver() {
     service_jriver-mediacenter "/MediaServer"
 }
 
-
-#######################################
-# Starts and enables (at startup) JRiver Media Center in a new Xvnc session
+# @description Starts and enables (at startup) JRiver Media Center in a new Xvnc session
 # TODO https://github.com/TigerVNC/tigervnc/blob/master/unix/vncserver/HOWTO.md
-#######################################
 service_jriver-xvnc() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1394,10 +1305,7 @@ service_jriver-xvnc() {
     fi
 }
 
-
-#######################################
-# Starts and enables (at startup) x11vnc screen sharing for the local desktop
-#######################################
+# @description Starts and enables (at startup) x11vnc screen sharing for the local desktop
 service_jriver-x11vnc() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1461,11 +1369,8 @@ service_jriver-x11vnc() {
     && echo "x11vnc running on localhost:$PORT"
 }
 
-
-#######################################
-# Starts and enables (at startup) an hourly service to build the latest version of
+# @description Starts and enables (at startup) an hourly service to build the latest version of
 # JRiver Media Center RPM from the source DEB and create/update an RPM repository
-#######################################
 service_jriver-createrepo() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1503,10 +1408,7 @@ service_jriver-createrepo() {
     && "${ENABLE[@]}" "$TIMER_NAME"
 }
 
-
-#######################################
-# Detects if MC is installed on btrfs and disables CoW
-#######################################
+# @description Detects if MC is installed on btrfs and disables CoW
 disable_btrfs_cow() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1523,10 +1425,7 @@ disable_btrfs_cow() {
     done
 }
 
-
-#######################################
-# Completely uninstalls MC, services, and firewall rules
-#######################################
+# @description Completely uninstalls MC, services, and firewall rules
 uninstall() {
     debug "Running: ${FUNCNAME[0]}"
 
@@ -1557,7 +1456,7 @@ uninstall() {
     done
 
     echo "Removing repo files"
-    sudo rm -rf \
+    execute sudo rm -rf \
         "/etc/yum.repos.d/jriver.repo" \
         /etc/apt/sources.list.d/{jriver,mediacenter}*.list # also remove legacy repo files
     if [[ $ID == "suse" ]]; then
@@ -1596,10 +1495,7 @@ uninstall() {
     return 0
 }
 
-
-#######################################
-# Checks for installJRMC update and re-executes, if necessary
-#######################################
+# @description Checks for installJRMC update and re-executes, if necessary
 update_self() {
     debug "Running: ${FUNCNAME[0]} $*"
 
@@ -1666,7 +1562,7 @@ update_self() {
     rm -f "$tmp"
 }
 
-
+# @description installJRMC main function
 main() {
     debug "Running: ${FUNCNAME[0]} $*"
 
@@ -1727,7 +1623,7 @@ main() {
             # if ! zypper repos | grep -q "X11_XOrg"; then
             #     echo "Installing the X11 repository"
             #     execute sudo zypper  --non-interactive --quiet addrepo \
-            #         "https://download.opensuse.org/repositories/X11:/XOrg/$OS_NAME/X11:XOrg.repo"
+            #         "https://download.opensuse.org/repositories/X11:/XOrg/${NAME// /_}/X11:XOrg.repo"
             #     execute sudo zypper  --non-interactive --quiet refresh
             # fi
             ;;
@@ -1738,7 +1634,6 @@ main() {
         if install_mc_repo; then
             echo "JRiver Media Center installed successfully from remote repository"
             link_ssl_certs
-            # migrateLibrary
             restore_license
             open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
             disable_btrfs_cow
@@ -1768,7 +1663,6 @@ main() {
             return 1
         fi
         link_ssl_certs
-        # migrateLibrary
         restore_license
         open_firewall "jriver-mediacenter" "52100-52200/tcp" "1900/udp"
         disable_btrfs_cow
@@ -1809,7 +1703,24 @@ main() {
     # done
 }
 
-# Roughly turn debugging on, reparse in getInput() with getopt
+# @section Helper functions
+debug() { (( DEBUG )) && echo "Debug: $*"; }
+err() { echo "Error: $*" >&2; }
+ask_ok() {
+    declare response
+    (( YES_SWITCH )) && return 0
+    read -r -p "$* [y/N]: " response
+    [[ ${response,,} =~ ^(yes|y)$ ]]
+}
+execute() {
+    if debug "$*"; then
+        "$@"
+    else
+        "$@" &>/dev/null
+    fi
+}
+
+# Roughly turn debugging on, reparse in get_input() with getopt
 [[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
 
 main "$@"

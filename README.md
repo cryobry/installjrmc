@@ -8,7 +8,7 @@ You can always find the latest version of installJRMC, changelog, and documentat
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options will install the latest version of JRiver Media Center (MC) from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager (`--install repo`). If any other option is passed, then the default install method (i.e. `--install repo` or `--install local`) must be specified. This makes it possible to install services and containers independent of MC.>
+Running `installJRMC` without any options implies `--install repo` and will install the latest version of JRiver Media Center (MC) from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If any other option is passed, then the default install method (i.e. `--install repo` or `--install local`) must be specified (to allow services and containers to be installed independent of MC).
 
 ## tl;dr
 
@@ -51,6 +51,8 @@ $ installJRMC --help
       The webroot directory to install the repo (default: /var/www/jriver/)
   --createrepo-user USER
       The web server user if different from the current user
+--no-self-update
+    Disable the installJRMC update check
 --yes, -y, --auto
     Always assume yes for questions
 --version, -v
@@ -120,7 +122,7 @@ Multiple services (but not `--service-types`) can be installed at one time using
 
 * `installJRMC --install local --compat --restorefile /path/to/license.mjr --mcversion 33.0.20`
 
-    Build and install an MC 33.0.20 comptability RPM locally and activate it using the `/path/to/license.mjr`
+    Build and install an MC 33.0.20 compatibility RPM locally and activate it using the `/path/to/license.mjr`
 
 * `installJRMC --createrepo --createrepo-webroot /srv/jriver/repo --createrepo-user www-user`
 
