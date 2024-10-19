@@ -111,6 +111,12 @@ print_help() {
 parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
 
+  declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
+    COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
+    YES_SWITCH USER_MC_VERSION USER_MC_REPO MJR_FILE \
+    BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY \
+    BUILD_TARGET CREATEREPO_TARGET
+
   local long_opts short_opts input
   long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
   long_opts+="restorefile:,betapass:,"
@@ -145,7 +151,7 @@ parse_input() {
           fi
           ;;
         --arch) shift; echo "Switching arch from $ARCH to $1"; ARCH="$1" ;;
-        --mcrepo) shift && MC_REPO="$1" ;;
+        --mcrepo) shift && USER_MC_REPO="$1" ;;
         --restorefile) shift && MJR_FILE="$1" ;;
         --betapass) shift && BETAPASS="$1" ;;
         --service-type) shift && SERVICE_TYPE="$1" ;;
@@ -187,20 +193,20 @@ init() {
   declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
   declare -g CREATEREPO_WEBROOT="/var/www/jriver"
   declare -g CREATEREPO_USER="$USER" # can be root
-  declare -g ID RPM_MGR ARCH NAME \
-    BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
-    COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
-    YES_SWITCH USER_MC_VERSION MJR_FILE BETAPASS SERVICE_TYPE \
-    VNCPASS USER_DISPLAY BUILD_TARGET CREATEREPO_TARGET
+  declare -g ID VERSION_ID ARCH NAME
+  declare -g MC_MVERSION MC_PKG MC_RPM MC_ROOT 
   declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
   declare -ga SERVICES CONTAINERS
 
   # Try to save users from themselves
-  (( EUID == 0 )) && err "Running as root user but continuing"
+  if ((EUID == 0)); then
+    err "Running as root but attempting to continue"
+    ask_ok "Continue as root user?" || exit 1
+  fi
 
-  # Set default user
   if [[ -n $SUDO_USER ]]; then
-    err "Sudo detected, attempting to continue as $SUDO_USER but this is not recommended"
+    err "Sudo detected, installJRMC should not be run with sudo but attempting to continue"
+    ask_ok "Continue as user $SUDO_USER (unsupported and may result in permission issues)?" || exit 1
     USER="${SUDO_USER:-$USER}"
   fi
 
@@ -249,12 +255,10 @@ init() {
 
   # Normalize ID and set host-specific vars
   case $ID in
-    debian|arch) ;;
-    centos|fedora)
-      RPM_MGR=$(command -v dnf &>/dev/null && echo "dnf" || echo "yum")
-      ;;
+    debian|arch|fedora|centos) ;;
     rhel|almalinux) ID="centos" ;;
     linuxmint|neon|zorin|*ubuntu*) ID="ubuntu" ;;
+    raspbian) ID="debian" ;;
     *suse*)
       ID="suse"
       # Currently there is no remote repository for SUSE
@@ -271,15 +275,12 @@ init() {
         esac
       fi
       ;;
-    raspbian) ID="debian" ;;
     *)
       err "Auto-detecting distro, this is unreliable and --compat may be required"
       if command -v dnf &>/dev/null; then
         ID="fedora"
-        RPM_MGR="dnf"
       elif command -v yum &>/dev/null; then
         ID="centos"
-        RPM_MGR="yum"
         COMPAT_SWITCH=1
       elif command -v apt-get &>/dev/null; then
         ID="ubuntu"
@@ -300,17 +301,47 @@ init() {
   CREATEREPO_TARGET="${CREATEREPO_TARGET:-$ID}"
 
   # Match the MC repo to the system codename
-  if [[ $ID == debian || $ID == ubuntu ]]; then
+  if [[ -z $USER_MC_REPO && ($ID == debian || $ID == ubuntu) ]]; then
     MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
   fi
 
-  # Change the repo for user-specified legacy versions
-  case $MC_MVERSION in
-    2[0-6]) MC_REPO="jessie" ;;
-    2[7-9]|30) MC_REPO="buster" ;;
-    31) MC_REPO="bullseye" ;;
-    # After this point, things get messy with multiple repos for the same MC version
-  esac
+  # Change the repo for legacy MC versions
+  if [[ -n $USER_MC_VERSION ]]; then
+    # Get MVERSION from user input
+    case ${USER_MC_VERSION%%.*} in
+      2[0-6]) USER_MC_REPO="jessie" ;;
+      2[7-9]|30) USER_MC_REPO="buster" ;;
+      31) USER_MC_REPO="bullseye" ;;
+      # After this point, things get messy with multiple repos for the same MC version
+    esac
+  fi
+
+  # Don't check for latest MC version if set by user or using --install=repo only
+  if [[ -z $USER_MC_VERSION ]] \
+  && ((BUILD_SWITCH || LOCAL_INSTALL_SWITCH || CREATEREPO_SWITCH)); then
+    # Retrieves the latest MC version number from the specified MC_REPO
+    get_latest_mc_version "${USER_MC_REPO:-$MC_REPO}"
+  fi
+  
+  # Set MC version variables
+  MC_REPO="${USER_MC_REPO:-$MC_REPO}"
+  MC_VERSION="${USER_MC_VERSION:-$MC_VERSION}"
+  MC_MVERSION="${MC_VERSION%%.*}"
+  MC_PKG="mediacenter$MC_MVERSION"
+  MC_RPM="$OUTPUT_DIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
+  MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
+
+  if [[ -n $USER_MC_VERSION ]]; then
+    # Append explicit package version when user provides --mcversion
+    case $ID in
+      fedora|centos|suse)
+        MC_PKG+="-$MC_VERSION"
+        ;;
+      debian|ubuntu)
+        MC_PKG+="=$MC_VERSION"
+        ;;
+    esac
+  fi
 
   debug "Using host platform: $ID $VERSION_ID"
   debug "Using MC repository: $MC_REPO"
@@ -318,9 +349,11 @@ init() {
   # Set distro-specific package manager commands for normalized IDs
   case $ID in
     fedora|centos)
-      PKG_INSTALL=(execute sudo "$RPM_MGR" install -y)
-      PKG_REMOVE=(execute sudo "$RPM_MGR" remove -y)
-      PKG_UPDATE=(execute sudo "$RPM_MGR" makecache)
+      local rpm_mgr
+      rpm_mgr=$(command -v dnf &>/dev/null && echo "dnf" || echo "yum")
+      PKG_INSTALL=(execute sudo "$rpm_mgr" install -y)
+      PKG_REMOVE=(execute sudo "$rpm_mgr" remove -y)
+      PKG_UPDATE=(execute sudo "$rpm_mgr" makecache)
       PKG_QUERY=(rpm -q)
       PKG_INSTALL_LOCAL() { install_mc_rhel; }
       ;;
@@ -354,63 +387,37 @@ init() {
   esac
 }
 
-# @description Determines the latest JRiver MC version using several fallback methods 
-set_mc_version() {
-  debug "Running: ${FUNCNAME[0]}"
+# @description Determines the latest JRiver MC version using several methods
+# @arg $1 string MC repository name
+get_latest_mc_version() {
+  debug "Running: ${FUNCNAME[0]}" "$*"
+  
+  local cnt mc_version_source
 
-  declare -g MC_VERSION_SOURCE MC_MVERSION MC_ROOT
-  declare -g MC_PKG MC_RPM
-  local cnt
-
-  # Determine the latest MC version
-  # User input
-  if [[ -n $USER_MC_VERSION ]]; then
-    MC_VERSION_SOURCE="user input"
-    MC_VERSION="$USER_MC_VERSION"
-  # Containerized package manager
-  elif install_package --silent buildah \
+  if install_package --silent buildah \
   && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
   && buildah run "$cnt" -- sh -c \
     "apk add apt" &>/dev/null \
   && buildah run "$cnt" -- sh -c \
-    "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null \
+    "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $1 main' > /etc/apt/sources.list 2>&1" &>/dev/null \
   && buildah run "$cnt" -- sh -c \
     "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null \
   && MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null \
   && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-    MC_VERSION_SOURCE="containerized package manager"
+    mc_version_source="containerized package manager"
     execute buildah rm "$cnt"
   # Webscrape
   elif install_package --silent wget \
   && MC_VERSION=$(wget -qO- "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
   && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-    MC_VERSION_SOURCE="webscrape"
+    mc_version_source="webscrape"
   # Hardcoded
   else
-    MC_VERSION_SOURCE="hardcoded"
+    mc_version_source="hardcoded"
     err "Warning! Using hardcoded version number"
   fi
   
-  # Set major version number and other variables
-  MC_MVERSION="${MC_VERSION%%.*}"
-  MC_PKG="mediacenter$MC_MVERSION"
-  MC_RPM="$OUTPUT_DIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
-  MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
-
-  if [[ $MC_VERSION_SOURCE == "user input" ]]; then
-    # Append explicit package version when user provides --mcversion
-    case $ID in
-      fedora|centos|suse)
-        MC_PKG+="-$MC_VERSION"
-        ;;
-      debian|ubuntu)
-        MC_PKG+="=$MC_VERSION"
-        ;;
-    esac
-  fi
-
-  echo "Using MC version $MC_VERSION from the $MC_REPO repo (determined by $MC_VERSION_SOURCE)"
-  return 0
+  echo "Using latest MC version $MC_VERSION from the $MC_REPO repo (determined by $mc_version_source)"
 }
 
 # @description Installs a package using the system package manager
@@ -494,6 +501,47 @@ install_package() {
   return 0
 }
 
+# @description install host-specific external repos
+install_external_repos() {
+  debug "Running: ${FUNCNAME[0]}"
+
+  case $ID in
+    ubuntu)
+      if ! grep ^deb /etc/apt/sources.list | grep -q universe; then
+        echo "Adding universe repository"
+        if ! execute sudo add-apt-repository -y universe; then
+          err "Adding universe repository failed"
+        fi
+      fi
+      ;;
+    centos)
+      if ! command -v dpkg &>/dev/null; then
+        echo "Adding EPEL repository"
+        install_package epel-release
+      fi
+      if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
+        echo "Installing the RPMFusion repository"
+        install_package --no-install-check \
+          "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+      fi
+      ;;
+    fedora)
+      if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
+        echo "Installing the RPMFusion repository"
+        install_package --no-install-check \
+          "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
+      fi
+      ;;
+    suse)
+      # if ! zypper repos | grep -q "X11_XOrg"; then
+      #   echo "Installing the X11 repository"
+      #   execute sudo zypper  --non-interactive --quiet addrepo \
+      #     "https://download.opensuse.org/repositories/X11:/XOrg/${NAME// /_}/X11:XOrg.repo"
+      #   execute sudo zypper  --non-interactive --quiet refresh
+      # fi
+      ;;
+  esac
+}
 
 # @description Installs mesa-va-drivers-freeworld
 install_mesa_freeworld() {
@@ -781,7 +829,7 @@ build_rpm() {
     err "Build failed"
     # For automation, let's remove the source DEB and reaquire it on next 
     # run after failure in case it is corrupted or buggy
-    [[ -f $MC_DEB ]] && echo "Removing source DEB" && rm -f "$MC_DEB"
+    [[ -f $MC_DEB ]] && echo "Removing source DEB" && execute rm -f "$MC_DEB"
     exit 1
   fi
 }
@@ -1352,7 +1400,8 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$SCRIPT_DIR/installJRMC --outputdir=$OUTPUT_DIR --createrepo=$CREATEREPO_TARGET --createrepo-webroot=$CREATEREPO_WEBROOT --createrepo-user=$CREATEREPO_USER
+		ExecStart=$SCRIPT_DIR/installJRMC --outputdir=$OUTPUT_DIR --createrepo=$CREATEREPO_TARGET \
+      --createrepo-webroot=$CREATEREPO_WEBROOT --createrepo-user=$CREATEREPO_USER --yes --no-update
 
 		[Install]
 		WantedBy=multi-user.target
@@ -1540,9 +1589,8 @@ main() {
     echo "To enable debugging output, use --debug or -d"
   fi
 
+  # Parse input, set default/host variables, and MC version
   init "$@"
-
-  set_mc_version
 
   if (( UNINSTALL_SWITCH )); then
     if ask_ok "Do you really want to uninstall JRiver Media Center?"; then
@@ -1553,43 +1601,7 @@ main() {
     exit
   fi
 
-  # Install external repos
-  case $ID in
-    ubuntu)
-      if ! grep ^deb /etc/apt/sources.list | grep -q universe; then
-        echo "Adding universe repository"
-        if ! execute sudo add-apt-repository -y universe; then
-          err "Adding universe repository failed"
-        fi
-      fi
-      ;;
-    centos)
-      if ! command -v dpkg &>/dev/null; then
-        echo "Adding EPEL repository"
-        install_package epel-release
-      fi
-      if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
-        echo "Installing the RPMFusion repository"
-        install_package --no-install-check \
-          "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-      fi
-      ;;
-    fedora)
-      if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
-        echo "Installing the RPMFusion repository"
-        install_package --no-install-check \
-          "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
-      fi
-      ;;
-    suse)
-      # if ! zypper repos | grep -q "X11_XOrg"; then
-      #   echo "Installing the X11 repository"
-      #   execute sudo zypper  --non-interactive --quiet addrepo \
-      #     "https://download.opensuse.org/repositories/X11:/XOrg/${NAME// /_}/X11:XOrg.repo"
-      #   execute sudo zypper  --non-interactive --quiet refresh
-      # fi
-      ;;
-  esac
+  install_external_repos
 
   if (( REPO_INSTALL_SWITCH )); then
     echo "Installing JRiver Media Center from remote repository"
