@@ -10,7 +10,6 @@
 # TODO (v2)
 #   1. Interactive mode
 #   2. Additional containerization (createrepo and rpmbuild)
-#   3. Tests
 #
 # BUGS
 #   1. No createrepo on Mint
@@ -18,10 +17,10 @@
 shopt -s extglob
 
 declare -g SCRIPT_VERSION="1.3.5-dev"
-declare -g MC_DEFAULT_REPO="bullseye" # should match the MC_VERSION
+declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.30" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
-declare -ig SELF_UPDATE=1 # set to 0 to disable automatic self-update
+declare -ig UPDATE_SWITCH=1 # set to 0 to disable automatic self-update
 
 # @description Print help text
 print_help() {
@@ -68,7 +67,7 @@ print_help() {
 		      Specify the webroot directory to install the repo (default: /var/www/jriver)
 		    --createrepo-user USER
 		      Specify the web server user if it differs from \$USER
-		  --no-self-update
+		  --no-update
 		    Disable automatic self-update
 		  --uninstall, -u
 		    Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
@@ -111,51 +110,39 @@ print_help() {
 parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
 
-  declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
-    COMPAT_SWITCH TEST_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
-    YES_SWITCH USER_MC_VERSION MJR_RESTORE_FILE BETAPASS SERVICE_TYPE \
-    VNCPASS USER_DISPLAY MC_REPO BUILD_TARGET REPO_TARGET
-  declare -ga SERVICES CONTAINERS
-  local long_opts short_opts input
+
+}
+
+# @description Perform OS detection and fallback
+# Generate OS-specific functions
+init() {
+  debug "Running: ${FUNCNAME[0]}"
+
   declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
-  declare -g SCRIPT_DIR=; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+  declare -g SCRIPT_DIR; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
   declare -g CREATEREPO_USER="$USER"
   declare -g OUTPUT_DIR="$SCRIPT_DIR/output"
   declare -g CREATEREPO_WEBROOT="/var/www/jriver"
   declare -g USER="${SUDO_USER:-$USER}"
   declare -g HOME; HOME=$(getent passwd "$USER" | cut -d: -f6)
+  declare -g ID RPM_MGR ARCH NAME \
+    BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
+    COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
+    YES_SWITCH USER_MC_VERSION MJR_RESTORE_FILE BETAPASS SERVICE_TYPE \
+    VNCPASS USER_DISPLAY BUILD_TARGET CREATEREPO_TARGET
+  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
+  declare -ga SERVICES CONTAINERS
 
-  # Set some defaults if zero or one arguments are passed
-  if [[ $# -eq 0 && $ID != "unknown" ]]; then
-    debug "Automatically setting --install repo"
-    REPO_INSTALL_SWITCH=1
-  elif [[ $# -eq 1 || $# -eq 2 ]]; then
-    case "$1" in
-      --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
-      --arch | --betapass | --restorefile | --outputdir | --no-self-update)
-        if  [[ $ID != "unknown" ]]; then
-          debug "Automatically setting --install repo"
-          REPO_INSTALL_SWITCH=1
-        fi
-        ;;
-      --compat)
-        if [[ $# -eq 1 ]]; then
-          BUILD_SWITCH=1
-          LOCAL_INSTALL_SWITCH=1
-        fi
-        ;;
-    esac
-  fi
-
+  local long_opts short_opts input
   long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
   long_opts+="restorefile:,betapass:,"
   long_opts+="service-type:,service:,services:,"
-  long_opts+="version,debug,verbose,help,uninstall,tests,yes,auto,no-self-update,"
+  long_opts+="version,debug,verbose,help,uninstall,yes,auto,no-update,"
   long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
   long_opts+="vncpass:,display:,container:"
   short_opts="+i:b::s:c:uyvdh"
 
-  # Reset DEBUG and catch with getopt
+  # Reset DEBUG and recatch properly with getopt
   declare -g DEBUG=0
 
   if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
@@ -165,103 +152,43 @@ parse_input() {
         --install|-i)
           shift
           case $1 in
-            local|rpm)
-              BUILD_SWITCH=1
-              LOCAL_INSTALL_SWITCH=1
-              ;;
-            repo|remote)
-              REPO_INSTALL_SWITCH=1
-              ;;
+            local|rpm|deb) BUILD_SWITCH=1; LOCAL_INSTALL_SWITCH=1 ;;
+            repo|remote) REPO_INSTALL_SWITCH=1 ;;
           esac
           ;;
-        --build|-b)
-          BUILD_SWITCH=1
-          shift && BUILD_TARGET="$1"
-          ;;
-        --outputdir)
-          shift && OUTPUT_DIR="$1"
-          ;;
+        --build|-b) BUILD_SWITCH=1; shift; BUILD_TARGET="$1" ;;
+        --outputdir) shift && OUTPUT_DIR="$1" ;;
         --mcversion)
           shift
           if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
             USER_MC_VERSION="$1"
           else
-            err "Bad --mcversion"
-            print_help
-            exit 1
+            err "Bad --mcversion"; print_help; exit 1
           fi
           ;;
-        --arch)
-          shift
-          echo "Switching from $ARCH to $1 architecture"
-          ARCH="$1"
+        --arch) shift; echo "Switching arch from $ARCH to $1"; ARCH="$1" ;;
+        --mcrepo) shift && MC_REPO="$1" ;;
+        --restorefile) shift && MJR_RESTORE_FILE="$1" ;;
+        --betapass) shift && BETAPASS="$1" ;;
+        --service-type) shift && SERVICE_TYPE="$1" ;;
+        --service|-s|--services) shift && SERVICES+=("$1") ;;
+        --createrepo) 
+          BUILD_SWITCH=1; CREATEREPO_SWITCH=1
+          shift; CREATEREPO_TARGET="$1"; BUILD_TARGET="$1"
           ;;
-        --mcrepo)
-          shift && MC_REPO="$1"
-          ;;
-        --restorefile)
-          shift && MJR_RESTORE_FILE="$1"
-          ;;
-        --betapass)
-          shift && BETAPASS="$1"
-          ;;
-        --service-type)
-          shift && SERVICE_TYPE="$1"
-          ;;
-        --service|-s|--services)
-          shift && SERVICES+=("$1")
-          ;;
-        --createrepo)
-          BUILD_SWITCH=1
-          CREATEREPO_SWITCH=1
-          shift && REPO_TARGET="$1" && BUILD_TARGET="$1"
-          ;;
-        --createrepo-webroot)
-          shift && CREATEREPO_WEBROOT="$1"
-          ;;
-        --createrepo-user)
-          shift && CREATEREPO_USER="$1"
-          ;;
-        --vncpass)
-          shift && VNCPASS="$1"
-          ;;
-        --display)
-          shift && USER_DISPLAY="$1"
-          ;;
-        --compat)
-          COMPAT_SWITCH=1
-          BUILD_SWITCH=1
-          ;;
-        --no-self-update)
-          SELF_UPDATE=0
-          ;;
-        --container|-c)
-          shift && CONTAINERS+=("$1")
-          ;;
-        --yes|-y|--auto)
-          YES_SWITCH=1
-          ;;
-        --version|-v)
-          echo "Version: $SCRIPT_VERSION"
-          exit 0
-          ;;
-        --debug|-d|--verbose)
-          DEBUG=1
-          ;;
-        --help|-h)
-          print_help 
-          exit
-          ;;
-        --uninstall|-u)
-          UNINSTALL_SWITCH=1
-          ;;
-        --tests)
-          TEST_SWITCH=1
-          ;;
-        --)
-          shift
-          break
-          ;;
+        --createrepo-webroot) shift && CREATEREPO_WEBROOT="$1" ;;
+        --createrepo-user) shift && CREATEREPO_USER="$1" ;;
+        --vncpass) shift && VNCPASS="$1" ;;
+        --display) shift && USER_DISPLAY="$1" ;;
+        --compat) COMPAT_SWITCH=1; BUILD_SWITCH=1 ;;
+        --no-update) UPDATE_SWITCH=0 ;;
+        --container|-c) shift && CONTAINERS+=("$1") ;;
+        --yes|-y|--auto) YES_SWITCH=1 ;;
+        --version|-v) echo "Version: $SCRIPT_VERSION"; exit 0 ;;
+        --debug|-d|--verbose) DEBUG=1 ;;
+        --help|-h) print_help; exit 0 ;;
+        --uninstall|-u) UNINSTALL_SWITCH=1 ;;
+        --) shift; break ;;
       esac
       shift
     done
@@ -269,28 +196,9 @@ parse_input() {
     err "Incorrect options provided"
     print_help && exit 1
   fi
-}
 
-# @description Perform OS detection and fallback
-# Generate OS-specific functions
-init() {
-  debug "Running: ${FUNCNAME[0]}"
-
-  declare -g ID RPM_MGR ARCH NAME
-  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
-
-  echo "Starting installJRMC"
-  (( DEBUG )) || echo "To enable debugging output, use --debug or -d"
-  (( EUID == 0 )) && err "Running as root user"
-
-  if [[ -f /etc/os-release ]]; then
-    source /etc/os-release
-  else
-    err "/etc/os-release not found"
-    err "Your OS is unsupported"
-    print_help
-    exit 1
-  fi
+  # Get host information
+  [[ -f /etc/os-release ]] && source /etc/os-release
 
   # Detect architecture and translate to MC convention
   ARCH=$(uname -m)
@@ -301,7 +209,7 @@ init() {
 
   debug "Detected host platform: $ID $VERSION_ID $ARCH"
 
-  # Normalize ID and set distro-specific vars
+  # Normalize ID and set host-specific vars
   case $ID in
     debian|arch) ;;
     centos|fedora)
@@ -334,27 +242,49 @@ init() {
       fi
   esac
 
-  # Set defaults
+  # Set some defaults if zero or one arguments are passed
+  if [[ $# -eq 0 && $ID != "unknown" ]]; then
+    debug "Automatically setting --install repo"
+    REPO_INSTALL_SWITCH=1
+  elif [[ $# -eq 1 || $# -eq 2 ]]; then
+    case "$1" in
+      --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
+      --arch | --betapass | --restorefile | --outputdir | --no-self-update)
+        if [[ $ID != "unknown" ]]; then
+          debug "Automatically setting --install repo"
+          REPO_INSTALL_SWITCH=1
+        fi
+        ;;
+      --compat)
+        if [[ $# -eq 1 ]]; then
+          BUILD_SWITCH=1
+          LOCAL_INSTALL_SWITCH=1
+        fi
+        ;;
+    esac
+  fi
+
+  # Set default targets
   BUILD_TARGET="${BUILD_TARGET:-$ID}"
-  REPO_TARGET="${REPO_TARGET:-$ID}"
+  CREATEREPO_TARGET="${CREATEREPO_TARGET:-$ID}"
 
   # Match the MC repo to the system
   if [[ $ID == debian || $ID == ubuntu ]]; then
-    MC_DEFAULT_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_DEFAULT_REPO}}
+    MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
   fi
 
   # Change the repo for user-specified legacy versions
   if [[ -n $USER_MC_VERSION ]]; then
     case $MC_MVERSION in
-      2[0-6]) MC_DEFAULT_REPO="jessie" ;;
-      2[7-9]|30) MC_DEFAULT_REPO="buster" ;;
-      31) MC_DEFAULT_REPO="bullseye" ;;
+      2[0-6]) MC_REPO="jessie" ;;
+      2[7-9]|30) MC_REPO="buster" ;;
+      31) MC_REPO="bullseye" ;;
       # After this point, things get messy with multiple repos for the same version
     esac
   fi
 
   debug "Using host platform: $ID $VERSION_ID"
-  debug "Using MC repository: ${MC_REPO:-$MC_DEFAULT_REPO}"
+  debug "Using MC repository: $MC_REPO"
 
   # Set distro-specific package manager commands 
   case $ID in
@@ -414,7 +344,7 @@ set_mc_version() {
   && buildah run "$cnt" -- sh -c \
     "apk add apt" &>/dev/null \
   && buildah run "$cnt" -- sh -c \
-    "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main' > /etc/apt/sources.list 2>&1" &>/dev/null \
+    "echo 'deb [trusted=no arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main' > /etc/apt/sources.list 2>&1" &>/dev/null \
   && buildah run "$cnt" -- sh -c \
     "apt update --allow-insecure-repositories &>/dev/null" &>/dev/null \
   && MC_VERSION=$(buildah run "$cnt" -- apt-cache policy mediacenter?? | grep Candidate | awk '{print $2}' | sort -V | tail -n1) &>/dev/null \
@@ -450,7 +380,7 @@ set_mc_version() {
     esac
   fi
 
-  echo "Using MC version $MC_VERSION from the ${MC_REPO:-$MC_DEFAULT_REPO} repo (determined by $MC_VERSION_SOURCE)"
+  echo "Using MC version $MC_VERSION from the $MC_REPO repo (determined by $MC_VERSION_SOURCE)"
   return 0
 }
 
@@ -581,7 +511,7 @@ install_mc_repo() {
       install_package wget
       debug "Adding MC repository to $deb_repo_file"
       sudo bash -c "cat <<-EOF > $deb_repo_file
-				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ ${MC_REPO:-$MC_DEFAULT_REPO} main
+				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main
 			EOF"
       debug "Installing JRiver Media Center RPM key"
       wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
@@ -1393,7 +1323,7 @@ service_jriver-createrepo() {
 
 		[Service]
 		$USER_STRING
-		ExecStart=$SCRIPT_DIR/installJRMC --outputdir=$OUTPUT_DIR --createrepo=$REPO_TARGET --createrepo-webroot=$CREATEREPO_WEBROOT --createrepo-user=$CREATEREPO_USER
+		ExecStart=$SCRIPT_DIR/installJRMC --outputdir=$OUTPUT_DIR --createrepo=$CREATEREPO_TARGET --createrepo-webroot=$CREATEREPO_WEBROOT --createrepo-user=$CREATEREPO_USER
 
 		[Install]
 		WantedBy=multi-user.target
@@ -1503,7 +1433,7 @@ uninstall() {
 }
 
 # @description Checks for installJRMC update and re-executes, if necessary
-update_self() {
+update() {
   debug "Running: ${FUNCNAME[0]} $*"
 
   local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
@@ -1573,19 +1503,19 @@ update_self() {
 main() {
   debug "Running: ${FUNCNAME[0]} $*"
 
-  parse_input "$@"
-  init
+  (( EUID == 0 )) && err "Running as root user"
 
-  debug "Debugging on"
-  debug "installJRMC version: $SCRIPT_VERSION"
-
-  ((SELF_UPDATE)) && update_self "$@"
-
-  if ((TEST_SWITCH)); then 
-    echo "Running tests, all other options are skipped"
-    tests
-    exit
+  echo "Starting installJRMC"
+  if (( DEBUG )); then
+    echo "Debugging on"
+    echo "installJRMC version: $SCRIPT_VERSION"
+  else
+    echo "To enable debugging output, use --debug or -d"
   fi
+
+  init "$@"
+
+  ((UPDATE_SWITCH)) && update "$@"
 
   set_mc_version
 
@@ -1655,7 +1585,7 @@ main() {
     [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
     acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
 
-    if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $REPO_TARGET =~ (centos|fedora|suse) ]]; then
+    if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $CREATEREPO_TARGET =~ (centos|fedora|suse) ]]; then
       install_package "dpkg" "rpm-build"
       [[ -d $OUTPUT_DIR/SPECS ]] || execute mkdir -p "$OUTPUT_DIR/SPECS"
       build_rpm
