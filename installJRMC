@@ -68,7 +68,7 @@ print_help() {
 		    --createrepo-user USER
 		      Specify the web server user if it differs from \$USER
 		  --no-update
-		    Disable automatic self-update
+		    Disable automatic installJRMCself-update
 		  --uninstall, -u
 		    Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
 		  --yes, -y, --auto
@@ -145,56 +145,84 @@ init() {
   # Reset DEBUG and recatch properly with getopt
   declare -g DEBUG=0
 
-  if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
-    eval set -- "$input"
-    while true; do
-      case $1 in
-        --install|-i)
-          shift
-          case $1 in
-            local|rpm|deb) BUILD_SWITCH=1; LOCAL_INSTALL_SWITCH=1 ;;
-            repo|remote) REPO_INSTALL_SWITCH=1 ;;
-          esac
-          ;;
-        --build|-b) BUILD_SWITCH=1; shift; BUILD_TARGET="$1" ;;
-        --outputdir) shift && OUTPUT_DIR="$1" ;;
-        --mcversion)
-          shift
-          if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
-            USER_MC_VERSION="$1"
-          else
-            err "Bad --mcversion"; print_help; exit 1
+
+  # Set defaults for no arguments or parse input
+  if [[ $# -eq 0 ]]; then
+    debug "Automatically setting --install repo"
+    REPO_INSTALL_SWITCH=1
+    # Skip getopt
+  else
+    # Set sane defaults for 
+    if [[ $# -le 2 ]]; then
+      case "$1" in
+        --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
+        --arch | --betapass | --restorefile | --outputdir | --no-update)
+          if [[ $ID != "unknown" ]]; then
+            debug "Automatically setting --install repo"
+            REPO_INSTALL_SWITCH=1
           fi
           ;;
-        --arch) shift; echo "Switching arch from $ARCH to $1"; ARCH="$1" ;;
-        --mcrepo) shift && MC_REPO="$1" ;;
-        --restorefile) shift && MJR_RESTORE_FILE="$1" ;;
-        --betapass) shift && BETAPASS="$1" ;;
-        --service-type) shift && SERVICE_TYPE="$1" ;;
-        --service|-s|--services) shift && SERVICES+=("$1") ;;
-        --createrepo) 
-          BUILD_SWITCH=1; CREATEREPO_SWITCH=1
-          shift; CREATEREPO_TARGET="$1"; BUILD_TARGET="$1"
+        --compat)
+          if [[ $# -eq 1 ]]; then
+            BUILD_SWITCH=1
+            LOCAL_INSTALL_SWITCH=1
+          fi
           ;;
-        --createrepo-webroot) shift && CREATEREPO_WEBROOT="$1" ;;
-        --createrepo-user) shift && CREATEREPO_USER="$1" ;;
-        --vncpass) shift && VNCPASS="$1" ;;
-        --display) shift && USER_DISPLAY="$1" ;;
-        --compat) COMPAT_SWITCH=1; BUILD_SWITCH=1 ;;
-        --no-update) UPDATE_SWITCH=0 ;;
-        --container|-c) shift && CONTAINERS+=("$1") ;;
-        --yes|-y|--auto) YES_SWITCH=1 ;;
-        --version|-v) echo "Version: $SCRIPT_VERSION"; exit 0 ;;
-        --debug|-d|--verbose) DEBUG=1 ;;
-        --help|-h) print_help; exit 0 ;;
-        --uninstall|-u) UNINSTALL_SWITCH=1 ;;
-        --) shift; break ;;
       esac
-      shift
-    done
-  else
-    err "Incorrect options provided"
-    print_help && exit 1
+    fi
+
+    if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
+      eval set -- "$input"
+      while true; do
+        case $1 in
+          --install|-i)
+            shift
+            case $1 in
+              local|rpm|deb) BUILD_SWITCH=1; LOCAL_INSTALL_SWITCH=1 ;;
+              repo|remote) REPO_INSTALL_SWITCH=1 ;;
+            esac
+            ;;
+          --build|-b) BUILD_SWITCH=1; shift; BUILD_TARGET="$1" ;;
+          --outputdir) shift && OUTPUT_DIR="$1" ;;
+          --mcversion)
+            shift
+            if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
+              USER_MC_VERSION="$1"
+            else
+              err "Bad --mcversion"; print_help; exit 1
+            fi
+            ;;
+          --arch) shift; echo "Switching arch from $ARCH to $1"; ARCH="$1" ;;
+          --mcrepo) shift && MC_REPO="$1" ;;
+          --restorefile) shift && MJR_RESTORE_FILE="$1" ;;
+          --betapass) shift && BETAPASS="$1" ;;
+          --service-type) shift && SERVICE_TYPE="$1" ;;
+          --service|-s|--services) shift && SERVICES+=("$1") ;;
+          --createrepo) 
+            BUILD_SWITCH=1; CREATEREPO_SWITCH=1
+            shift; CREATEREPO_TARGET="$1"; BUILD_TARGET="$1"
+            ;;
+          --createrepo-webroot) shift && CREATEREPO_WEBROOT="$1" ;;
+          --createrepo-user) shift && CREATEREPO_USER="$1" ;;
+          --vncpass) shift && VNCPASS="$1" ;;
+          --display) shift && USER_DISPLAY="$1" ;;
+          --compat) COMPAT_SWITCH=1; BUILD_SWITCH=1 ;;
+          --no-update) UPDATE_SWITCH=0 ;;
+          --container|-c) shift && CONTAINERS+=("$1") ;;
+          --yes|-y|--auto) YES_SWITCH=1 ;;
+          --version|-v) echo "Version: $SCRIPT_VERSION"; exit 0 ;;
+          --debug|-d|--verbose) DEBUG=1 ;;
+          --help|-h) print_help; exit 0 ;;
+          --uninstall|-u) UNINSTALL_SWITCH=1 ;;
+          --) shift; break ;;
+        esac
+        shift
+      done
+    else
+      err "Incorrect options provided"
+      print_help && exit 1
+    fi
+
   fi
 
   # Get host information
@@ -242,27 +270,7 @@ init() {
       fi
   esac
 
-  # Set some defaults if zero or one arguments are passed
-  if [[ $# -eq 0 && $ID != "unknown" ]]; then
-    debug "Automatically setting --install repo"
-    REPO_INSTALL_SWITCH=1
-  elif [[ $# -eq 1 || $# -eq 2 ]]; then
-    case "$1" in
-      --debug | -d | -y | --yes | --auto | --mcrepo | --mcversion | \
-      --arch | --betapass | --restorefile | --outputdir | --no-self-update)
-        if [[ $ID != "unknown" ]]; then
-          debug "Automatically setting --install repo"
-          REPO_INSTALL_SWITCH=1
-        fi
-        ;;
-      --compat)
-        if [[ $# -eq 1 ]]; then
-          BUILD_SWITCH=1
-          LOCAL_INSTALL_SWITCH=1
-        fi
-        ;;
-    esac
-  fi
+
 
   # Set default targets
   BUILD_TARGET="${BUILD_TARGET:-$ID}"
@@ -1469,7 +1477,7 @@ update() {
     after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
     if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
       echo "installJRMC repository updated. Restarting script..."
-      exec "$SCRIPT_PATH" "$@" "--no-self-update"
+      exec "$SCRIPT_PATH" "$@" "--no-update"
     fi
   fi
 
@@ -1493,7 +1501,7 @@ update() {
     echo "Updating installJRMC $SCRIPT_VERSION to $remote_version"
     execute mv "$tmp" "$SCRIPT_PATH"
     execute chmod +x "$SCRIPT_PATH"
-    exec "$SCRIPT_PATH" "$@" "--no-self-update"
+    exec "$SCRIPT_PATH" "$@" "--no-update"
   fi
 
   rm -f "$tmp"
