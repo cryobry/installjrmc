@@ -577,7 +577,7 @@ install_mc_repo() {
     fedora|centos)
       sudo bash -c "cat <<-EOF > $rpm_repo_file
 				[jriver]
-				name=JRiver Media Center repo by BryanC
+				name=JRiver Media Center by BryanC
 				baseurl=https://repos.bryanroessler.com/jriver
 				gpgcheck=0
 			EOF"
