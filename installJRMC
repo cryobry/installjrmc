@@ -621,8 +621,8 @@ acquire_deb() {
       execute rm "$MC_DEB"
     else
       echo "Using existing DEB: $MC_DEB"
+      return 0
     fi
-    return 0
   fi
 
   # Define the repositories to check
@@ -640,7 +640,7 @@ acquire_deb() {
       break
     fi
     err "DEB file not found/downloaded"
-    exit 1
+    return 1
   done
 
   [[ -f $MC_DEB ]]
