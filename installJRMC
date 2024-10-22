@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.3.6"
+declare -g SCRIPT_VERSION="1.3.7"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.30" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
