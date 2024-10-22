@@ -839,7 +839,7 @@ install_mc_deb() {
     sed -i 's/ ([^)]*)//g' "control"
 
     # Remove libwebkit2gtk and their fantastic package versioning strategy
-    sed -i 's/,\s*libwebkit2gtk[^,]*\|libwebkit2gtk[^,]*,\?//g' "control"
+    sed -i 's/,\s*libwebkit2gtk[^,]*,\?|libwebkit2gtk[^,]*,\?//g' "control"
 
     # TODO ugly ZorinOS workaround
     [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
