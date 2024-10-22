@@ -576,7 +576,7 @@ install_mc_repo() {
       install_package wget 
       debug "Installing JRiver Media Center RPM key"
       local keyfile="/usr/share/keyrings/jriver-com-archive-keyring.gpg"
-      wget -O- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | 
+      wget --quiet --output-document=- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | 
         gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       debug "Adding MC repository to $deb_repo_file"
       sudo bash -c "cat <<-EOF > $deb_repo_file
