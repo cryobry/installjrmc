@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.3.5"
+declare -g SCRIPT_VERSION="1.3.6-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.30" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -141,7 +141,7 @@ parse_input() {
           esac
           ;;
         --build|-b) BUILD_SWITCH=1; shift; BUILD_TARGET="$1" ;;
-        --outputdir) shift && OUTPUT_DIR="$1" ;;
+        --outputdir) shift; OUTPUT_DIR="$1" ;;
         --mcversion)
           shift
           if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
@@ -151,22 +151,22 @@ parse_input() {
           fi
           ;;
         --arch) shift; echo "Switching arch from $ARCH to $1"; ARCH="$1" ;;
-        --mcrepo) shift && USER_MC_REPO="$1" ;;
-        --restorefile) shift && MJR_FILE="$1" ;;
-        --betapass) shift && BETAPASS="$1" ;;
-        --service-type) shift && SERVICE_TYPE="$1" ;;
-        --service|-s|--services) shift && SERVICES+=("$1") ;;
+        --mcrepo) shift; USER_MC_REPO="$1" ;;
+        --restorefile) shift; MJR_FILE="$1" ;;
+        --betapass) shift; BETAPASS="$1" ;;
+        --service-type) shift; SERVICE_TYPE="$1" ;;
+        --service|-s|--services) shift; SERVICES+=("$1") ;;
         --createrepo) 
           BUILD_SWITCH=1; CREATEREPO_SWITCH=1
           shift; CREATEREPO_TARGET="$1"; BUILD_TARGET="$1"
           ;;
-        --createrepo-webroot) shift && CREATEREPO_WEBROOT="$1" ;;
-        --createrepo-user) shift && CREATEREPO_USER="$1" ;;
-        --vncpass) shift && VNCPASS="$1" ;;
-        --display) shift && USER_DISPLAY="$1" ;;
+        --createrepo-webroot) shift; CREATEREPO_WEBROOT="$1" ;;
+        --createrepo-user) shift; CREATEREPO_USER="$1" ;;
+        --vncpass) shift; VNCPASS="$1" ;;
+        --display) shift; USER_DISPLAY="$1" ;;
         --compat) COMPAT_SWITCH=1; BUILD_SWITCH=1 ;;
         --no-update) UPDATE_SWITCH=0 ;;
-        --container|-c) shift && CONTAINERS+=("$1") ;;
+        --container|-c) shift; CONTAINERS+=("$1") ;;
         --yes|-y|--auto) YES_SWITCH=1 ;;
         --version|-v) echo "Version: $SCRIPT_VERSION"; exit 0 ;;
         --debug|-d|--verbose) DEBUG=1 ;;
@@ -177,8 +177,7 @@ parse_input() {
       shift
     done
   else
-    err "Incorrect options provided"
-    print_help && exit 1
+    err "Incorrect options provided"; print_help; exit 1
   fi
 }
 
@@ -211,29 +210,14 @@ init() {
   fi
 
   # Set default command arguments and/or parse user input
-  if [[ $# -eq 0 ]]; then
-    debug "Automatically setting --install repo"
+  if [[ $# -eq 0 || ! "$*" =~ (--install|--service|--container) ]]; then
+    debug "Automatically using --install=repo"
     REPO_INSTALL_SWITCH=1
-  else
-    # Use --install=repo by default for simple arguments
-    if [[ $# -le 2 ]]; then
-      case "$1" in
-        --debug| -d| --verbose| -y| --yes| --auto| --mcrepo| --mcversion| \
-        --arch| --betapass| --restorefile| --outputdir| --no-update)
-          REPO_INSTALL_SWITCH=1
-          ;;
-        --compat)
-          if [[ $# -eq 1 ]]; then
-            BUILD_SWITCH=1
-            LOCAL_INSTALL_SWITCH=1
-          fi
-          ;;
-      esac
-    fi
-    # Parse input commands with getopt
-    parse_input "$@"
   fi
-
+  
+  # Parse input commands with getopt
+  [[ $# -gt 0 ]] && parse_input "$@"
+  
   # Run the self-updater if enabled
   ((UPDATE_SWITCH)) && update "$@"
 
@@ -268,6 +252,7 @@ init() {
         case "$1" in
           --debug| -d| --verbose| -y| --yes| --auto| --mcrepo| --mcversion| \
           --arch| --betapass| --restorefile| --outputdir| --no-update)
+            debug "Automatically using --install local for SUSE"
             REPO_INSTALL_SWITCH=0
             BUILD_SWITCH=1
             LOCAL_INSTALL_SWITCH=1
@@ -289,6 +274,7 @@ init() {
       else
         err "OS detection failed!"
         ask_ok "Continue with manual installation?" || exit 1
+        debug "Automatically using --install local for unknown distro"
         ID="unknown"
         REPO_INSTALL_SWITCH=0
         BUILD_SWITCH=1
@@ -305,7 +291,7 @@ init() {
     MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
   fi
 
-  # Change the repo for legacy MC versions
+  # Use the correct repo for legacy MC versions
   if [[ -n $USER_MC_VERSION ]]; then
     # Get MVERSION from user input
     case ${USER_MC_VERSION%%.*} in
@@ -524,6 +510,8 @@ install_external_repos() {
         install_package --no-install-check \
           "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
       fi
+      # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
+      install_mesa_freeworld
       ;;
     fedora)
       if ! "${PKG_QUERY[@]}" rpmfusion-free-release &>/dev/null; then
@@ -531,6 +519,8 @@ install_external_repos() {
         install_package --no-install-check \
           "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$VERSION_ID.noarch.rpm"
       fi
+      # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
+      install_mesa_freeworld
       ;;
     suse)
       # if ! zypper repos | grep -q "X11_XOrg"; then
@@ -581,18 +571,17 @@ install_mc_repo() {
 				baseurl=https://repos.bryanroessler.com/jriver
 				gpgcheck=0
 			EOF"
-      # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
-      install_mesa_freeworld
       ;;
     debian|ubuntu)
-      install_package wget
+      install_package wget 
+      debug "Installing JRiver Media Center RPM key"
+      local keyfile="/usr/share/keyrings/jriver-com-archive-keyring.gpg"
+      wget -O- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | 
+        gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       debug "Adding MC repository to $deb_repo_file"
       sudo bash -c "cat <<-EOF > $deb_repo_file
-				deb [trusted=yes arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main
+				deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main
 			EOF"
-      debug "Installing JRiver Media Center RPM key"
-      wget -qO- "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
-        sudo tee /etc/apt/trusted.gpg.d/jriver.asc &>/dev/null
       ;;
     *)
       err "An MC repository for $ID is not yet available"
@@ -650,6 +639,8 @@ acquire_deb() {
       echo "Found"
       break
     fi
+    err "DEB file not found/downloaded"
+    exit 1
   done
 
   [[ -f $MC_DEB ]]
@@ -847,6 +838,9 @@ install_mc_deb() {
     # Remove minimum version specifiers from control file
     sed -i 's/ ([^)]*)//g' "control"
 
+    # Remove libwebkit2gtk and their fantastic package versioning strategy
+    sed -i '/^Depends:/s/libwebkit2gtk[^,]*,\? *//g' "control"
+
     # TODO ugly ZorinOS workaround
     [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
     && ! grep -q zorin /etc/os-release \
@@ -1035,7 +1029,8 @@ link_ssl_certs() {
 restore_license() {
   debug "Running: ${FUNCNAME[0]}"
 
-  local f newest mjrfiles
+  local f newest
+  local -a mjrfiles
 
   # Glob mjr files from common directories
   shopt -s nullglob
@@ -1694,7 +1689,7 @@ execute() {
   fi
 }
 
-# Roughly turn debugging on, reparse in get_input() with getopt
+# Roughly turn debugging on, reparse in parse_input() with getopt
 [[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
 
 main "$@"
