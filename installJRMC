@@ -493,7 +493,7 @@ install_external_repos() {
 
   case $ID in
     ubuntu)
-      if ! grep ^deb /etc/apt/sources.list | grep -q universe; then
+      if ! grep ^deb /etc/apt/sources.list.d/* | grep -q universe; then
         echo "Adding universe repository"
         if ! execute sudo add-apt-repository -y universe; then
           err "Adding universe repository failed"
@@ -839,7 +839,7 @@ install_mc_deb() {
     sed -i 's/ ([^)]*)//g' "control"
 
     # Remove libwebkit2gtk and their fantastic package versioning strategy
-    sed -i '/^Depends:/s/libwebkit2gtk[^,]*,\? *//g' "control"
+    sed -i 's/,\s*libwebkit2gtk[^,]*\|libwebkit2gtk[^,]*,\?//g' "control"
 
     # TODO ugly ZorinOS workaround
     [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
