@@ -210,7 +210,7 @@ init() {
   fi
 
   # Set default command arguments and/or parse user input
-  if [[ $# -eq 0 || ! "$*" =~ (--install|--service|--container) ]]; then
+  if [[ $# -eq 0 || ! "$*" =~ (--install|--service|--container|--createrepo) ]]; then
     debug "Automatically using --install=repo"
     REPO_INSTALL_SWITCH=1
   fi
