@@ -1595,10 +1595,9 @@ update() {
 main() {
   debug "Running: ${FUNCNAME[0]} $*"
 
-  echo "Starting installJRMC"
+  echo "Starting installJRMC $SCRIPT_VERSION"
   if (( DEBUG )); then
     echo "Debugging on"
-    echo "installJRMC version: $SCRIPT_VERSION"
   else
     echo "To enable debugging output, use --debug or -d"
   fi
