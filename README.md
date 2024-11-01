@@ -27,7 +27,7 @@ $ installJRMC --help
 --compat
     Build/install MC without minimum dependency version requirements
 --mcversion VERSION
-    Build or install a specific MC version, ex. "33.0.30" (default: latest version)
+    Build or install a specific MC version, ex. "33.0.30" or "33" (default: latest)
 --mcrepo REPO
     Specify the MC repository, ex. "bullseye", "bookworm", "noble", etc (default: latest official)
 --arch ARCH

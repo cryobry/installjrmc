@@ -16,7 +16,7 @@
 
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.3.7"
+declare -g SCRIPT_VERSION="1.3.8-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.30" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -42,7 +42,7 @@ print_help() {
 		  --compat
 		    Build/install MC locally without minimum dependency version requirements
 		  --mcversion VERSION
-		    Specify the MC version, ex. "$MC_VERSION" (default: latest version)
+		    Specify the MC version, ex. "$MC_VERSION" or "${MC_VERSION%%.*}" (default: latest)
 		  --arch VERSION
 		    Specify the MC architecture, ex. "amd64", "arm64", etc (default: host architecture)
 		  --mcrepo REPO
@@ -146,6 +146,24 @@ parse_input() {
           shift
           if [[ $1 =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
             USER_MC_VERSION="$1"
+          elif [[ $1 =~ ([0-9][0-9]) ]]; then
+            case $1 in
+              33) ;; # use update check to determine latest version
+              32) USER_MC_VERSION="32.0.58" ;;
+              31) USER_MC_VERSION="31.0.83" ;;
+              30) USER_MC_VERSION="30.0.96" ;;
+              29) USER_MC_VERSION="29.0.91" ;;
+              28) USER_MC_VERSION="28.0.110" ;;
+              27) USER_MC_VERSION="27.0.88" ;;
+              26) USER_MC_VERSION="26.0.107" ;;
+              25) USER_MC_VERSION="25.0.114" ;;
+              24) USER_MC_VERSION="24.0.78" ;;
+              23) USER_MC_VERSION="23.0.104" ;;
+              22) USER_MC_VERSION="22.0.102" ;;
+              21) USER_MC_VERSION="21.0.90" ;;
+              20) USER_MC_VERSION="20.0.131" ;;
+              *) err "Bad --mcversion"; print_help; exit 1 ;;
+            esac
           else
             err "Bad --mcversion"; print_help; exit 1
           fi
@@ -299,6 +317,7 @@ init() {
       2[7-9]|30) USER_MC_REPO="buster" ;;
       31) USER_MC_REPO="bullseye" ;;
       # After this point, things get messy with multiple repos for the same MC version
+      # Just use the default repo
     esac
   fi
 
@@ -865,7 +884,7 @@ install_mc_deb() {
 install_mc_rhel() {
   debug "Running: ${FUNCNAME[0]}"
 
-  # Install mesa-va-freeworld separately from the RPM for dnf swap
+  # Swap in freeworld hardware acceleration separately from the RPM
   install_mesa_freeworld
   
   install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
@@ -957,7 +976,7 @@ install_mc_arch() {
   popd &>/dev/null || return
 }
 
-# @description Copy the RPM to createrepo-webroot and runs createrepo as the createrepo-user
+# @description Copy the RPM to createrepo-webroot and run createrepo as the createrepo-user
 run_createrepo() {
   debug "Running: ${FUNCNAME[0]}"
 
