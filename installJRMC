@@ -306,7 +306,11 @@ init() {
 
   # Match the MC repo to the system codename
   if [[ -z $USER_MC_REPO && ($ID == debian || $ID == ubuntu) ]]; then
-    MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
+    if [[ $UBUNTU_CODENAME == "oracular" ]]; then
+      MC_REPO="noble" # TODO temporarily use noble repo for Ubuntu 24.10
+    else  
+      MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
+    fi
   fi
 
   # Use the correct repo for legacy MC versions
@@ -579,28 +583,40 @@ install_mesa_freeworld() {
 install_mc_repo() {
   debug "Running: ${FUNCNAME[0]}"
 
-  local deb_repo_file="/etc/apt/sources.list.d/jriver.list"
-  local rpm_repo_file="/etc/yum.repos.d/jriver.repo"
+  local repo_file repo_text
 
   case $ID in
     fedora|centos)
-      sudo bash -c "cat <<-EOF > $rpm_repo_file
+      repo_file="/etc/yum.repos.d/jriver.repo"
+      read -r -d '' repo_text <<-EOF
 				[jriver]
 				name=JRiver Media Center by BryanC
 				baseurl=https://repos.bryanroessler.com/jriver
 				gpgcheck=0
-			EOF"
+			EOF
       ;;
     debian|ubuntu)
-      install_package wget 
-      debug "Installing JRiver Media Center RPM key"
+      local major_version="${VERSION_ID%%.*}"
+      local minor_version="${VERSION_ID##*.}"
       local keyfile="/usr/share/keyrings/jriver-com-archive-keyring.gpg"
+      if [[ $ID == "ubuntu" ]] \
+      && [[ $major_version -gt 24 || ($major_version -eq 24 && $minor_version -ge 10) ]]; then
+        repo_file="/etc/apt/sources.list.d/jriver.sources" # TODO new Ubuntu sources file format
+        read -r -d '' repo_text <<-EOF
+					Types: deb
+					URIs: http://dist.jriver.com/latest/mediacenter/
+					Signed-By: $keyfile
+					Suites: noble
+					Components: main
+				EOF
+      else
+        repo_file="/etc/apt/sources.list.d/jriver.list"
+        repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main"
+      fi
+      install_package wget 
+      echo "Installing JRiver Media Center RPM key"
       wget --quiet --output-document=- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | 
         gpg --dearmor | sudo tee "$keyfile" &>/dev/null
-      debug "Adding MC repository to $deb_repo_file"
-      sudo bash -c "cat <<-EOF > $deb_repo_file
-				deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main
-			EOF"
       ;;
     *)
       err "An MC repository for $ID is not yet available"
@@ -608,6 +624,9 @@ install_mc_repo() {
       return 1
       ;;
   esac
+
+  echo "Adding MC repository to $repo_file"
+  sudo tee "$repo_file" > /dev/null <<< "$repo_text"
 
   if ! "${PKG_UPDATE[@]}"; then
     err "Package update failed!"
