@@ -493,8 +493,8 @@ install_package() {
   esac
 
   # Install packages if any need installation
+  echo "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
-    debug "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"
     if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
       ((silent)) || err "Failed to install ${pkg_array[*]}"
       return 1
