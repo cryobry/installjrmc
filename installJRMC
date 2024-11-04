@@ -13,7 +13,6 @@
 #
 # BUGS
 #   1. No createrepo on Mint
-
 shopt -s extglob
 
 declare -g SCRIPT_VERSION="1.3.10"
@@ -433,7 +432,6 @@ get_latest_mc_version() {
 # @option --silent | -s Do not print errors (useful for optional packages)
 install_package() {
   debug "Running: ${FUNCNAME[0]}" "$@"
-
   local -a pkg_array install_flags
   local -A pkg_aliases
   local input pkg
@@ -578,7 +576,6 @@ install_mesa_freeworld() {
 # @description Installs JRiver Media Center from a remote repository
 install_mc_repo() {
   debug "Running: ${FUNCNAME[0]}"
-
   local repo_file repo_text
 
   case $ID in
@@ -912,7 +909,6 @@ install_mc_suse() {
 # @description Installs Media Center generically for unsupported OSes
 install_mc_generic() {
   debug "Running: ${FUNCNAME[0]}"
-
   local -a raw_files
   local extract_dir
 
@@ -1265,9 +1261,7 @@ service_jriver-mediacenter() {
 # @description Starts and enables (at startup) a JRiver Media Server service
 service_jriver-mediaserver() {
   debug "Running: ${FUNCNAME[0]}"
-
   set_service_vars "${FUNCNAME[0]##*_}" "user"
-
   service_jriver-mediacenter "/MediaServer"
 }
 
@@ -1341,12 +1335,9 @@ service_jriver-xvnc() {
 service_jriver-x11vnc() {
   debug "Running: ${FUNCNAME[0]}"
   local -a start_cmd
-
   set_service_vars "${FUNCNAME[0]##*_}" "user"
   set_display_vars
-
   declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
-
   install_package x11vnc
   set_vnc_pass x11vnc
 
