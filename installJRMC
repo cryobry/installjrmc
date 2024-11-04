@@ -494,6 +494,7 @@ install_package() {
 
   # Install packages if any need installation
   echo "${PKG_INSTALL[*]} ${install_flags[*]} ${pkg_array[*]}"
+  declare -p
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
     if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
       ((silent)) || err "Failed to install ${pkg_array[*]}"
