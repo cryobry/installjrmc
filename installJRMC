@@ -1549,10 +1549,6 @@ uninstall() {
 # @description Checks for installJRMC update and re-executes, if necessary
 update() {
   debug "Running: ${FUNCNAME[0]} $*"
-
-  local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-  local tmp; tmp=$(mktemp)
-
   debug "Checking for installJRMC update"
 
   # Function to extract and normalize version from a script
@@ -1566,51 +1562,56 @@ update() {
     echo "$version_line"
   }
 
+  # Helper function for version comparison
+  version_greater() {
+    # Returns true if version $1 is greater than version $2
+    [[ "$(echo -e "$1\n$2" | sort -V | head -n 1)" != "$1" ]]
+  }
+
   # Check if we're in a git directory and if it's the installJRMC repository
   if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
-  && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"bryan/installJRMC"* ]]; then
+  && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"installJRMC"* ]]; then
     debug "installJRMC git repository detected. Running git pull..."
 
     # Get the current commit hash
-    local before_pull_hash
+    local before_pull_hash after_pull_hash
     before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
-
     if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
       return 0
     fi
-
-    local after_pull_hash
     after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
     if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
       echo "installJRMC repository updated. Restarting script..."
       exec "$SCRIPT_PATH" "$@" "--no-update"
     fi
+  else # Download the latest version of the script
+    local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
+    local tmp; tmp=$(mktemp)
+
+    # Acquire latest version
+    install_package --silent wget
+    if command -v wget &>/dev/null; then
+      execute wget -q -O "$tmp" "$script_url"
+    elif command -v curl &>/dev/null; then
+      execute curl -s -L -o "$tmp" "$script_url"
+    else
+      return 1
+    fi
+
+    # Get latest version number
+    local remote_version
+    remote_version=$(extract_version "$tmp")
+    [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
+
+    # Compare versions and update if necessary
+    if version_greater "$remote_version" "$SCRIPT_VERSION"; then
+      echo "Updating installJRMC $SCRIPT_VERSION to $remote_version"
+      execute mv "$tmp" "$SCRIPT_PATH"
+      execute chmod +x "$SCRIPT_PATH"
+      rm -f "$tmp"
+      exec "$SCRIPT_PATH" "$@" "--no-update"
+    fi
   fi
-
-  # Download the latest version of the script
-  install_package --silent wget
-  if command -v wget &>/dev/null; then
-    execute wget -q -O "$tmp" "$script_url"
-  elif command -v curl &>/dev/null; then
-    execute curl -s -L -o "$tmp" "$script_url"
-  else
-    return 1
-  fi
-
-  # Get latest version number
-  local remote_version
-  remote_version=$(extract_version "$tmp")
-  [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
-
-  # Compare versions and update if necessary
-  if [[ $SCRIPT_VERSION < $remote_version ]]; then
-    echo "Updating installJRMC $SCRIPT_VERSION to $remote_version"
-    execute mv "$tmp" "$SCRIPT_PATH"
-    execute chmod +x "$SCRIPT_PATH"
-    exec "$SCRIPT_PATH" "$@" "--no-update"
-  fi
-
-  rm -f "$tmp"
 }
 
 # @description installJRMC main function
