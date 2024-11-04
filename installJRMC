@@ -72,7 +72,7 @@ print_help() {
 		  --uninstall, -u
 		    Uninstall JRiver MC, remove services, containers, and firewall rules (does not remove library files)
 		  --yes, -y, --auto
-		    Always assume yes for questions
+		    Assume yes response to questions
 		  --version, -v
 		    Print this script version and exit
 		  --debug, -d
@@ -172,10 +172,8 @@ parse_input() {
         --betapass) shift; BETAPASS="$1" ;;
         --service-type) shift; SERVICE_TYPE="$1" ;;
         --service|-s|--services) shift; SERVICES+=("$1") ;;
-        --createrepo) 
-          BUILD_SWITCH=1; CREATEREPO_SWITCH=1
-          shift; CREATEREPO_TARGET="$1"; BUILD_TARGET="$1"
-          ;;
+        --createrepo) shift; CREATEREPO_TARGET="$1"; BUILD_TARGET="$1"
+          BUILD_SWITCH=1; CREATEREPO_SWITCH=1 ;;
         --createrepo-webroot) shift; CREATEREPO_WEBROOT="$1" ;;
         --createrepo-user) shift; CREATEREPO_USER="$1" ;;
         --vncpass) shift; VNCPASS="$1" ;;
