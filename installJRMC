@@ -435,7 +435,7 @@ install_package() {
   debug "Running: ${FUNCNAME[0]}" "$@"
   local -a pkg_array install_flags
   local -A pkg_aliases
-  local input pkg
+  local input pkg _pkg
   local no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
   local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
 
@@ -458,25 +458,38 @@ install_package() {
   case $ID in
     debian|ubuntu)
       pkg_aliases=(
-        ["rpm-build"]="rpm"
-        ["createrepo_c"]="createrepo"
-        ["tigervnc-server"]="tigervnc-standalone-server"
-      )
-      ;;
+        [rpm-build]="rpm"
+        [createrepo_c]="createrepo"
+        [tigervnc-server]="tigervnc-standalone-server"
+      ) ;;
+    suse)
+      pkg_aliases=(
+        [buildah]="buildah fuse-overlayfs"
+      ) ;;
   esac
 
-  # Filter out already installed packages
+  # Filter out already installed packages to create pkg_array
   for pkg in "$@"; do
     if [[ -v pkg_aliases[$pkg] ]]; then
       debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"
-      pkg=${pkg_aliases[$pkg]}
-    fi
-    if ((no_install_check)) \
-    || ! { command -v "$pkg" &>/dev/null \
-    || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
-      pkg_array+=("$pkg")
+      IFS=' ' read -ra pkgs <<< "${pkg_aliases[$pkg]}"
+      for _pkg in "${pkgs[@]}"; do
+        if ((no_install_check)) \
+        || ! { command -v "$_pkg" &>/dev/null \
+        || "${PKG_QUERY[@]}" "$_pkg" &>/dev/null; }; then
+          pkg_array+=("$_pkg")
+        else
+          debug "$_pkg already installed, skipping installation"
+        fi
+      done
     else
-      debug "$pkg already installed, skipping installation"
+      if ((no_install_check)) \
+      || ! { command -v "$pkg" &>/dev/null \
+      || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
+        pkg_array+=("$pkg")
+      else
+        debug "$pkg already installed, skipping installation"
+      fi
     fi
   done
 
