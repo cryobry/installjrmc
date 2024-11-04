@@ -322,37 +322,6 @@ init() {
     esac
   fi
 
-  # Don't check for latest MC version if set by user or using --install=repo only
-  if [[ -z $USER_MC_VERSION ]] \
-  && ((BUILD_SWITCH || LOCAL_INSTALL_SWITCH || CREATEREPO_SWITCH)); then
-    # Retrieves the latest MC version number from the specified MC_REPO
-    get_latest_mc_version "${USER_MC_REPO:-$MC_REPO}"
-  fi
-  
-  # Set MC version variables
-  MC_REPO="${USER_MC_REPO:-$MC_REPO}"
-  MC_VERSION="${USER_MC_VERSION:-$MC_VERSION}"
-  MC_MVERSION="${MC_VERSION%%.*}"
-  MC_PKG="mediacenter$MC_MVERSION"
-  MC_RPM="$OUTPUT_DIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
-  MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
-
-  if [[ -n $USER_MC_VERSION ]]; then
-    # Append explicit package version when user provides --mcversion
-    case $ID in
-      fedora|centos|suse)
-        MC_PKG+="-$MC_VERSION"
-        ;;
-      debian|ubuntu)
-        MC_PKG+="=$MC_VERSION"
-        ;;
-    esac
-  fi
-
-  debug "Using host platform: $ID $VERSION_ID"
-  debug "Using MC repository: $MC_REPO"
-
-  # Set distro-specific package manager commands for normalized IDs
   case $ID in
     fedora|centos)
       local rpm_mgr
@@ -391,6 +360,39 @@ init() {
       PKG_QUERY=(:)
       PKG_INSTALL_LOCAL() { install_mc_generic; }
   esac
+
+  # Don't check for latest MC version if set by user or using --install=repo only
+  if [[ -z $USER_MC_VERSION ]] \
+  && ((BUILD_SWITCH || LOCAL_INSTALL_SWITCH || CREATEREPO_SWITCH)); then
+    # Retrieves the latest MC version number from the specified MC_REPO
+    get_latest_mc_version "${USER_MC_REPO:-$MC_REPO}"
+  fi
+  
+  # Set MC version variables
+  MC_REPO="${USER_MC_REPO:-$MC_REPO}"
+  MC_VERSION="${USER_MC_VERSION:-$MC_VERSION}"
+  MC_MVERSION="${MC_VERSION%%.*}"
+  MC_PKG="mediacenter$MC_MVERSION"
+  MC_RPM="$OUTPUT_DIR/RPMS/x86_64/mediacenter$MC_MVERSION-$MC_VERSION.x86_64.rpm"
+  MC_ROOT="/usr/lib/jriver/Media Center $MC_MVERSION"
+
+  if [[ -n $USER_MC_VERSION ]]; then
+    # Append explicit package version when user provides --mcversion
+    case $ID in
+      fedora|centos|suse)
+        MC_PKG+="-$MC_VERSION"
+        ;;
+      debian|ubuntu)
+        MC_PKG+="=$MC_VERSION"
+        ;;
+    esac
+  fi
+
+  debug "Using host platform: $ID $VERSION_ID"
+  debug "Using MC repository: $MC_REPO"
+
+  # Set distro-specific package manager commands for normalized IDs
+
 }
 
 # @description Determines the latest JRiver MC version using several methods
@@ -493,8 +495,6 @@ install_package() {
   esac
 
   # Install packages if any need installation
-  echo "${PKG_INSTALL[*]} ${install_flags[*]} ${pkg_array[*]}"
-  declare -p
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
     if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
       ((silent)) || err "Failed to install ${pkg_array[*]}"
