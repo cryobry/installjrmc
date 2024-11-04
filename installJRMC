@@ -806,7 +806,7 @@ build_rpm() {
 
 		Provides: mediacenter$MC_MVERSION
 
-		License: Copyright 1998-2024, JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
+		License: Copyright 1998-$(date +%Y), JRiver, Inc.  All rights reserved.  Protected by U.S. patents #7076468 and #7062468
 		URL: http://www.jriver.com/
 
 		%define __provides_exclude_from ^%{_libdir}/jriver/.*/.*\\.so.*$
@@ -908,8 +908,8 @@ install_mc_suse() {
 # @description Installs Media Center generically for unsupported OSes
 install_mc_generic() {
   debug "Running: ${FUNCNAME[0]}"
-  local -a raw_files
   local extract_dir
+  local -a raw_files
 
   echo "Using generic installation method"
 
@@ -1052,7 +1052,7 @@ link_ssl_certs() {
 # @description Restore the mjr license file from MJR_FILE or other common locations
 restore_license() {
   debug "Running: ${FUNCNAME[0]}"
-  local f newest
+  local newest f
   local -a mjrfiles
 
   # Glob mjr files from common directories
@@ -1534,7 +1534,6 @@ update() {
 
   # Compare semantic version strings
   version_greater() {
-    # Returns true if version $1 is greater than version $2
     [[ "$(echo -e "$1\n$2" | sort -V | head -n 1)" != "$1" ]]
   }
 
@@ -1565,13 +1564,10 @@ update() {
     [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
 
     # Compare versions and update if necessary
-    if version_greater "$remote_version" "$SCRIPT_VERSION"; then
-      execute mv "$tmp" "$SCRIPT_PATH"
-      execute chmod +x "$SCRIPT_PATH"
-      execute rm -f "$tmp"
-    else
-      return 0
-    fi
+    version_greater "$remote_version" "$SCRIPT_VERSION" || return 0
+    execute mv "$tmp" "$SCRIPT_PATH"
+    execute chmod +x "$SCRIPT_PATH"
+    execute rm -f "$tmp"
   fi
 
   echo "installJRMC updated, restarting"
