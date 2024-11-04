@@ -399,13 +399,7 @@ get_latest_mc_version() {
   debug "Running: ${FUNCNAME[0]}" "$*"
   local cnt mc_version_source
 
-  if install_local --silent buildah; then
-    echo "YAY"
-  else
-    echo "NAY"
-  fi
-
-  if install_package --silent buildah \
+  if install_package buildah \
   && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
   && buildah run "$cnt" -- sh -c \
     "apk add apt" &>/dev/null \
