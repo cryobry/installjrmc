@@ -1,14 +1,16 @@
 # installJRMC
 
-This self-contained program will install [JRiver Media Center](https://www.jriver.com/) and associated services on most major Linux distros.
+This self-contained program will install [JRiver Media Center](https://www.jriver.com/) and associated services on most Linux distributions.
 
-You can always find the latest version of installJRMC, changelog, and documentation in [my repository](https://git.bryanroessler.com/bryan/installJRMC).
+You can find the latest version of installJRMC, changelog, and documentation in [my repository](https://git.bryanroessler.com/bryan/installJRMC).
 
 ## Executing
 
 `installJRMC [--option [ARGUMENT]]`
 
-Running `installJRMC` without any options implies `--install repo` and will install the latest version of JRiver Media Center (MC) from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If any other option is passed, then the default install method (i.e. `--install repo` or `--install local`) must be specified (to allow services and containers to be installed independent of MC).
+Running `installJRMC` without any options implies `--install repo` (on SUSE: `--install local`) and will install the latest version of Media Center from the official JRiver repository (Ubuntu/Debian) or my [unofficial repository](https://repos.bryanroessler.com/jriver/) (Fedora/CentOS) using the system package manager. If `--service` or `--container` is passed then the default install method (`--install repo` or `--install local`) must be specified (to allow services and containers to be installed independent of MC).
+
+Recent versions of installJRMC will automatically self-update to the latest installJRMC release.
 
 ## tl;dr
 
