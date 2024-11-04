@@ -15,7 +15,7 @@
 #   1. No createrepo on Mint
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.3.10"
+declare -g SCRIPT_VERSION="1.3.11-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -539,7 +539,7 @@ install_external_repos() {
       # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
       install_mesa_freeworld
       ;;
-    suse)
+    suse) # TODO may eventually be needed if X11_XOrg is not available by default
       # if ! zypper repos | grep -q "X11_XOrg"; then
       #   echo "Installing the X11 repository"
       #   execute sudo zypper  --non-interactive --quiet addrepo \
@@ -847,8 +847,7 @@ build_rpm() {
     echo "Build successful. The RPM file is located at: $MC_RPM"
   else
     err "Build failed"
-    # For automation, let's remove the source DEB and reaquire it on next 
-    # run after failure in case it is corrupted or buggy
+    # After failire, remove the source DEB and reaquire it on next run
     [[ -f $MC_DEB ]] && echo "Removing source DEB" && execute rm -f "$MC_DEB"
     exit 1
   fi
@@ -887,7 +886,6 @@ install_mc_deb() {
     --allow-downgrades \
     "$MC_DEB"
 }
-
 
 # @description Installs Media Center RPM package on RHEL distros
 install_mc_rhel() {
