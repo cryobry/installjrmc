@@ -399,6 +399,8 @@ get_latest_mc_version() {
   debug "Running: ${FUNCNAME[0]}" "$*"
   local cnt mc_version_source
 
+  install_package buildah; echo "Buildah install return code: $?"
+
   if install_package buildah \
   && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
   && buildah run "$cnt" -- sh -c \
