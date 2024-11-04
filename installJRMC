@@ -1550,34 +1550,64 @@ update() {
     # Get the current commit hash
     local before_pull_hash after_pull_hash
     before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
-    # Run a git stash in case there are local changes
+
+    # Stash any local changes
     execute git -C "$SCRIPT_DIR" stash --quiet
-    debug "git -C $SCRIPT_DIR pull"
-    if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
+
+    # Pull the latest changes
+    debug "Executing git pull in $SCRIPT_DIR"
+    if git -C "$SCRIPT_DIR" pull | grep -q "Already up to date"; then
+      debug "No updates found in git repository."
       return 0
     fi
+
+    # Get the new commit hash after pull
     after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
-    [[ "$before_pull_hash" == "$after_pull_hash" ]] && return 0
-  else # Download the latest version of the script
-    local tmp; tmp=$(mktemp)
 
-    # Acquire latest version
-    download "$SCRIPT_URL" "$tmp" || return 1
+    # If the commit hash has changed, an update occurred
+    if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
+      echo "Detected installJRMC update, restarting"
+      exec "$SCRIPT_PATH" "$@" "--no-update"
+    else
+      debug "Git pull did not change the commit hash. No update applied."
+      return 0
+    fi
+  else
+    debug "Not in a git repository or not the installJRMC repository. Checking for updates via download."
 
-    # Get latest version number
+    local tmp
+    tmp=$(mktemp) || { err "Failed to create temporary file."; return 1; }
+
+    # Acquire the latest version of the script
+    if ! download "$SCRIPT_URL" "$tmp"; then
+      err "Failed to download the latest script."
+      rm -f "$tmp"
+      return 1
+    fi
+
+    # Extract the latest version number
     local remote_version
     remote_version=$(extract_version "$tmp")
-    [[ -z $remote_version ]] && { rm -f "$tmp"; return 1; }
+    if [[ -z "$remote_version" ]]; then
+      err "Failed to extract version from the downloaded script."
+      execute rm -f "$tmp"
+      return 1
+    fi
 
-    # Compare versions and update if necessary
-    version_greater "$remote_version" "$SCRIPT_VERSION" || return 0
-    execute mv "$tmp" "$SCRIPT_PATH"
-    execute chmod +x "$SCRIPT_PATH"
-    execute rm -f "$tmp"
+    # Compare versions and update if the remote version is greater
+    if version_greater "$remote_version" "$SCRIPT_VERSION"; then
+      execute mv "$tmp" "$SCRIPT_PATH" || { err "Failed to replace the script"; execute rm -f "$tmp"; return 1; }
+      execute chmod +x "$SCRIPT_PATH" || { err "Failed to make the script executable"; return 1; }
+      execute rm -f "$tmp"
+
+      echo "Detected installJRMC update, restarting"
+      exec "$SCRIPT_PATH" "$@" "--no-update"
+    else
+      debug "Current installJRMC $SCRIPT_VERSION is the latest version"
+      execute rm -f "$tmp"
+      return 0
+    fi
   fi
-
-  echo "Detected installJRMC update, restarting"
-  exec "$SCRIPT_PATH" "$@" "--no-update"
 }
 
 # @description installJRMC main function
