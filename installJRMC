@@ -110,13 +110,11 @@ print_help() {
 # @arg $@ User input
 parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
-
   declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
     COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
     YES_SWITCH USER_MC_VERSION USER_MC_REPO MJR_FILE \
     BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY \
     BUILD_TARGET CREATEREPO_TARGET
-
   local long_opts short_opts input
   long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
   long_opts+="restorefile:,betapass:,"
@@ -203,7 +201,6 @@ parse_input() {
 # @see parse_input
 init() {
   debug "Running: ${FUNCNAME[0]}"
-
   declare -g USER
   declare -g SCRIPT_PATH; SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
   declare -g SCRIPT_DIR; SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
@@ -400,7 +397,6 @@ init() {
 # @arg $1 string MC repository name
 get_latest_mc_version() {
   debug "Running: ${FUNCNAME[0]}" "$*"
-  
   local cnt mc_version_source
 
   if install_package --silent buildah \
@@ -648,11 +644,8 @@ install_mc_repo() {
 # @description Acquires the source DEB package from JRiver
 acquire_deb() {
   debug "Running: ${FUNCNAME[0]}"
-
   local fname="MediaCenter-$MC_VERSION-$ARCH.deb"
   declare -g MC_DEB="$OUTPUT_DIR/SOURCES/$fname"
-
-  debug "MC_DEB=$MC_DEB"
 
   # If deb file already exists, skip download
   if [[ -f $MC_DEB ]]; then
@@ -904,10 +897,8 @@ install_mc_deb() {
 # @description Installs Media Center RPM package on RHEL distros
 install_mc_rhel() {
   debug "Running: ${FUNCNAME[0]}"
-
   # Swap in freeworld hardware acceleration separately from the RPM
   install_mesa_freeworld
-  
   install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
@@ -1000,7 +991,6 @@ install_mc_arch() {
 # @description Copy the RPM to createrepo-webroot and run createrepo as the createrepo-user
 run_createrepo() {
   debug "Running: ${FUNCNAME[0]}"
-
   local -a cr_cmd
 
   install_package createrepo_c
@@ -1044,7 +1034,6 @@ run_createrepo() {
 # @description Symlink certificates if they do not exist in default location
 link_ssl_certs() {
   debug "Running: ${FUNCNAME[0]}"
-
   local target_cert f
   local mc_cert_link="$MC_ROOT/ca-certificates.crt"
   local -a source_certs=(
@@ -1068,7 +1057,6 @@ link_ssl_certs() {
 # @description Restore the mjr license file from MJR_FILE or other common locations
 restore_license() {
   debug "Running: ${FUNCNAME[0]}"
-
   local f newest
   local -a mjrfiles
 
@@ -1109,7 +1097,6 @@ restore_license() {
 # @arg $2 array List of ports in firewall-cmd format
 open_firewall() {
   debug "Running: ${FUNCNAME[0]}" "$*"
-
   local port
   local service="$1"
   shift
@@ -1148,7 +1135,6 @@ open_firewall() {
 # @arg $1 string Service type (xvnc, x11vnc)
 set_vnc_pass() {
   debug "Running: ${FUNCNAME[0]}"
-
   local vncpassfile="$HOME/.vnc/jrmc_passwd"
 
   [[ -d ${vncpassfile%/*} ]] || execute mkdir -p "${vncpassfile%/*}"
@@ -1178,7 +1164,6 @@ set_vnc_pass() {
 # @description Set display and port variables
 set_display_vars() {
   debug "Running: ${FUNCNAME[0]}"
-
   declare -g THIS_DISPLAY THIS_DISPLAY_NUM NEXT_DISPLAY
 
   # Check USER_DISPLAY, else environment DISPLAY, else set to :0
@@ -1198,7 +1183,6 @@ set_display_vars() {
 # @arg $1 string Service name
 set_service_vars() {
   debug "Running: ${FUNCNAME[0]}" "$*"
-
   declare -g SERVICE_NAME SERVICE_FNAME TIMER_NAME TIMER_FNAME 
   declare -g USER_STRING GRAPHICAL_TARGET
   declare -ga RELOAD ENABLE DISABLE IS_ENABLED IS_ACTIVE
@@ -1291,14 +1275,13 @@ service_jriver-mediaserver() {
 # TODO https://github.com/TigerVNC/tigervnc/blob/master/unix/vncserver/HOWTO.md
 service_jriver-xvnc() {
   debug "Running: ${FUNCNAME[0]}"
+  local -a start_cmd
 
   set_service_vars "${FUNCNAME[0]##*_}" "system"
   set_display_vars
-  local -a start_cmd
   declare -g PORT=$(( NEXT_DISPLAY_NUM + 5900 ))
 
   install_package tigervnc-server
-
   set_vnc_pass xvnc
 
   start_cmd=(
@@ -1357,15 +1340,14 @@ service_jriver-xvnc() {
 # @description Starts and enables (at startup) x11vnc screen sharing for the local desktop
 service_jriver-x11vnc() {
   debug "Running: ${FUNCNAME[0]}"
+  local -a start_cmd
 
   set_service_vars "${FUNCNAME[0]##*_}" "user"
   set_display_vars
 
-  local -a start_cmd
   declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
 
   install_package x11vnc
-
   set_vnc_pass x11vnc
 
   # If .Xauthority file is missing, generate a dummy for x11vnc -auth guess
@@ -1461,8 +1443,7 @@ service_jriver-createrepo() {
 # @description Detects if MC is installed on btrfs and disables CoW
 disable_btrfs_cow() {
   debug "Running: ${FUNCNAME[0]}"
-
-  local dir
+  local dir 
   local mc_user_path="$HOME/.jriver"
 
   for dir in "$MC_ROOT" "$mc_user_path"; do
@@ -1478,7 +1459,6 @@ disable_btrfs_cow() {
 # @description Completely uninstalls MC, services, and firewall rules
 uninstall() {
   debug "Running: ${FUNCNAME[0]}"
-
   local service unit f i
 
   echo "Stopping and removing all Media Center services"
