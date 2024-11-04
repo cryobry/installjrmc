@@ -494,11 +494,11 @@ install_package() {
 
   # Install packages if any need installation
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
+    debug "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"
     if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
       ((silent)) || err "Failed to install ${pkg_array[*]}"
       return 1
     fi
-    echo "HERE!"
   fi
   return 0
 }
