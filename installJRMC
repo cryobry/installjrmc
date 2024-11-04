@@ -1581,7 +1581,7 @@ update() {
     # Acquire the latest version of the script
     if ! download "$SCRIPT_URL" "$tmp"; then
       err "Failed to download the latest script."
-      rm -f "$tmp"
+      execute rm -f "$tmp"
       return 1
     fi
 
