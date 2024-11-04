@@ -479,7 +479,7 @@ install_package() {
         || "${PKG_QUERY[@]}" "$_pkg" &>/dev/null; }; then
           pkg_array+=("$_pkg")
         else
-          debug "$_pkg already installed, skipping installation"
+          debug "$_pkg is already installed, skipping installation"
         fi
       done
     else
@@ -488,7 +488,7 @@ install_package() {
       || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
         pkg_array+=("$pkg")
       else
-        debug "$pkg already installed, skipping installation"
+        debug "$pkg is already installed, skipping installation"
       fi
     fi
   done
