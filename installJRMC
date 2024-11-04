@@ -399,8 +399,6 @@ get_latest_mc_version() {
   debug "Running: ${FUNCNAME[0]}" "$*"
   local cnt mc_version_source
 
-  install_package buildah; echo "Buildah install return code: $?"
-
   if install_package buildah \
   && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
   && buildah run "$cnt" -- sh -c \
@@ -494,6 +492,8 @@ install_package() {
       ((no_gpg_check)) && install_flags+=(--allow-unsigned-rpm) ;;
   esac
 
+  echo HERE
+
   # Install packages if any need installation
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
     if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
@@ -564,7 +564,7 @@ install_mesa_freeworld() {
           err "Package swap failed for $pkg!"
         fi
       else
-        execute "${PKG_INSTALL[@]}" "$freeworld_pkg"
+        "${PKG_INSTALL[@]}" "$freeworld_pkg"
       fi
     fi
   }
