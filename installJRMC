@@ -322,6 +322,7 @@ init() {
     esac
   fi
 
+  # Set distro-specific package manager commands for normalized IDs
   case $ID in
     fedora|centos)
       local rpm_mgr
@@ -388,11 +389,8 @@ init() {
     esac
   fi
 
-  debug "Using host platform: $ID $VERSION_ID"
-  debug "Using MC repository: $MC_REPO"
-
-  # Set distro-specific package manager commands for normalized IDs
-
+  debug "Host platform: $ID $VERSION_ID"
+  debug "MC repository: $MC_REPO"
 }
 
 # @description Determines the latest JRiver MC version using several methods
@@ -401,7 +399,8 @@ get_latest_mc_version() {
   debug "Running: ${FUNCNAME[0]}" "$*"
   local cnt mc_version_source
 
-  if install_package buildah \
+  # Use generalized containerized package manager to determine latest MC version
+  if install_package --silent buildah \
   && cnt=$(buildah from --quiet alpine:edge 2>/dev/null) \
   && buildah run "$cnt" -- sh -c \
     "apk add apt" &>/dev/null \
@@ -413,11 +412,11 @@ get_latest_mc_version() {
   && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
     mc_version_source="containerized package manager"
     execute buildah rm "$cnt"
-  # Webscrape
+  # Fallback to webscrape
   elif MC_VERSION=$(download "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
   && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
     mc_version_source="webscrape"
-  # Hardcoded
+  # Fallback to hardcoded value
   else
     mc_version_source="hardcoded"
     err "Warning! Using hardcoded version number"
