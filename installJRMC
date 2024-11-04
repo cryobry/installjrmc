@@ -1691,7 +1691,7 @@ execute() {
 download() {
   local url="$1"
   local output="${2:-}"
-  local download_cmd
+  local -a download_cmd
 
   if command -v wget &>/dev/null; then
     download_cmd=(wget --quiet)
