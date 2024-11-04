@@ -13,6 +13,8 @@
 #
 # BUGS
 #   1. No createrepo on Mint
+#
+# Be careful with tabs in heredocs
 shopt -s extglob
 
 declare -g SCRIPT_VERSION="1.3.11-dev"
@@ -193,6 +195,11 @@ parse_input() {
   else
     err "Incorrect options provided"; print_help; exit 1
   fi
+
+  # Print some warnings for unsupported argument combinations
+  if [[ -n $USER_MC_REPO ]] && ((LOCAL_INSTALL_SWITCH)); then
+    err "--install=local is not compatible with --mcrepo as only the default ($MC_REPO) DEB is available"
+  fi
 }
 
 # @description Perform OS detection and generate OS-specific functions
@@ -259,7 +266,7 @@ init() {
     *suse*)
       ID="suse"
       # Currently there is no remote repository for SUSE
-      # installJRMC can easily build one but I'd rather a SUSEian provide it
+      # installJRMC can easily create one but I'd rather a SUSEian provide it
       # So use local rpmbuild method by default for SUSE
       if [[ $# -le 2 ]]; then
         case "$1" in
@@ -480,16 +487,14 @@ install_package() {
   # Generate installation flags based on the distribution
   case $ID in
     debian|ubuntu)
-      ((allow_downgrades)) && install_flags+=(--allow-downgrades)
-      ;;
+      ((allow_downgrades)) && install_flags+=(--allow-downgrades) ;;
     fedora|centos)
       ((allow_downgrades)) && install_flags+=(--allowerasing)
       ((no_gpg_check)) && install_flags+=(--nogpgcheck)
       ((refresh)) && install_flags+=(--refresh)
       ;;
     suse)
-      ((no_gpg_check)) && install_flags+=(--allow-unsigned-rpm)
-      ;;
+      ((no_gpg_check)) && install_flags+=(--allow-unsigned-rpm) ;;
   esac
 
   # Install packages if any need installation
@@ -884,6 +889,7 @@ install_mc_deb() {
     --allow-downgrades \
     "$MC_DEB"; then
     err "Local MC DEB installation failed"
+    err "Only the default MC repo can be used for --install=local"
     if ask_ok "Remove source DEB and retry"; then
       execute rm -f "$MC_DEB"
       exec "$SCRIPT_PATH" "$@" "--no-update"
