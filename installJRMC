@@ -1159,7 +1159,7 @@ set_vnc_pass() {
     elif [[ $1 == "x11vnc" ]]; then
       execute x11vnc -storepasswd "$VNCPASS" "$vncpassfile"
     fi
-    return $?
+    return
   else
     declare -g NOVNCAUTH=1
   fi
