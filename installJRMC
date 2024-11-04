@@ -480,22 +480,22 @@ install_package() {
   # Generate installation flags based on the distribution
   case $ID in
     debian|ubuntu)
-      (( allow_downgrades )) && install_flags+=(--allow-downgrades)
+      ((allow_downgrades)) && install_flags+=(--allow-downgrades)
       ;;
     fedora|centos)
-      (( allow_downgrades )) && install_flags+=(--allowerasing)
-      (( no_gpg_check )) && install_flags+=(--nogpgcheck)
-      (( refresh )) && install_flags+=(--refresh)
+      ((allow_downgrades)) && install_flags+=(--allowerasing)
+      ((no_gpg_check)) && install_flags+=(--nogpgcheck)
+      ((refresh)) && install_flags+=(--refresh)
       ;;
     suse)
-      (( no_gpg_check )) && install_flags+=(--allow-unsigned-rpm)
+      ((no_gpg_check)) && install_flags+=(--allow-unsigned-rpm)
       ;;
   esac
 
   # Install packages if any need installation
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
     if ! "${PKG_INSTALL[@]}" "${install_flags[@]}" "${pkg_array[@]}"; then     
-      (( silent )) || err "Failed to install ${pkg_array[*]}."
+      ((silent)) || err "Failed to install ${pkg_array[*]}"
       return 1
     fi
   fi
@@ -887,6 +887,8 @@ install_mc_deb() {
     if ask_ok "Remove source DEB and retry"; then
       execute rm -f "$MC_DEB"
       exec "$SCRIPT_PATH" "$@" "--no-update"
+    else
+      return 1
     fi
   fi
 }
