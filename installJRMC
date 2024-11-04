@@ -207,7 +207,7 @@ init() {
   declare -g CREATEREPO_USER="$USER" # can be root
   declare -g ID VERSION_ID ARCH NAME
   declare -g MC_MVERSION MC_PKG MC_RPM MC_ROOT 
-  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY DOWNLOAD_CMD
+  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
   declare -ga SERVICES CONTAINERS
 
   # Try to save users from themselves
@@ -366,7 +366,7 @@ init() {
       PKG_REMOVE=(execute sudo apt-get remove --auto-remove -y -q0)
       PKG_UPDATE=(execute sudo apt-get update -y -q0)
       PKG_QUERY=(dpkg -s)
-      PKG_INSTALL_LOCAL() { install_mc_deb; }
+      PKG_INSTALL_LOCAL() { install_mc_deb "$@"; }
       ;;
     suse)
       PKG_INSTALL=(execute sudo zypper --gpg-auto-import-keys --non-interactive --quiet install --force --no-confirm)
@@ -856,7 +856,7 @@ install_mc_deb() {
   debug "Running: ${FUNCNAME[0]}"  
 
   if (( COMPAT_SWITCH )); then
-    declare extract_dir && extract_dir="$(mktemp -d)"
+    local extract_dir; extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
     command -v ar &>/dev/null || { install_package binutils || return 1; }
     execute ar x "$MC_DEB"
@@ -878,11 +878,17 @@ install_mc_deb() {
     execute rm -rf "$extract_dir"
   fi
 
-  install_package \
+  if ! install_package \
     --no-install-check \
     --no-gpg-check \
     --allow-downgrades \
-    "$MC_DEB"
+    "$MC_DEB"; then
+    err "Local MC DEB installation failed"
+    if ask_ok "Remove source DEB and retry"; then
+      execute rm -f "$MC_DEB"
+      exec "$SCRIPT_PATH" "$@" "--no-update"
+    fi
+  fi
 }
 
 # @description Installs Media Center RPM package on RHEL distros
@@ -1620,7 +1626,7 @@ main() {
   fi
 
   if (( LOCAL_INSTALL_SWITCH )); then
-    if PKG_INSTALL_LOCAL; then
+    if PKG_INSTALL_LOCAL "$@"; then
       echo "JRiver Media Center installed successfully from local package"
     else
       err "JRiver Media Center local package installation failed"
