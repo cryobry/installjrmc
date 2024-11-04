@@ -861,18 +861,17 @@ install_mc_deb() {
   if (( COMPAT_SWITCH )); then
     declare extract_dir && extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
-    command -v ar &>/dev/null || install_package binutils
+    command -v ar &>/dev/null || { install_package binutils || return 1; }
     execute ar x "$MC_DEB"
     execute tar xJf "control.tar.xz"
     # Remove minimum version specifiers from control file
     sed -i 's/ ([^)]*)//g' "control"
-
     # Remove libwebkit2gtk and their fantastic package versioning strategy
     sed -i 's/,\s*libwebkit2gtk[^,]*,\?|libwebkit2gtk[^,]*,\?//g' "control"
 
-    # TODO ugly ZorinOS workaround
+    # TODO workaround for ZorinOS
     [[ $ID == "ubuntu" && ${VERSION_ID%.*} -le 16 ]] \
-    && ! grep -q zorin /etc/os-release \
+    && grep -q zorin /etc/os-release \
     && sed -i 's/libva2/libva1/g' "control"
 
     execute tar -cJf "control.tar.xz" "control" "postinst"
