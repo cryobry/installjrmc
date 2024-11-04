@@ -663,7 +663,7 @@ acquire_deb() {
   # Loop through the repositories and attempt to download
   for repo in "${repos[@]}"; do
     echo "Checking $repo for DEB package"
-    if execute download "$MC_DEB" "$repo"; then
+    if execute download "$repo" "$MC_DEB"; then
       echo "Found"
       break
     fi
@@ -1474,7 +1474,7 @@ uninstall() {
     unset f
   done
 
-  echo "Removing repo files"
+  echo "Removing MC repositories"
   execute sudo rm -rf \
     "/etc/yum.repos.d/jriver.repo" \
     /etc/apt/sources.list.d/{jriver,mediacenter}*.{list,sources} # also remove legacy repo files
@@ -1557,7 +1557,7 @@ update() {
     local tmp; tmp=$(mktemp)
 
     # Acquire latest version
-    download "$tmp" "$script_url" || return 1
+    download "$script_url" "$tmp" || return 1
 
     # Get latest version number
     local remote_version
