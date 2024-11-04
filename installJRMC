@@ -20,6 +20,7 @@ declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -ig UPDATE_SWITCH=1 # set to 0 to disable automatic self-update
+declare -g SCRIPT_URL="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
 
 # @description Print help text
 print_help() {
@@ -1553,11 +1554,10 @@ update() {
     after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
     [[ "$before_pull_hash" == "$after_pull_hash" ]] && return 0
   else # Download the latest version of the script
-    local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
     local tmp; tmp=$(mktemp)
 
     # Acquire latest version
-    download "$script_url" "$tmp" || return 1
+    download "$SCRIPT_URL" "$tmp" || return 1
 
     # Get latest version number
     local remote_version
@@ -1713,12 +1713,12 @@ download() {
   fi
 
   if [[ ${download_cmd[0]} == "wget" ]]; then
-    "${download_cmd[@]}" --output-document="${output:--}" "$url"
+    "${download_cmd[@]}" --output-document="${output:--}" "$url" || return 1
   elif [[ ${download_cmd[0]} == "curl" ]]; then
     if [[ -n "$output" ]]; then
-      "${download_cmd[@]}" --output "$output" "$url"
+      "${download_cmd[@]}" --output "$output" "$url" || return 1
     else
-      "${download_cmd[@]}" "$url"
+      "${download_cmd[@]}" "$url" || return 1
     fi
   else
     err "Unsupported download command: ${download_cmd[*]}"
