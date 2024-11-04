@@ -269,16 +269,11 @@ init() {
       # Currently there is no remote repository for SUSE
       # installJRMC can easily create one but I'd rather a SUSEian provide it
       # So use local rpmbuild method by default for SUSE
-      if [[ $# -le 2 ]]; then
-        case "$1" in
-          --debug| -d| --verbose| -y| --yes| --auto| --mcrepo| --mcversion| \
-          --arch| --betapass| --restorefile| --outputdir| --no-update)
-            debug "Automatically using --install local for SUSE"
-            REPO_INSTALL_SWITCH=0
-            BUILD_SWITCH=1
-            LOCAL_INSTALL_SWITCH=1
-            ;;
-        esac
+      if ((REPO_INSTALL_SWITCH)); then
+        debug "Automatically using --install=local for SUSE"
+        REPO_INSTALL_SWITCH=0
+        BUILD_SWITCH=1
+        LOCAL_INSTALL_SWITCH=1
       fi
       ;;
     *)
@@ -295,7 +290,7 @@ init() {
       else
         err "OS detection failed!"
         ask_ok "Continue with manual installation?" || exit 1
-        debug "Automatically using --install local for unknown distro"
+        debug "Automatically using --install=local for unknown distro"
         ID="unknown"
         REPO_INSTALL_SWITCH=0
         BUILD_SWITCH=1
@@ -475,7 +470,7 @@ install_package() {
       debug "Aliasing $pkg to ${pkg_aliases[$pkg]}"
       pkg=${pkg_aliases[$pkg]}
     fi
-    if (( no_install_check )) \
+    if ((no_install_check)) \
     || ! { command -v "$pkg" &>/dev/null \
     || "${PKG_QUERY[@]}" "$pkg" &>/dev/null; }; then
       pkg_array+=("$pkg")
@@ -777,7 +772,7 @@ build_rpm() {
   requires="${requires%?}" 
   recommends="${recommends%?}"
 
-  if (( COMPAT_SWITCH )); then
+  if ((COMPAT_SWITCH)); then
     # Strip minimum versions
     requires=$(echo "$requires" | awk -F" " 'NF == 4 {print $1 " " $2} NF != 4 {print $0}')
   fi
@@ -860,7 +855,7 @@ build_rpm() {
 install_mc_deb() {
   debug "Running: ${FUNCNAME[0]}"  
 
-  if (( COMPAT_SWITCH )); then
+  if ((COMPAT_SWITCH)); then
     local extract_dir; extract_dir="$(mktemp -d)"
     pushd "$extract_dir" &>/dev/null || return
     command -v ar &>/dev/null || { install_package binutils || return 1; }
@@ -1175,10 +1170,10 @@ set_display_vars() {
   THIS_DISPLAY_NUM="${THIS_DISPLAY#*:}" # strip prefix
   THIS_DISPLAY_NUM="${THIS_DISPLAY_NUM%%.*}" # strip suffix
   # Increment each time we run this
-  if (( NEXT_DISPLAY_NUM )); then
-    declare -g NEXT_DISPLAY_NUM=$(( NEXT_DISPLAY_NUM + 1 ))
+  if ((NEXT_DISPLAY_NUM)); then
+    declare -g NEXT_DISPLAY_NUM=$((NEXT_DISPLAY_NUM + 1))
   else
-    declare -g NEXT_DISPLAY_NUM=$(( THIS_DISPLAY_NUM + 1 ))
+    declare -g NEXT_DISPLAY_NUM=$((THIS_DISPLAY_NUM + 1))
   fi
   NEXT_DISPLAY=":$NEXT_DISPLAY_NUM"
 }
@@ -1281,7 +1276,7 @@ service_jriver-xvnc() {
 
   set_service_vars "${FUNCNAME[0]##*_}" "system"
   set_display_vars
-  declare -g PORT=$(( NEXT_DISPLAY_NUM + 5900 ))
+  declare -g PORT=$((NEXT_DISPLAY_NUM + 5900))
 
   install_package tigervnc-server
   set_vnc_pass xvnc
@@ -1294,7 +1289,7 @@ service_jriver-xvnc() {
     -xstartup "/usr/bin/mediacenter$MC_MVERSION"
   )
 
-  if (( NOVNCAUTH )); then
+  if ((NOVNCAUTH)); then
     start_cmd+=(
       -name "jriver$NEXT_DISPLAY" 
       -SecurityTypes None)
@@ -1325,7 +1320,7 @@ service_jriver-xvnc() {
   if ! "${ENABLE[@]}" "$SERVICE_NAME"; then
     err "vncserver failed to start on DISPLAY $NEXT_DISPLAY"
     # Allow to increment 10 times before breaking
-    max=$(( THIS_DISPLAY_NUM + 10 ))
+    max=$((THIS_DISPLAY_NUM + 10))
     while [[ $NEXT_DISPLAY_NUM -lt $max ]]; do
       echo "Incrementing DISPLAY and retrying"
       service_jriver-xvnc && return
@@ -1345,7 +1340,7 @@ service_jriver-x11vnc() {
   local -a start_cmd
   set_service_vars "${FUNCNAME[0]##*_}" "user"
   set_display_vars
-  declare -g PORT=$(( THIS_DISPLAY_NUM + 5900 ))
+  declare -g PORT=$((THIS_DISPLAY_NUM + 5900))
   install_package x11vnc
   set_vnc_pass x11vnc
 
@@ -1369,7 +1364,7 @@ service_jriver-x11vnc() {
     -bg
   )
 
-  if (( NOVNCAUTH )); then
+  if ((NOVNCAUTH)); then
     start_cmd+=(-nopw)
   else
     start_cmd+=(-rfbauth "$HOME/.vnc/jrmc_passwd")
@@ -1588,7 +1583,7 @@ main() {
   debug "Running: ${FUNCNAME[0]} $*"
 
   echo "Starting installJRMC $SCRIPT_VERSION"
-  if (( DEBUG )); then
+  if ((DEBUG)); then
     echo "Debugging on"
   else
     echo "To enable debugging output, use --debug or -d"
@@ -1597,7 +1592,7 @@ main() {
   # Parse input, set default/host variables, and MC version
   init "$@"
 
-  if (( UNINSTALL_SWITCH )); then
+  if ((UNINSTALL_SWITCH)); then
     if ask_ok "Do you really want to uninstall JRiver Media Center?"; then
       uninstall
     else
@@ -1608,7 +1603,7 @@ main() {
 
   install_external_repos
 
-  if (( REPO_INSTALL_SWITCH )); then
+  if ((REPO_INSTALL_SWITCH)); then
     echo "Installing JRiver Media Center from remote repository"
     if install_mc_repo; then
       echo "JRiver Media Center installed successfully from remote repository"
@@ -1622,7 +1617,7 @@ main() {
     fi
   fi
 
-  if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
+  if ((BUILD_SWITCH)) && [[ $ID != "arch" ]]; then
     [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
     acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
 
@@ -1633,7 +1628,7 @@ main() {
     fi
   fi
 
-  if (( LOCAL_INSTALL_SWITCH )); then
+  if ((LOCAL_INSTALL_SWITCH)); then
     if PKG_INSTALL_LOCAL "$@"; then
       echo "JRiver Media Center installed successfully from local package"
     else
@@ -1646,7 +1641,7 @@ main() {
     disable_btrfs_cow
   fi
 
-  if (( CREATEREPO_SWITCH )); then
+  if ((CREATEREPO_SWITCH)); then
     if run_createrepo; then
       echo "Successfully updated repo"
     else
@@ -1682,11 +1677,11 @@ main() {
 }
 
 # @section Helper functions
-debug() { (( DEBUG )) && echo "Debug: $*"; }
+debug() { ((DEBUG)) && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 ask_ok() {
   declare response
-  (( YES_SWITCH )) && return 0
+  ((YES_SWITCH)) && return 0
   read -r -p "$* [y/N]: " response
   [[ ${response,,} =~ ^(yes|y)$ ]]
 }
