@@ -1552,6 +1552,7 @@ update() {
     before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
     # Run a git stash in case there are local changes
     execute git -C "$SCRIPT_DIR" stash --quiet
+    debug "git -C $SCRIPT_DIR pull"
     if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
       return 0
     fi
@@ -1575,7 +1576,7 @@ update() {
     execute rm -f "$tmp"
   fi
 
-  echo "installJRMC updated, restarting"
+  echo "Detected installJRMC update, restarting"
   exec "$SCRIPT_PATH" "$@" "--no-update"
 }
 
