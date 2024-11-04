@@ -1551,7 +1551,7 @@ update() {
   debug "Running: ${FUNCNAME[0]} $*"
   debug "Checking for installJRMC update"
 
-  # Function to extract and normalize version from a script
+  # Extract and normalize version from a script
   extract_version() {
     local version_line
     version_line=$(grep -m 1 'SCRIPT_VERSION=' "$1")
@@ -1562,7 +1562,7 @@ update() {
     echo "$version_line"
   }
 
-  # Helper function for version comparison
+  # Compare semantic version strings
   version_greater() {
     # Returns true if version $1 is greater than version $2
     [[ "$(echo -e "$1\n$2" | sort -V | head -n 1)" != "$1" ]]
@@ -1576,6 +1576,8 @@ update() {
     # Get the current commit hash
     local before_pull_hash after_pull_hash
     before_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
+    # Run a git stash in case there are local changes
+    execute git stash --quiet
     if git -C "$SCRIPT_DIR" pull | grep -qv "Already up to date"; then
       return 0
     fi
