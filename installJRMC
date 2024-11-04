@@ -664,7 +664,7 @@ acquire_deb() {
   # Loop through the repositories and attempt to download
   for repo in "${repos[@]}"; do
     echo "Checking $repo for DEB package"
-    if execute download "$repo" "$MC_DEB"; then
+    if download "$repo" "$MC_DEB"; then
       echo "Found"
       break
     fi
@@ -1713,12 +1713,12 @@ download() {
   fi
 
   if [[ ${download_cmd[0]} == "wget" ]]; then
-    "${download_cmd[@]}" --output-document="${output:--}" "$url" || return 1
+    "${download_cmd[@]}" --output-document="${output:--}" "$url"
   elif [[ ${download_cmd[0]} == "curl" ]]; then
     if [[ -n "$output" ]]; then
-      "${download_cmd[@]}" --output "$output" "$url" || return 1
+      "${download_cmd[@]}" --output "$output" "$url"
     else
-      "${download_cmd[@]}" "$url" || return 1
+      "${download_cmd[@]}" "$url"
     fi
   else
     err "Unsupported download command: ${download_cmd[*]}"
