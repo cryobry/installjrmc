@@ -8,13 +8,14 @@
 # https://www.apache.org/licenses/LICENSE-2.0
 #
 # TODO (v2)
-#   1. Interactive mode
-#   2. Additional containerization (createrepo and rpmbuild)
+# * Interactive mode
+# * Additional containerization (createrepo and rpmbuild)
 #
 # BUGS
-#   1. No createrepo on Mint
+# * No createrepo on Mint
 #
-# Be careful with tabs in heredocs
+# NOTES
+# * Be careful with tabs in heredocs
 shopt -s extglob
 
 declare -g SCRIPT_VERSION="1.3.11-dev"
@@ -317,8 +318,7 @@ init() {
 
   # Use the correct repo for legacy MC versions
   if [[ -n $USER_MC_VERSION ]]; then
-    # Get MVERSION from user input
-    case ${USER_MC_VERSION%%.*} in
+    case ${USER_MC_VERSION%%.*} in # get MVERSION from user input
       2[0-6]) USER_MC_REPO="jessie" ;;
       2[7-9]|30) USER_MC_REPO="buster" ;;
       31) USER_MC_REPO="bullseye" ;;
