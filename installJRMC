@@ -208,7 +208,7 @@ init() {
   declare -g CREATEREPO_USER="$USER" # can be root
   declare -g ID VERSION_ID ARCH NAME
   declare -g MC_MVERSION MC_PKG MC_RPM MC_ROOT 
-  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
+  declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY DOWNLOAD_CMD
   declare -ga SERVICES CONTAINERS
 
   # Try to save users from themselves
@@ -411,8 +411,7 @@ get_latest_mc_version() {
     mc_version_source="containerized package manager"
     execute buildah rm "$cnt"
   # Webscrape
-  elif install_package --silent wget \
-  && MC_VERSION=$(wget -qO- "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
+  elif MC_VERSION=$(download "$BOARD_URL" | grep -o "[0-9][0-9]\.[0-9]\.[0-9]\+" | head -n 1) \
   && [[ $MC_VERSION =~ ([0-9]+.[0-9]+.[0-9]+) ]]; then
     mc_version_source="webscrape"
   # Hardcoded
@@ -608,9 +607,8 @@ install_mc_repo() {
         repo_file="/etc/apt/sources.list.d/jriver.list"
         repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main"
       fi
-      install_package wget 
       echo "Installing JRiver Media Center RPM key"
-      wget --quiet --output-document=- http://dist.jriver.com/mediacenter@jriver.com.gpg.key | 
+      download "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
         gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       ;;
     *)
@@ -665,7 +663,7 @@ acquire_deb() {
   # Loop through the repositories and attempt to download
   for repo in "${repos[@]}"; do
     echo "Checking $repo for DEB package"
-    if execute wget --quiet --output-document "$MC_DEB" "$repo"; then
+    if execute download "$MC_DEB" "$repo"; then
       echo "Found"
       break
     fi
@@ -1542,7 +1540,7 @@ update() {
   # Check if we're in a git directory and if it's the installJRMC repository
   if git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree &>/dev/null \
   && [[ "$(git -C "$SCRIPT_DIR" config --get remote.origin.url)" == *"installJRMC"* ]]; then
-    debug "installJRMC git repository detected. Running git pull..."
+    debug "installJRMC git repository detected. Running git pull"
 
     # Get the current commit hash
     local before_pull_hash after_pull_hash
@@ -1553,23 +1551,13 @@ update() {
       return 0
     fi
     after_pull_hash=$(git -C "$SCRIPT_DIR" rev-parse HEAD)
-    if [[ "$before_pull_hash" != "$after_pull_hash" ]]; then
-      echo "installJRMC repository updated. Restarting script..."
-      exec "$SCRIPT_PATH" "$@" "--no-update"
-    fi
+    [[ "$before_pull_hash" == "$after_pull_hash" ]] && return 0
   else # Download the latest version of the script
     local script_url="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
     local tmp; tmp=$(mktemp)
 
     # Acquire latest version
-    install_package --silent wget
-    if command -v wget &>/dev/null; then
-      execute wget -q -O "$tmp" "$script_url"
-    elif command -v curl &>/dev/null; then
-      execute curl -s -L -o "$tmp" "$script_url"
-    else
-      return 1
-    fi
+    download "$tmp" "$script_url" || return 1
 
     # Get latest version number
     local remote_version
@@ -1578,13 +1566,16 @@ update() {
 
     # Compare versions and update if necessary
     if version_greater "$remote_version" "$SCRIPT_VERSION"; then
-      echo "Updating installJRMC $SCRIPT_VERSION to $remote_version"
       execute mv "$tmp" "$SCRIPT_PATH"
       execute chmod +x "$SCRIPT_PATH"
-      rm -f "$tmp"
-      exec "$SCRIPT_PATH" "$@" "--no-update"
+      execute rm -f "$tmp"
+    else
+      return 0
     fi
   fi
+
+  echo "installJRMC updated, restarting"
+  exec "$SCRIPT_PATH" "$@" "--no-update"
 }
 
 # @description installJRMC main function
@@ -1627,7 +1618,6 @@ main() {
   fi
 
   if (( BUILD_SWITCH )) && [[ $ID != "arch" ]]; then
-    install_package "wget"
     [[ -d $OUTPUT_DIR/SOURCES ]] || execute mkdir -p "$OUTPUT_DIR/SOURCES"
     acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
 
@@ -1700,6 +1690,39 @@ execute() {
     "$@"
   else
     "$@" &>/dev/null
+  fi
+}
+download() {
+  local url="$1"
+  local output="${2:-}"
+  local download_cmd
+
+  if command -v wget &>/dev/null; then
+    download_cmd=(wget --quiet)
+  elif command -v curl &>/dev/null; then
+    download_cmd=(curl --silent --location)
+  else
+    if install_package --quiet wget; then
+      download_cmd=(wget --quiet)
+    elif install_package --quiet curl; then
+      download_cmd=(curl --silent --location)
+    else
+      err "Unable to install wget or curl"
+      return 1
+    fi
+  fi
+
+  if [[ ${download_cmd[0]} == "wget" ]]; then
+    "${download_cmd[@]}" --output-document="${output:--}" "$url"
+  elif [[ ${download_cmd[0]} == "curl" ]]; then
+    if [[ -n "$output" ]]; then
+      "${download_cmd[@]}" --output "$output" "$url"
+    else
+      "${download_cmd[@]}" "$url"
+    fi
+  else
+    err "Unsupported download command: ${download_cmd[*]}"
+    return 1
   fi
 }
 
