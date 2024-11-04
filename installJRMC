@@ -1509,7 +1509,7 @@ uninstall() {
     echo "JRiver Media Center has been completely uninstalled"
     echo "To remove your MC library: rm -rf $HOME/.jriver"
   elif [[ $? -eq 100 ]]; then
-    err "JRiver Media Center package '$MC_PKG' is not present and was not uninstalled"
+    err "JRiver Media Center package '${MC_PKG%%=*}' is not present and was not uninstalled"
   else
     err "Could not remove Media Center package"
   fi
