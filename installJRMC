@@ -1613,7 +1613,7 @@ main() {
     acquire_deb || { err "Could not download Media Center DEB package"; return 1; }
 
     if [[ $BUILD_TARGET =~ (centos|fedora|suse) || $CREATEREPO_TARGET =~ (centos|fedora|suse) ]]; then
-      install_package "dpkg" "rpm-build"
+      install_package dpkg rpm-build
       [[ -d $OUTPUT_DIR/SPECS ]] || execute mkdir -p "$OUTPUT_DIR/SPECS"
       build_rpm
     fi
@@ -1693,9 +1693,9 @@ download() {
   elif command -v curl &>/dev/null; then
     download_cmd=(curl --silent --location)
   else
-    if install_package --quiet wget; then
+    if install_package --silent wget; then
       download_cmd=(wget --quiet)
-    elif install_package --quiet curl; then
+    elif install_package --silent curl; then
       download_cmd=(curl --silent --location)
     else
       err "Unable to install wget or curl"
