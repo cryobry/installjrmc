@@ -492,7 +492,7 @@ install_package() {
       ((no_gpg_check)) && install_flags+=(--allow-unsigned-rpm) ;;
   esac
 
-  echo HERE
+  echo "Pacakge array: ${pkg_array[*]}"
 
   # Install packages if any need installation
   if [[ ${#pkg_array[@]} -gt 0 ]]; then
