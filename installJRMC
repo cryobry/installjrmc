@@ -604,8 +604,7 @@ install_mc_repo() {
       && [[ $major_version -gt 24 || ($major_version -eq 24 && $minor_version -ge 10) ]]; then
         repo_file="/etc/apt/sources.list.d/jriver.sources" # TODO new Ubuntu sources file format
         local old_repo_file="/etc/apt/sources.list.d/jriver.list"
-        debug HERE1
-        [[ -f $old_repo_file ]] && debug HRE2 && execute rm -f "$old_repo_file"
+        [[ -f $old_repo_file ]] && execute sudo rm -f "$old_repo_file"
         read -r -d '' repo_text <<-EOF
 					Types: deb
 					URIs: http://dist.jriver.com/latest/mediacenter/
