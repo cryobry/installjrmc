@@ -18,7 +18,7 @@
 # * Be careful with tabs in heredocs
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.4.1"
+declare -g SCRIPT_VERSION="1.4.2-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -604,7 +604,8 @@ install_mc_repo() {
       && [[ $major_version -gt 24 || ($major_version -eq 24 && $minor_version -ge 10) ]]; then
         repo_file="/etc/apt/sources.list.d/jriver.sources" # TODO new Ubuntu sources file format
         local old_repo_file="/etc/apt/sources.list.d/jriver.list"
-        [[ -f $old_repo_file ]] && execute rm -f "$old_repo_file"
+        debug HERE1
+        [[ -f $old_repo_file ]] && debug HRE2 && execute rm -f "$old_repo_file"
         read -r -d '' repo_text <<-EOF
 					Types: deb
 					URIs: http://dist.jriver.com/latest/mediacenter/
