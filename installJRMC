@@ -18,7 +18,7 @@
 # * Be careful with tabs in heredocs
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.4.3"
+declare -g SCRIPT_VERSION="1.4.4-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -304,11 +304,7 @@ init() {
 
   # Match the MC repo to the system codename
   if [[ -z $USER_MC_REPO && ($ID == debian || $ID == ubuntu) ]]; then
-    if [[ $UBUNTU_CODENAME == "oracular" ]]; then
-      MC_REPO="noble" # TODO temporarily use noble repo for Ubuntu 24.10
-    else  
-      MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
-    fi
+    MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
   fi
 
   # Use the correct repo for legacy MC versions
