@@ -625,7 +625,7 @@ install_mc_repo() {
         done
         read -r -d '' repo_text <<-EOF
 					Types: deb
-					URIs: http://dist.jriver.com/$repo/mediacenter/
+					URIs: http://dist.jriver.com/$channel/mediacenter/
 					Signed-By: $keyfile
 					Suites: $MC_REPO
 					Components: main
@@ -636,8 +636,8 @@ install_mc_repo() {
           repo_file="/etc/apt/sources.list.d/jriver-beta.list"
         else
           repo_file="/etc/apt/sources.list.d/jriver.list"
-          repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/$repo/mediacenter/ $MC_REPO main"
         fi
+        repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/$channel/mediacenter/ $MC_REPO main"
         echo "Installing JRiver Media Center RPM key"
         download "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
           gpg --dearmor | sudo tee "$keyfile" &>/dev/null
@@ -651,7 +651,8 @@ install_mc_repo() {
   esac
 
   echo "Adding MC repository file: $repo_file"
-  echo "$repo_text" | sudo tee "$repo_file" &>/dev/null
+  debug "repo_text: $repo_text"
+  sudo tee "$repo_file" &>/dev/null <<< "$repo_text"
 
   if ! "${PKG_UPDATE[@]}"; then
     err "Package update failed!"
