@@ -309,7 +309,11 @@ init() {
 
   # Match the MC repo to the system codename
   if [[ -z $USER_MC_REPO && ($ID == debian || $ID == ubuntu) ]]; then
-    MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
+    if [[ $UBUNTU_CODENAME == "oracular" ]]; then
+      MC_REPO="noble" # TODO temporarily use noble repo for Ubuntu 24.10
+    else  
+      MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
+    fi
   fi
 
   # Use the correct repo for legacy MC versions
