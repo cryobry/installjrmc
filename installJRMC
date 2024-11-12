@@ -203,8 +203,13 @@ parse_input() {
     err "--install=local is not compatible with --mcrepo as only the default ($MC_REPO) DEB is available"
   fi
 
+  if [[ -n $BETA_PASS ]] && ((REPO_INSTALL_SWITCH)); then
+    echo "Warning: not all repositories have beta channels"
+    echo "If the MC package is unavailable, try using --mcrepo to select another repository"
+  fi
+
   if [[ -n $CONTAINER_INSTALL_SWITCH ]] && ((LOCAL_INSTALL_SWITCH || REPO_INSTALL_SWITCH)); then
-    err "Multiple --install methods are not compatible"
+    err "Some --install methods are incompatible"
   fi
 }
 
@@ -309,11 +314,7 @@ init() {
 
   # Match the MC repo to the system codename
   if [[ -z $USER_MC_REPO && ($ID == debian || $ID == ubuntu) ]]; then
-    if [[ $UBUNTU_CODENAME == "oracular" ]]; then
-      MC_REPO="noble" # TODO temporarily use noble repo for Ubuntu 24.10
-    else  
-      MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
-    fi
+    MC_REPO=${UBUNTU_CODENAME:-${VERSION_CODENAME:-$MC_REPO}}
   fi
 
   # Use the correct repo for legacy MC versions
