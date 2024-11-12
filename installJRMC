@@ -18,7 +18,7 @@
 # * Be careful with tabs in heredocs
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.4.4"
+declare -g SCRIPT_VERSION="1.4.5-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -114,10 +114,9 @@ print_help() {
 parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
   declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
-    COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
+    CONTAINER_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
     YES_SWITCH USER_MC_VERSION USER_MC_REPO MJR_FILE \
-    BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY \
-    BUILD_TARGET CREATEREPO_TARGET
+    BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY BUILD_TARGET CREATEREPO_TARGET
   local long_opts short_opts input
   long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
   long_opts+="restorefile:,betapass:,"
@@ -139,6 +138,8 @@ parse_input() {
           case $1 in
             local|rpm|deb) BUILD_SWITCH=1; LOCAL_INSTALL_SWITCH=1 ;;
             repo|remote) REPO_INSTALL_SWITCH=1 ;;
+            container) CONTAINER_INSTALL_SWITCH=1 ;;
+            *) err "Invalid --install option passed"; exit 1 ;;
           esac
           ;;
         --build|-b) BUILD_SWITCH=1; shift; BUILD_TARGET="$1" ;;
@@ -200,6 +201,10 @@ parse_input() {
   # Print some warnings for unsupported argument combinations
   if [[ -n $USER_MC_REPO ]] && ((LOCAL_INSTALL_SWITCH)); then
     err "--install=local is not compatible with --mcrepo as only the default ($MC_REPO) DEB is available"
+  fi
+
+  if [[ -n $CONTAINER_INSTALL_SWITCH ]] && ((LOCAL_INSTALL_SWITCH || REPO_INSTALL_SWITCH)); then
+    err "Multiple --install methods are not compatible"
   fi
 }
 
@@ -584,7 +589,7 @@ install_mesa_freeworld() {
 # @description Installs JRiver Media Center from a remote repository
 install_mc_repo() {
   debug "Running: ${FUNCNAME[0]}"
-  local repo_file repo_text
+  local repo_file repo_text channel
 
   case $ID in
     fedora|centos)
@@ -597,28 +602,46 @@ install_mc_repo() {
 			EOF
       ;;
     debian|ubuntu)
+      [[ -n $BETAPASS ]] && channel="beta" || channel="latest"
       local major_version="${VERSION_ID%%.*}"
       local minor_version="${VERSION_ID##*.}"
       local keyfile="/usr/share/keyrings/jriver-com-archive-keyring.gpg"
       if [[ $ID == "ubuntu" ]] \
       && [[ $major_version -gt 24 || ($major_version -eq 24 && $minor_version -ge 10) ]]; then
-        repo_file="/etc/apt/sources.list.d/jriver.sources" # TODO new Ubuntu sources file format
-        local old_repo_file="/etc/apt/sources.list.d/jriver.list"
-        [[ -f $old_repo_file ]] && execute sudo rm -f "$old_repo_file"
+        if [[ $channel == "beta" ]]; then
+          repo_file="/etc/apt/sources.list.d/jriver-beta.sources"
+        else
+          repo_file="/etc/apt/sources.list.d/jriver.sources"
+        fi
+
+        old_repo_files=(
+          "/etc/apt/sources.list.d/jriver.list"
+          "/etc/apt/sources.list.d/jriver-beta.list"
+          "/etc/apt/sources.list.d/jriver_beta.list"
+        )
+
+        for f in "${old_repo_files[@]}"; do
+          [[ -f $f ]] && execute sudo rm -f "$f"
+        done
         read -r -d '' repo_text <<-EOF
 					Types: deb
-					URIs: http://dist.jriver.com/latest/mediacenter/
+					URIs: http://dist.jriver.com/$repo/mediacenter/
 					Signed-By: $keyfile
 					Suites: $MC_REPO
 					Components: main
 				EOF
       else
-        repo_file="/etc/apt/sources.list.d/jriver.list"
-        repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/latest/mediacenter/ $MC_REPO main"
+        if [[ $channel == "beta" ]]; then
+          execute sudo rm -f "/etc/apt/sources.list.d/jriver_beta.list"
+          repo_file="/etc/apt/sources.list.d/jriver-beta.list"
+        else
+          repo_file="/etc/apt/sources.list.d/jriver.list"
+          repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/$repo/mediacenter/ $MC_REPO main"
+        fi
+        echo "Installing JRiver Media Center RPM key"
+        download "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
+          gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       fi
-      echo "Installing JRiver Media Center RPM key"
-      download "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
-        gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       ;;
     *)
       err "An MC repository for $ID is not yet available"
@@ -665,9 +688,11 @@ acquire_deb() {
   # Define the repositories to check
   local repos=(
     "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/latest/$fname"
-    "https://files.jriver-cdn.com/mediacenter/test/$fname"
-    "https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/$fname"
-  )
+    "https://files.jriver-cdn.com/mediacenter/test/$fname")
+
+  if [[ -n $BETAPASS ]]; then
+    repos=("https://files.jriver-cdn.com/mediacenter/channels/v$MC_MVERSION/beta/$BETAPASS/$fname" "${repos[@]}")
+  fi
 
   # Loop through the repositories and attempt to download
   for repo in "${repos[@]}"; do
