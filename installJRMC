@@ -651,7 +651,7 @@ install_mc_repo() {
   esac
 
   echo "Adding MC repository file: $repo_file"
-  sudo tee "$repo_file" &>/dev/null <<< "$repo_text"
+  echo "$repo_text" | sudo tee "$repo_file" &>/dev/null
 
   if ! "${PKG_UPDATE[@]}"; then
     err "Package update failed!"
