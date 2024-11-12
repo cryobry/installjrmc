@@ -219,7 +219,7 @@ init() {
   declare -g CREATEREPO_WEBROOT="/var/www/jriver"
   declare -g CREATEREPO_USER="$USER" # can be root
   declare -g ID VERSION_ID ARCH NAME
-  declare -g MC_MVERSION MC_PKG MC_RPM MC_ROOT 
+  declare -g MC_MVERSION MC_PKG MC_RPM MC_ROOT
   declare -ga PKG_INSTALL PKG_REMOVE PKG_UPDATE PKG_QUERY
   declare -ga SERVICES CONTAINERS
 
@@ -638,10 +638,10 @@ install_mc_repo() {
           repo_file="/etc/apt/sources.list.d/jriver.list"
         fi
         repo_text="deb [signed-by=$keyfile arch=amd64,i386,armhf,arm64] http://dist.jriver.com/$channel/mediacenter/ $MC_REPO main"
-        echo "Installing JRiver Media Center RPM key"
-        download "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
-          gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       fi
+      echo "Installing JRiver Media Center RPM key"
+      download "http://dist.jriver.com/mediacenter@jriver.com.gpg.key" | 
+      gpg --dearmor | sudo tee "$keyfile" &>/dev/null
       ;;
     *)
       err "An MC repository for $ID is not yet available"
