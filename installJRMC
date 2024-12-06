@@ -24,6 +24,7 @@ declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -ig UPDATE_SWITCH=1 # set to 0 to disable automatic self-update
 declare -g SCRIPT_URL="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
+declare -g DEBUG=${DEBUG:-0} # det default debug and allow DEBUG env override (default: disabled)
 
 # @description Print help text
 print_help() {
@@ -115,7 +116,7 @@ parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
   declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
     CONTAINER_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
-    YES_SWITCH USER_MC_VERSION USER_MC_REPO MJR_FILE \
+    YES_SWITCH USER_MC_VERSION USER_MC_REPO MJR_FILE DEBUG \
     BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY BUILD_TARGET CREATEREPO_TARGET
   local long_opts short_opts input
   long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
@@ -127,7 +128,7 @@ parse_input() {
   short_opts="+i:b::s:c:uyvdh"
 
   # Reset DEBUG and recatch properly with getopt
-  declare -g DEBUG=0
+  DEBUG=0
 
   if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
     eval set -- "$input"
@@ -950,7 +951,6 @@ install_mc_rhel() {
 # @description Installs Media Center RPM package on SUSE
 install_mc_suse() {
   debug "Running: ${FUNCNAME[0]}"
-  
   install_package --no-install-check --no-gpg-check --allow-downgrades "$MC_RPM"
 }
 
@@ -1756,7 +1756,7 @@ main() {
 debug() { ((DEBUG)) && echo "Debug: $*"; }
 err() { echo "Error: $*" >&2; }
 ask_ok() {
-  declare response
+  local response
   ((YES_SWITCH)) && return 0
   read -r -p "$* [y/N]: " response
   [[ ${response,,} =~ ^(yes|y)$ ]]
@@ -1802,7 +1802,9 @@ download() {
   fi
 }
 
-# Roughly turn debugging on, reparse in parse_input() with getopt
-[[ " $* " =~ ( --debug | -d ) ]] && declare -g DEBUG=1
+# Roughly turn debugging on for pre-init
+# Reset and reparse in parse_input() with getopt
+[[ " $* " =~ ( --debug | -d ) ]] && DEBUG=1
 
 main "$@"
+exit
