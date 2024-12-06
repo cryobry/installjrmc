@@ -563,7 +563,7 @@ install_external_repos() {
       # Install mesa-va-drivers-freeworld separately from the RPM using dnf swap
       install_mesa_freeworld
       ;;
-    suse) # TODO may eventually be needed if X11_XOrg is not available by default
+    suse) : # TODO may eventually be needed if X11_XOrg is not available by default
       # if ! zypper repos | grep -q "X11_XOrg"; then
       #   echo "Installing the X11 repository"
       #   execute sudo zypper  --non-interactive --quiet addrepo \
@@ -1026,8 +1026,7 @@ install_mc_arch() {
     --force \
     --noconfirm \
     -p mediacenter.pkgbuild; then
-    echo "makepkg failed"
-    exit 1
+    err "makepkg failed"; exit 1
   fi
 
   popd &>/dev/null || return
@@ -1043,8 +1042,8 @@ run_createrepo() {
   # Ensure the webroot exists
   if [[ ! -d $CREATEREPO_WEBROOT ]]; then
     if ! execute sudo -u "$CREATEREPO_USER" mkdir -p "$CREATEREPO_WEBROOT"; then
-      if ! execute sudo mkdir -p "$CREATEREPO_WEBROOT" && 
-         ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
+      if ! (execute sudo mkdir -p "$CREATEREPO_WEBROOT" \
+      || execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"); then
         err "Could not create the createrepo-webroot path!"
         err "Make sure that the webroot $CREATEREPO_WEBROOT is writable by user $CREATEREPO_USER"
         err "Or change the repo ownership with --createrepo-user"
@@ -1054,8 +1053,8 @@ run_createrepo() {
   fi
 
   # Copy built RPMs to webroot
-  if ! execute sudo cp -nf "$MC_RPM" "$CREATEREPO_WEBROOT" || 
-     ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
+  if ! execute sudo cp -nf "$MC_RPM" "$CREATEREPO_WEBROOT" \
+  || ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
     err "Could not copy $MC_RPM to $CREATEREPO_WEBROOT"
     return 1
   fi
@@ -1068,8 +1067,8 @@ run_createrepo() {
     cr_cmd=(sudo createrepo -q "$CREATEREPO_WEBROOT")
     [[ -d $CREATEREPO_WEBROOT/repodata ]] && cr_cmd+=(--update)
     
-    if ! execute "${cr_cmd[@]}" || 
-       ! execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"; then
+    if ! (execute "${cr_cmd[@]}" \
+    || execute sudo chown -R "$CREATEREPO_USER:$CREATEREPO_USER" "$CREATEREPO_WEBROOT"); then
       err "createrepo failed"
       return 1
     fi
