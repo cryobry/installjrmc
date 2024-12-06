@@ -1498,13 +1498,13 @@ disable_btrfs_cow() {
 # @description Completely uninstalls MC, services, and firewall rules
 uninstall() {
   debug "Running: ${FUNCNAME[0]}"
-  local service unit f i
+  local service type unit f
 
   echo "Stopping and removing all Media Center services"
   for service in $(compgen -A "function" "service"); do
     service="${service##service_}"
-    for i in user system; do
-      set_service_vars "$service" "$i"; 
+    for type in user system; do
+      set_service_vars "$service" "$type"; 
       for unit in "$SERVICE_NAME" "$TIMER_NAME"; do
         if "${IS_ACTIVE[@]}" "$unit" || 
         "${IS_ENABLED[@]}" "$unit"; then
@@ -1512,16 +1512,10 @@ uninstall() {
         fi
       done
       for f in "$SERVICE_FNAME" "$TIMER_FNAME"; do
-        [[ -f $f ]] && 
-        execute sudo rm -f "$f"
+        [[ -f $f ]] && execute sudo rm -f "$f"
       done
       "${RELOAD[@]}"
-      unset f
     done
-    for f in /etc/systemd/system/jriver-*; do
-      execute sudo rm -f "$f"
-    done
-    unset f
   done
 
   echo "Removing MC repositories"
