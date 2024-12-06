@@ -18,7 +18,7 @@
 # * Be careful with tabs in heredocs
 shopt -s extglob
 
-declare -g SCRIPT_VERSION="1.4.5"
+declare -g SCRIPT_VERSION="1.4.6-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.37" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
@@ -288,24 +288,31 @@ init() {
       ;;
     *)
       err "Auto-detecting distro, this is unreliable and --compat may be required"
-      if command -v dnf &>/dev/null; then
-        ID="fedora"
-      elif command -v yum &>/dev/null; then
-        ID="centos"
-        COMPAT_SWITCH=1
-      elif command -v apt-get &>/dev/null; then
-        ID="ubuntu"
-      elif command -v pacman &>/dev/null; then
-        ID="arch"
-      else
+      for cmd in dnf yum apt-get pacman; do
+        if command -v "$cmd" &>/dev/null; then
+          case "$cmd" in
+            dnf) ID="fedora" ;;
+            yum) ID="centos"; COMPAT_SWITCH=1 ;;
+            apt-get) ID="ubuntu" ;;
+            pacman) ID="arch" ;;
+          esac
+          break
+        fi
+      done
+
+      if [[ -z $ID ]]; then
         err "OS detection failed!"
-        ask_ok "Continue with manual installation?" || exit 1
-        debug "Automatically using --install=local for unknown distro"
-        ID="unknown"
-        REPO_INSTALL_SWITCH=0
-        BUILD_SWITCH=1
-        LOCAL_INSTALL_SWITCH=1
+        if ask_ok "Continue with manual installation?"; then
+          debug "Automatically using --install=local for unknown distro"
+          ID="unknown"
+          REPO_INSTALL_SWITCH=0
+          BUILD_SWITCH=1
+          LOCAL_INSTALL_SWITCH=1
+        else
+          exit 1
+        fi
       fi
+      ;;
   esac
 
   # Set default targets
@@ -366,6 +373,7 @@ init() {
       PKG_UPDATE=(:)
       PKG_QUERY=(:)
       PKG_INSTALL_LOCAL() { install_mc_generic; }
+      ;;
   esac
 
   # Don't check for latest MC version if set by user or using --install=repo only
@@ -386,12 +394,8 @@ init() {
   if [[ -n $USER_MC_VERSION ]]; then
     # Append explicit package version when user provides --mcversion
     case $ID in
-      fedora|centos|suse)
-        MC_PKG+="-$MC_VERSION"
-        ;;
-      debian|ubuntu)
-        MC_PKG+="=$MC_VERSION"
-        ;;
+      fedora|centos|suse) MC_PKG+="-$MC_VERSION" ;;
+      debian|ubuntu) MC_PKG+="=$MC_VERSION" ;;
     esac
   fi
 
