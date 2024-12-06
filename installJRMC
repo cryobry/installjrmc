@@ -197,7 +197,7 @@ parse_input() {
       shift
     done
   else
-    err "Incorrect options provided"; print_help; exit 1
+    err "Incorrect option provided, see installJRMC --help"; exit 1
   fi
 
   # Print some warnings for unsupported argument combinations
