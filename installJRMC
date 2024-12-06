@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2317
 # @file installJRMC
 # @brief Install JRiver Media Center and associated services
 # @description See installJRMC --help or print_help() below for usage
