@@ -1091,8 +1091,8 @@ link_ssl_certs() {
   for f in "${source_certs[@]}"; do
     if [[ -f $f ]]; then
       if ! execute sudo ln -fs "$f" "$mc_cert_link"; then
-        err "Symlinking certificate failed"
-        return 1
+        err "Symlinking $f certificate failed"
+        continue
       fi
       break
     fi
