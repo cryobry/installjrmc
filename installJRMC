@@ -1082,7 +1082,8 @@ link_ssl_certs() {
   local mc_cert_link="$MC_ROOT/ca-certificates.crt"
   local -a source_certs=(
     "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" 
-    "/var/lib/ca-certificates/ca-bundle.pem")
+    "/var/lib/ca-certificates/ca-bundle.pem"
+    "$MC_ROOT/local-ca-certificates.crt")
 
   target_cert=$(readlink -f "$mc_cert_link")
   [[ -f $target_cert ]] && return 0
