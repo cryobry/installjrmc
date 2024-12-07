@@ -1090,13 +1090,13 @@ link_ssl_certs() {
 
   for f in "${source_certs[@]}"; do
     if [[ -f $f ]]; then
-      if ! execute sudo ln -fs "$f" "$mc_cert_link"; then
-        err "Symlinking $f certificate failed"
-        continue
+      if execute sudo ln -fs "$f" "$mc_cert_link"; then
+        debug "Symlinked $mc_cert_link to $f"
+        return 0
       fi
-      break
     fi
   done
+  return 1 # symlink failed
 }
 
 # @description Restore the mjr license file from MJR_FILE or other common locations
