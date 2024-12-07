@@ -22,9 +22,9 @@ declare -g SCRIPT_VERSION="1.4.6-dev"
 declare -g MC_REPO="bullseye" # should match the MC_VERSION
 declare -g MC_VERSION="33.0.44" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
-declare -ig UPDATE_SWITCH=1 # set to 0 to disable automatic self-update
+declare -gi UPDATE_SWITCH=1 # set to 0 to disable automatic self-update
 declare -g SCRIPT_URL="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-declare -ig DEBUG=${DEBUG:-0} # det default debug and allow DEBUG env override (default: disabled)
+declare -gi DEBUG=${DEBUG:-0} # det default debug and allow DEBUG env override (default: disabled)
 
 # @description Print help text
 print_help() {
@@ -114,9 +114,10 @@ print_help() {
 # @arg $@ User input
 parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
-  declare -g BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
+  declare -gi BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
     CONTAINER_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
-    YES_SWITCH USER_MC_VERSION USER_MC_REPO MJR_FILE DEBUG \
+    YES_SWITCH DEBUG
+  declare -g USER_MC_VERSION USER_MC_REPO MJR_FILE \
     BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY BUILD_TARGET CREATEREPO_TARGET
   local long_opts short_opts input
   long_opts="install:,build::,outputdir:,mcversion:,arch:,mcrepo:,compat,"
@@ -447,7 +448,7 @@ install_package() {
   local -a pkg_array install_flags
   local -A pkg_aliases
   local input pkg _pkg
-  local no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
+  local -i no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
   local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
 
   input=$(getopt -o +s -l "$long_opts" -- "$@") || { err "Incorrect options provided"; exit 1; }
@@ -1201,7 +1202,7 @@ set_vnc_pass() {
     fi
     return
   else
-    declare -g NOVNCAUTH=1
+    declare -gi NOVNCAUTH=1
   fi
 }
 
