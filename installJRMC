@@ -1096,7 +1096,7 @@ link_ssl_certs() {
       fi
     fi
   done
-  return 1 # symlink failed
+  err "Certificate symlinking failed"; return 1
 }
 
 # @description Restore the mjr license file from MJR_FILE or other common locations
