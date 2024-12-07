@@ -114,9 +114,9 @@ print_help() {
 # @arg $@ User input
 parse_input() {
   debug "Running: ${FUNCNAME[0]} $*"
-  declare -gi BUILD_SWITCH REPO_INSTALL_SWITCH LOCAL_INSTALL_SWITCH \
-    CONTAINER_INSTALL_SWITCH COMPAT_SWITCH CREATEREPO_SWITCH UNINSTALL_SWITCH \
-    YES_SWITCH DEBUG
+  declare -gi BUILD_SWITCH=0 REPO_INSTALL_SWITCH=0 LOCAL_INSTALL_SWITCH=0 \
+    CONTAINER_INSTALL_SWITCH=0 COMPAT_SWITCH=0 CREATEREPO_SWITCH=0 UNINSTALL_SWITCH=0 \
+    YES_SWITCH=0 DEBUG=0
   declare -g USER_MC_VERSION USER_MC_REPO MJR_FILE \
     BETAPASS SERVICE_TYPE VNCPASS USER_DISPLAY BUILD_TARGET CREATEREPO_TARGET
   local long_opts short_opts input
@@ -127,9 +127,6 @@ parse_input() {
   long_opts+="createrepo::,createrepo-webroot:,createrepo-user:,"
   long_opts+="vncpass:,display:,container:"
   short_opts="+i:b::s:c:uyvdh"
-
-  # Reset DEBUG and recatch properly with getopt
-  DEBUG=0
 
   if input=$(getopt -o $short_opts -l $long_opts -- "$@"); then
     eval set -- "$input"
