@@ -3,7 +3,6 @@
 # @file installJRMC
 # @brief Install JRiver Media Center and associated services
 # @description See installJRMC --help or print_help() below for usage
-#
 # Copyright (c) 2021-2024 Bryan C. Roessler
 # This software is released under the Apache License.
 # https://www.apache.org/licenses/LICENSE-2.0
@@ -25,7 +24,7 @@ declare -g MC_VERSION="33.0.44" # Do find all replace
 declare -g BOARD_URL="https://yabb.jriver.com/interact/index.php/board,86.0.html" # MC33
 declare -ig UPDATE_SWITCH=1 # set to 0 to disable automatic self-update
 declare -g SCRIPT_URL="https://git.bryanroessler.com/bryan/installJRMC/raw/master/installJRMC"
-declare -g DEBUG=${DEBUG:-0} # det default debug and allow DEBUG env override (default: disabled)
+declare -ig DEBUG=${DEBUG:-0} # det default debug and allow DEBUG env override (default: disabled)
 
 # @description Print help text
 print_help() {
