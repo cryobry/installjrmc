@@ -445,8 +445,8 @@ install_package() {
   local -a pkg_array install_flags
   local -A pkg_aliases
   local input pkg _pkg
-  local -i no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0
-  local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,silent"
+  local -i no_install_check=0 allow_downgrades=0 silent=0 refresh=0 no_gpg_check=0 reinstall=0
+  local long_opts="no-install-check,allow-downgrades,no-gpg-check,refresh,reinstall,silent"
 
   input=$(getopt -o +s -l "$long_opts" -- "$@") || { err "Incorrect options provided"; exit 1; }
   eval set -- "$input"
@@ -457,6 +457,7 @@ install_package() {
       --allow-downgrades) allow_downgrades=1 ;;
       --no-gpg-check) no_gpg_check=1 ;;
       --refresh) refresh=1 ;;
+      --reinstall) reinstall=1 ;;
       --silent|-s) silent=1 ;;
       --) shift; break ;;
     esac
@@ -505,7 +506,8 @@ install_package() {
   # Generate installation flags based on the distribution
   case $ID in
     debian|ubuntu)
-      ((allow_downgrades)) && install_flags+=(--allow-downgrades) ;;
+      ((allow_downgrades)) && install_flags+=(--allow-downgrades)
+      ((reinstall)) && install_flags+=(--reinstall) ;;
     fedora|centos)
       ((allow_downgrades)) && install_flags+=(--allowerasing)
       ((no_gpg_check)) && install_flags+=(--nogpgcheck)
@@ -922,10 +924,12 @@ install_mc_deb() {
     execute rm -rf "$extract_dir"
   fi
 
+  # Use --reinstall to make sure local package is installed over repo package
   if ! install_package \
     --no-install-check \
     --no-gpg-check \
     --allow-downgrades \
+    --reinstall \
     "$MC_DEB"; then
     err "Local MC DEB installation failed"
     err "Only the default MC repo can be used for --install=local"
