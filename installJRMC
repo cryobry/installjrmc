@@ -1143,13 +1143,13 @@ restore_license() {
 # @arg $2 array List of ports in firewall-cmd format
 open_firewall() {
   debug "Running: ${FUNCNAME[0]}" "$*"
-  local port
   local service="$1"
   shift
   local -a f_ports=("$@") # for firewall-cmd
   local u_ports="$*"
   u_ports="${u_ports// /|}" # concatenate
   u_ports="${u_ports//-/\:}" # for ufw
+  local port
 
   if command -v firewall-cmd &>/dev/null; then
     if ! sudo firewall-cmd --get-services | grep -q "$service"; then
@@ -1530,15 +1530,17 @@ uninstall() {
   fi
 
   echo "Removing firewall rules"
-  if command -v firewall-cmd &>/dev/null; then
-    execute sudo firewall-cmd --permanent --remove-service=jriver
-    execute sudo firewall-cmd --permanent --delete-service=jriver
-    execute sudo firewall-cmd --reload
-  elif command -v ufw &>/dev/null; then
-    execute sudo ufw delete allow jriver
-    [[ -f "/etc/ufw/applications.d/jriver" ]] &&
-      execute sudo rm -f /etc/ufw/applications.d/jriver
-  fi
+  for service in jriver-mediacenter jriver-xvnc jriver-x11vnc; do
+    if command -v firewall-cmd &>/dev/null; then
+      execute sudo firewall-cmd --permanent --remove-service=$service
+      execute sudo firewall-cmd --permanent --delete-service=$service
+      execute sudo firewall-cmd --reload
+    elif command -v ufw &>/dev/null; then
+      execute sudo ufw delete allow $service
+      [[ -f /etc/ufw/applications.d/$service ]] &&
+        execute sudo rm -f /etc/ufw/applications.d/$service
+    fi
+  done
 
   echo "Uninstalling JRiver Media Center package"
   if "${PKG_REMOVE[@]}" "${MC_PKG%%=*}"; then # remove version specifier
